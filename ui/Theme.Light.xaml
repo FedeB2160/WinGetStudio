@@ -1,0 +1,24 @@
+<!--
+    Theme.Light.xaml — palette chiara.
+    Stesse chiavi di Theme.Dark.xaml: cambiare solo i colori, mai i nomi.
+    UI.xaml li referenzia con {DynamicResource ...}, quindi basta rilanciare l'app.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <SolidColorBrush x:Key="BgBrush"         Color="#FFFFFF"/>  <!-- sfondo finestra -->
+    <SolidColorBrush x:Key="FgBrush"         Color="#000000"/>  <!-- testo principale -->
+    <SolidColorBrush x:Key="SubtleFgBrush"   Color="#6E6E6E"/>  <!-- testo secondario -->
+    <SolidColorBrush x:Key="CtrlBgBrush"     Color="#FDFDFD"/>  <!-- sfondo controlli -->
+    <SolidColorBrush x:Key="CtrlHoverBrush"  Color="#F0F0F0"/>  <!-- hover pulsanti -->
+    <SolidColorBrush x:Key="CtrlPressBrush"  Color="#E0E0E0"/>  <!-- pulsante premuto -->
+    <SolidColorBrush x:Key="BorderBrush2"    Color="#CCCCCC"/>  <!-- bordi e gridlines -->
+    <SolidColorBrush x:Key="HeaderBgBrush"   Color="#F3F3F3"/>  <!-- header DataGrid -->
+    <SolidColorBrush x:Key="RowAltBgBrush"   Color="#FAFAFA"/>  <!-- righe alterne -->
+    <SolidColorBrush x:Key="SelBgBrush"      Color="#CCE4F7"/>  <!-- riga selezionata -->
+    <SolidColorBrush x:Key="AccentBrush"     Color="#0078D4"/>  <!-- spinner, progress -->
+    <SolidColorBrush x:Key="OkBrush"         Color="#107C10"/>  <!-- esito ok -->
+    <SolidColorBrush x:Key="WarnBrush"       Color="#B89500"/>  <!-- esito avviso -->
+    <SolidColorBrush x:Key="ErrBrush"        Color="#C42B1C"/>  <!-- esito errore -->
+
+</ResourceDictionary>
