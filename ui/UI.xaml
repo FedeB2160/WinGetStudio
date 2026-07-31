@@ -13,7 +13,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="WinGet Update Tool" Height="620" Width="900"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="NoResize"
+        ResizeMode="CanMinimize"
         Background="{DynamicResource BgBrush}"
         Foreground="{DynamicResource FgBrush}">
 
@@ -99,8 +99,26 @@
             </Setter>
         </Style>
 
+        <!-- Maniglia di ridimensionamento colonna: invisibile, larga 8px, cursore SizeWE.
+             Va nel template dell'header con i nomi PART_*HeaderGripper esatti, altrimenti
+             DataGrid non la aggancia e le colonne restano fisse. -->
+        <Style x:Key="ColumnGripper" TargetType="Thumb">
+            <Setter Property="Width" Value="8"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Cursor" Value="SizeWE"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="{TemplateBinding Background}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Header DataGrid: anche qui template minimo, DataGridHeaderBorder di sistema
-             disegna il gradiente Aero e ignora Background. -->
+             disegna il gradiente Aero e ignora Background. Attenzione: ri-templare l'header
+             butta via i due Thumb del template di sistema, cioe' proprio cio' che permette
+             di trascinare il bordo colonna -> vanno rimessi a mano. -->
         <Style x:Key="GridHeader" TargetType="DataGridColumnHeader">
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -109,12 +127,18 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="DataGridColumnHeader">
-                        <Border Background="{DynamicResource HeaderBgBrush}"
-                                BorderBrush="{DynamicResource BorderBrush2}"
-                                BorderThickness="0,0,1,1">
-                            <ContentPresenter Margin="{TemplateBinding Padding}"
-                                              VerticalAlignment="Center"/>
-                        </Border>
+                        <Grid>
+                            <Border Background="{DynamicResource HeaderBgBrush}"
+                                    BorderBrush="{DynamicResource BorderBrush2}"
+                                    BorderThickness="0,0,1,1">
+                                <ContentPresenter Margin="{TemplateBinding Padding}"
+                                                  VerticalAlignment="Center"/>
+                            </Border>
+                            <Thumb x:Name="PART_LeftHeaderGripper"  HorizontalAlignment="Left"
+                                   Style="{StaticResource ColumnGripper}"/>
+                            <Thumb x:Name="PART_RightHeaderGripper" HorizontalAlignment="Right"
+                                   Style="{StaticResource ColumnGripper}"/>
+                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -178,13 +202,21 @@
 
         <!-- Top bar: ricerca + conteggio disponibili + selettore tema -->
         <DockPanel Grid.Row="0" Margin="0,0,0,8">
-            <Button x:Name="BtnRefresh" Content="Cerca aggiornamenti" Width="140" Height="30" DockPanel.Dock="Left"/>
+            <Button x:Name="BtnRefresh" Content="Check for updates" Width="124" Height="26" DockPanel.Dock="Left"/>
+            <!-- Spunta ON = flag include-unknown passato a "winget upgrade"; spenta di
+                 default. Foreground esplicito: la CheckBox di sistema forza il testo nero e
+                 in Dark-Mode sparirebbe. Ha effetto alla ricerca successiva. -->
+            <CheckBox x:Name="ChkUnknown" DockPanel.Dock="Left" IsChecked="False"
+                      VerticalAlignment="Center" Margin="10,0,0,0"
+                      Content="Unknown"
+                      ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"
+                      Foreground="{DynamicResource FgBrush}"/>
             <Control x:Name="TopSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
                      DockPanel.Dock="Left" Margin="10,0,0,0" Visibility="Collapsed"/>
             <!-- Pulsante ciclico Chiaro -> Scuro -> Auto. Glifo e ToolTip li scrive lo script.
                  Icone dal set di sistema (Segoe Fluent Icons, fallback Segoe MDL2 Assets). -->
-            <Button x:Name="BtnTheme" Width="36" Height="30" DockPanel.Dock="Right"
-                    FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"/>
+            <Button x:Name="BtnTheme" Width="30" Height="26" DockPanel.Dock="Right"
+                    FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"/>
             <TextBlock x:Name="TxtAvailable" VerticalAlignment="Center" Margin="12,0,0,0"
                        FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
         </DockPanel>
@@ -207,12 +239,12 @@
                     ElementStyle="{StaticResource GridCheckBox}"
                     EditingElementStyle="{StaticResource GridCheckBox}"
                     Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                <DataGridTextColumn Header="Nome"                 Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
-                <DataGridTextColumn Header="Versione installata"  Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
-                <DataGridTextColumn Header="Versione disponibile" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
-                <DataGridTextColumn Header="ID"                   Width="2*"   IsReadOnly="True" Binding="{Binding Id}"/>
+                <DataGridTextColumn Header="Name"              Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
+                <DataGridTextColumn Header="Installed version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
+                <DataGridTextColumn Header="Available version" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
+                <DataGridTextColumn Header="ID"                Width="2*"   IsReadOnly="True" Binding="{Binding Id}"/>
                 <!-- Esito: spinner (in corso) oppure glyph colorato -->
-                <DataGridTemplateColumn Header="Esito" Width="70">
+                <DataGridTemplateColumn Header="Result" Width="70">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <Grid HorizontalAlignment="Center" ToolTip="{Binding StatusDetail}">
@@ -258,16 +290,16 @@
 
         <!-- Messaggio "nessun aggiornamento" (nascosto di default) -->
         <TextBlock x:Name="TxtEmpty" Grid.Row="1"
-                   Text="Nessun aggiornamento disponibile."
+                   Text="No updates available."
                    FontSize="16" Foreground="{DynamicResource SubtleFgBrush}"
                    HorizontalAlignment="Center" VerticalAlignment="Center"
                    Visibility="Collapsed"/>
 
         <!-- Action bar: selezione + aggiorna + conteggio selezionati -->
         <DockPanel Grid.Row="2" Margin="0,8,0,0">
-            <Button x:Name="BtnToggleAll" Content="Seleziona tutto" Width="140" Height="30"
+            <Button x:Name="BtnToggleAll" Content="Select all" Width="104" Height="26"
                     DockPanel.Dock="Left" IsEnabled="False"/>
-            <Button x:Name="BtnUpdate" Content="Aggiorna" Width="140" Height="30"
+            <Button x:Name="BtnUpdate" Content="Update" Width="104" Height="26"
                     DockPanel.Dock="Left" Margin="8,0,0,0" IsEnabled="False"/>
             <TextBlock x:Name="TxtSelected" VerticalAlignment="Center" Margin="12,0,0,0"
                        Foreground="{DynamicResource SubtleFgBrush}"/>

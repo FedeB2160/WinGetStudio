@@ -3,7 +3,7 @@
     ---------------------
     Tool WPF standalone per gestire gli aggiornamenti winget con selezione a checkbox.
     - Richiede privilegi amministratore (self-elevation + manifest via ps2exe).
-    - Esegue "winget upgrade --include-unknown" e mostra i risultati in un DataGrid.
+    - Esegue "winget upgrade" (con --include-unknown opzionale) e mostra i risultati in un DataGrid.
     - Aggiorna solo gli elementi selezionati, in modo asincrono (UI non bloccante).
     - Tema Chiaro / Scuro / Auto (segue il sistema), pulsante ciclico in alto a destra.
 
@@ -54,14 +54,45 @@ Add-Type -AssemblyName WindowsBase
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 
 # ------------------------------------------------------------------
+# Riga della griglia (INotifyPropertyChanged)
+# ------------------------------------------------------------------
+# PERCHE' NON UN PSCustomObject: le NoteProperty non notificano WPF, quindi ogni cambio
+# di stato richiedeva $Grid.Items.Refresh(). Quel Refresh rigenera l'intera vista e
+# riporta lo scroll in cima: durante l'aggiornamento veniva chiamato 3 volte per
+# pacchetto, rendendo l'elenco di fatto non scorrevole. Con INotifyPropertyChanged si
+# ridisegna la sola cella cambiata e lo scroll resta dov'e' l'utente.
+# NB: i setter vanno invocati sul thread UI (nel runspace di update passano da UI{}).
+if (-not ('WgtRow' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System.ComponentModel;
+public class WgtRow : INotifyPropertyChanged {
+    public event PropertyChangedEventHandler PropertyChanged;
+    private void P(string n) {
+        PropertyChangedEventHandler h = PropertyChanged;
+        if (h != null) h(this, new PropertyChangedEventArgs(n));
+    }
+    private bool _selected;
+    private string _name = "", _version = "", _available = "", _id = "", _status = "", _detail = "";
+    public bool Selected      { get { return _selected; }  set { _selected = value;  P("Selected"); } }
+    public string Name        { get { return _name; }      set { _name = value;      P("Name"); } }
+    public string Version     { get { return _version; }   set { _version = value;   P("Version"); } }
+    public string Available   { get { return _available; } set { _available = value; P("Available"); } }
+    public string Id          { get { return _id; }        set { _id = value;        P("Id"); } }
+    public string Status      { get { return _status; }    set { _status = value;    P("Status"); } }
+    public string StatusDetail{ get { return _detail; }    set { _detail = value;    P("StatusDetail"); } }
+}
+'@
+}
+
+# ------------------------------------------------------------------
 # 2) CHECK: winget presente?
 # ------------------------------------------------------------------
 $wingetCmd = Get-Command winget -ErrorAction SilentlyContinue
 if (-not $wingetCmd) {
     [System.Windows.MessageBox]::Show(
-        "winget non e' installato o non e' disponibile nel PATH.`n`n" +
-        "Installa 'App Installer' dal Microsoft Store (Windows 10/11) e riprova.",
-        "winget non trovato",
+        "winget is not installed or not available in PATH.`n`n" +
+        "Install 'App Installer' from the Microsoft Store (Windows 10/11) and try again.",
+        "winget not found",
         [System.Windows.MessageBoxButton]::OK,
         [System.Windows.MessageBoxImage]::Error) | Out-Null
     exit 1
@@ -73,11 +104,13 @@ if (-not $wingetCmd) {
 # winget stampa una TABELLA A LARGHEZZA FISSA. I nomi contengono spazi, quindi
 # NON si puo' fare split su spazi: si parsa per posizione delle colonne, ricavata
 # dagli offset della riga di header.
-function Get-WinGetUpgrades {
-    # --include-unknown: include pacchetti con versione installata sconosciuta
+function Get-WinGetUpgrades([bool]$IncludeUnknown = $false) {
+    # --include-unknown: include pacchetti con versione installata sconosciuta (opzionale,
+    #   la spunta in alto lo comanda: senza, winget elenca solo cio' di cui sa la versione)
     # --accept-source-agreements: evita prompt interattivi al primo uso della sorgente
-    $raw = & winget upgrade --include-unknown --accept-source-agreements 2>&1 |
-           Out-String
+    $wgArgs = @('upgrade', '--accept-source-agreements')
+    if ($IncludeUnknown) { $wgArgs += '--include-unknown' }
+    $raw = & winget @wgArgs 2>&1 | Out-String
 
     # Normalizza in righe; winget usa \r di progresso -> tieni solo l'ultimo segmento
     $lines = $raw -split "`r`n|`n" | ForEach-Object { ($_ -split "`r")[-1] }
@@ -131,14 +164,12 @@ function Get-WinGetUpgrades {
 
         if ([string]::IsNullOrWhiteSpace($id)) { continue }
 
-        [void]$results.Add([PSCustomObject]@{
+        [void]$results.Add([WgtRow]@{
             Selected     = $false
             Name         = $name
             Version      = $version
             Available    = $available
             Id           = $id
-            Status       = ''
-            StatusDetail = ''
         })
     }
     return $results
@@ -254,7 +285,7 @@ function Get-XamlText([string]$name) {
 function Read-Xaml([string]$name) {
     $text = Get-XamlText $name
     if ([string]::IsNullOrWhiteSpace($text) -or $text -match '^\s*###') {
-        throw "XAML non disponibile: $name"
+        throw "XAML not available: $name"
     }
     [Windows.Markup.XamlReader]::Load(
         (New-Object System.Xml.XmlNodeReader ([xml]$text)))
@@ -264,6 +295,7 @@ $window = Read-Xaml 'UI.xaml'
 
 # Riferimenti ai controlli
 $BtnRefresh   = $window.FindName('BtnRefresh')
+$ChkUnknown   = $window.FindName('ChkUnknown')
 $BtnToggleAll = $window.FindName('BtnToggleAll')
 $BtnUpdate    = $window.FindName('BtnUpdate')
 $TxtAvailable = $window.FindName('TxtAvailable')
@@ -340,9 +372,9 @@ function Set-Theme {
     # NB: [char]0x.... e non "`u{....}" — l'escape `u esiste solo da PowerShell 6, e
     # ps2exe compila contro 5.1: la stringa resterebbe il letterale "u{E706}" (tofu).
     $glyph, $tip = switch ($script:themeMode) {
-        'Light' { [char]0xE706, 'Tema: Chiaro' }
-        'Dark'  { [char]0xE708, 'Tema: Scuro' }
-        default { [char]0xF08C, 'Tema: Auto (segue il sistema)' }
+        'Light' { [char]0xE706, 'Theme: Light' }
+        'Dark'  { [char]0xE708, 'Theme: Dark' }
+        default { [char]0xF08C, 'Theme: Auto (follows the system)' }
     }
     $BtnTheme.Content = $glyph
     $BtnTheme.ToolTip = $tip
@@ -404,17 +436,22 @@ function Refresh-SelectionState {
 
     # Allinea l'etichetta del toggle allo stato reale della selezione
     $script:allSelected   = ($total -gt 0 -and $sel -eq $total)
-    $BtnToggleAll.Content = if ($script:allSelected) { "Deseleziona tutto" } else { "Seleziona tutto" }
+    $BtnToggleAll.Content = if ($script:allSelected) { "Deselect all" } else { "Select all" }
 
     # Due contatori: disponibili (top) e selezionati (action bar)
-    $TxtAvailable.Text = if ($total -eq 0) { "" } elseif ($total -eq 1) { "1 aggiornamento disponibile" } else { "$total aggiornamenti disponibili" }
-    $TxtSelected.Text  = if ($sel -gt 0) { "$sel selezionati" } else { "" }
+    $TxtAvailable.Text = if ($total -eq 0) { "" } elseif ($total -eq 1) { "1 update available" } else { "$total updates available" }
+    $TxtSelected.Text  = if ($sel -gt 0) { "$sel selected" } else { "" }
 }
 
 function Set-BusyState([bool]$busy) {
     $script:isBusy = $busy
     $BtnRefresh.IsEnabled = -not $busy
-    $Grid.IsEnabled       = -not $busy
+    $ChkUnknown.IsEnabled = -not $busy
+    # Sola lettura, NON IsEnabled=$false: un DataGrid disabilitato non risponde piu' a
+    # rotellina, scrollbar e tastiera -> durante l'update l'elenco sembrava congelato.
+    # IsReadOnly blocca solo l'edit delle checkbox, che e' l'unica cosa da impedire.
+    if ($busy) { [void]$Grid.CommitEdit() }
+    $Grid.IsReadOnly = $busy
     if ($busy) {
         # Durante un'operazione i pulsanti selezione/aggiorna sono sempre spenti
         $BtnToggleAll.IsEnabled = $false
@@ -430,7 +467,7 @@ function Set-BusyState([bool]$busy) {
 # gira in un runspace separato cosi' l'overlay di caricamento resta animato.
 function Load-Upgrades {
     Set-BusyState $true
-    Write-Log "Ricerca aggiornamenti in corso..."
+    Write-Log "Searching for updates..."
     $items.Clear()
     $TxtEmpty.Visibility     = [System.Windows.Visibility]::Collapsed
     $Grid.Visibility         = [System.Windows.Visibility]::Collapsed
@@ -442,6 +479,7 @@ function Load-Upgrades {
 
     # Passa il codice del parser al runspace (i runspace non condividono le funzioni)
     $fnBody = ${function:Get-WinGetUpgrades}.ToString()
+    $incUnknown = [bool]$ChkUnknown.IsChecked
 
     # NB: le variabili condivise col Tick devono stare in scope $script: perche'
     # gli scriptblock degli eventi non catturano le variabili LOCALI di funzione.
@@ -450,13 +488,14 @@ function Load-Upgrades {
     $script:scanRs.ThreadOptions  = 'ReuseThread'
     $script:scanRs.Open()
     $script:scanRs.SessionStateProxy.SetVariable('fnBody', $fnBody)
+    $script:scanRs.SessionStateProxy.SetVariable('incUnknown', $incUnknown)
 
     $script:scanPs = [PowerShell]::Create()
     $script:scanPs.Runspace = $script:scanRs
     [void]$script:scanPs.AddScript({
         try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
         Invoke-Expression "function Get-WinGetUpgrades { $fnBody }"
-        Get-WinGetUpgrades   # niente virgola: gli elementi devono scorrere singoli sulla pipeline
+        Get-WinGetUpgrades $incUnknown   # niente virgola: gli elementi devono scorrere singoli sulla pipeline
     })
 
     # Poll di completamento sul thread UI: popola la griglia e ripristina lo stato
@@ -469,7 +508,7 @@ function Load-Upgrades {
 
         $result = @()
         try { $result = @($script:scanPs.EndInvoke($script:scanHandle)) }
-        catch { Write-Log "ERRORE durante la ricerca: $($_.Exception.Message)" }
+        catch { Write-Log "ERROR while searching: $($_.Exception.Message)" }
         $script:scanPs.Dispose(); $script:scanRs.Close(); $script:scanRs.Dispose()
         $script:scanPs = $null; $script:scanRs = $null
 
@@ -479,11 +518,11 @@ function Load-Upgrades {
         if ($items.Count -eq 0) {
             $TxtEmpty.Visibility = [System.Windows.Visibility]::Visible
             $Grid.Visibility     = [System.Windows.Visibility]::Collapsed
-            Write-Log "Nessun aggiornamento disponibile."
+            Write-Log "No updates available."
         }
         else {
             $Grid.Visibility = [System.Windows.Visibility]::Visible
-            Write-Log "Trovati $($items.Count) aggiornamenti."
+            Write-Log "Found $($items.Count) updates."
         }
         Set-BusyState $false
     })
@@ -500,7 +539,7 @@ function Start-UpdateSelected {
     $selected = @($items | Where-Object { $_.Selected })
     if ($selected.Count -eq 0) {
         [System.Windows.MessageBox]::Show(
-            "Nessun elemento selezionato.", "WinGet Update Tool",
+            "No items selected.", "WinGet Update Tool",
             [System.Windows.MessageBoxButton]::OK,
             [System.Windows.MessageBoxImage]::Information) | Out-Null
         return
@@ -508,12 +547,11 @@ function Start-UpdateSelected {
 
     # Azzera eventuali esiti precedenti sulle righe da aggiornare
     foreach ($item in $selected) { $item.Status = ''; $item.StatusDetail = '' }
-    $Grid.Items.Refresh()
 
     Set-BusyState $true
     $Progress.Value = 0
     $Progress.Maximum = $selected.Count
-    Write-Log "Avvio aggiornamento di $($selected.Count) pacchetti..."
+    Write-Log "Starting update of $($selected.Count) packages..."
 
     # Passa gli oggetti riga al runspace (aggiornati per riferimento).
     # Scope $script: per lo stesso motivo di Load-Upgrades (Tick non vede le locali).
@@ -550,8 +588,7 @@ function Start-UpdateSelected {
         foreach ($item in $selected) {
             $id   = $item.Id
             $name = $item.Name
-            UI { $item.Status = 'updating'; $item.StatusDetail = 'In corso...' }
-            UI { $window.FindName('Grid').Items.Refresh() }
+            UI { $item.Status = 'updating'; $item.StatusDetail = 'In progress...' }
             LogUI "-> $name [$id]"
             try {
                 # Aggiornamento silenzioso, match esatto sull'ID.
@@ -559,16 +596,16 @@ function Start-UpdateSelected {
                 # winget resterebbe in attesa di input per sempre.
                 $r = Invoke-WinGet $wingetPath `
                         "upgrade --id `"$id`" --include-unknown -e --silent --disable-interactivity --accept-source-agreements --accept-package-agreements" `
-                        { param($s) LogUI "   ...$name in corso da ${s}s" }
+                        { param($s) LogUI "   ...$name running for ${s}s" }
                 $code  = $r.ExitCode
                 $token = Get-UpdateStatus $code
 
                 UI { $item.Status = $token; $item.StatusDetail = "exit $code" }
                 switch ($token) {
                     'ok'      { LogUI "   OK: $name ($($r.Seconds)s)" }
-                    'warning' { LogUI "   AVVISO (exit $code): $name" }
+                    'warning' { LogUI "   WARNING (exit $code): $name" }
                     default {
-                        LogUI "   ERRORE (exit $code): $name"
+                        LogUI "   ERROR (exit $code): $name"
                         # Ultima riga significativa dell'output winget, se presente
                         $lastLine = ($r.Output -split "`r`n|`n" | Where-Object { $_.Trim() } | Select-Object -Last 1)
                         if ($lastLine) { LogUI "      $($lastLine.Trim())" }
@@ -579,16 +616,14 @@ function Start-UpdateSelected {
                 # Errore sul singolo pacchetto: NON interrompe la coda
                 $msg = $_.Exception.Message
                 UI { $item.Status = 'error'; $item.StatusDetail = $msg }
-                LogUI "   ECCEZIONE: $msg"
+                LogUI "   EXCEPTION: $msg"
             }
             finally {
                 $done++
                 UI { $progress.Value = $done }
-                # Forza il refresh visuale della riga nel DataGrid
-                UI { $window.FindName('Grid').Items.Refresh() }
             }
         }
-        LogUI "Aggiornamento completato ($done/$($selected.Count))."
+        LogUI "Update complete ($done/$($selected.Count))."
     })
 
     # Callback a fine runspace: riabilita la UI e pulisce
@@ -619,10 +654,10 @@ $BtnToggleAll.Add_Click({
     # il pulsante agisce sulla cache vecchia (es. deseleziona con 4/5 selezionati).
     Refresh-SelectionState
     $newState = -not $script:allSelected
+    # Chiude un'eventuale transazione di edit aperta, altrimenti il DataGrid al termine
+    # dell'edit riscrive sulla riga il valore che aveva prima del clic sul pulsante.
+    [void]$Grid.CommitEdit()
     foreach ($it in $items) { $it.Selected = $newState }
-    # Chiude un'eventuale transazione di edit aperta: Items.Refresh() durante un edit lancia.
-    $Grid.CommitEdit() | Out-Null
-    $Grid.Items.Refresh()
     Refresh-SelectionState
 })
 

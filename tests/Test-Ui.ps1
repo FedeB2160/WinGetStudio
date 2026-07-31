@@ -32,7 +32,7 @@ function Read-Xaml([string]$name) {
 # 2) UI.xaml carica e i controlli cercati da FindName ci sono tutti?
 $window = Read-Xaml 'UI.xaml'
 "OK load   UI.xaml -> $($window.GetType().Name)"
-$names = 'BtnRefresh', 'BtnToggleAll', 'BtnUpdate', 'BtnTheme', 'TxtAvailable',
+$names = 'BtnRefresh', 'ChkUnknown', 'BtnToggleAll', 'BtnUpdate', 'BtnTheme', 'TxtAvailable',
          'TxtSelected', 'Grid', 'TxtEmpty', 'TopSpinner', 'Progress', 'TxtLog'
 foreach ($n in $names) { if (-not $window.FindName($n)) { throw "controllo mancante: $n" } }
 "OK names  $($names.Count) controlli trovati"
@@ -80,5 +80,36 @@ foreach ($f in $xamlFiles) {
     if ($t -match "(?m)^'@") { throw "$f contiene una riga che inizia con '@" }
 }
 "OK build  $($xamlFiles.Count) marcatori presenti, nessun XAML rompe l'here-string"
+
+# 8) Le righe notificano WPF da sole? Senza INotifyPropertyChanged servirebbe
+# $Grid.Items.Refresh() a ogni cambio di stato: quello rigenera la vista e riporta lo
+# scroll in cima, cioe' il blocco dell'elenco durante l'aggiornamento.
+$cs = [regex]::Match($code, "(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@").Groups[1].Value
+if (-not $cs) { throw "definizione C# di WgtRow non trovata nello script" }
+if (-not ('WgtRow' -as [type])) { Add-Type -TypeDefinition $cs }
+$fired = New-Object System.Collections.ArrayList
+$row = [WgtRow]@{ Name = 'Test'; Id = 'Test.Id' }
+$row.add_PropertyChanged({ param($s, $e) [void]$fired.Add($e.PropertyName) })
+$row.Status = 'updating'
+$row.Selected = $true
+if ("$fired" -ne 'Status Selected') { throw "PropertyChanged non emesso come atteso: '$fired'" }
+"OK notify  WgtRow emette PropertyChanged ($fired)"
+
+# 9) Nessuno rimette a posto le due regressioni: griglia disabilitata (non si scrolla
+# piu') o Items.Refresh() a ogni riga (scroll rimandato in cima).
+$regress = @(Get-Content $scriptPath | Where-Object {
+    $_ -notmatch '^\s*#' -and ($_ -match '\$Grid\.IsEnabled\s*=' -or $_ -match 'Items\.Refresh\(\)')
+})
+if ($regress) { throw "griglia bloccata durante l'update:`n$($regress -join "`n")" }
+"OK scroll  nessun Grid.IsEnabled=/Items.Refresh() nel codice"
+
+# 10) Colonne ridimensionabili? Il template custom dell'header sostituisce quello di
+# sistema e con esso i due Thumb che DataGrid aggancia per trascinare il bordo: senza
+# i nomi PART_*HeaderGripper esatti le colonne tornano fisse, in silenzio.
+$uiText = Get-Content (Join-Path $root 'ui\UI.xaml') -Raw
+foreach ($g in 'PART_LeftHeaderGripper', 'PART_RightHeaderGripper') {
+    if ($uiText -notmatch [regex]::Escape($g)) { throw "gripper $g assente dal template dell'header" }
+}
+"OK resize  entrambi i gripper presenti nel template dell'header"
 
 Write-Host "`nTUTTO OK" -ForegroundColor Green
