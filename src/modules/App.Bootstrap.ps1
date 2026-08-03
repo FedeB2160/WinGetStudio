@@ -116,12 +116,15 @@ function Start-App([switch]$NoShow) {
     # 2) Finestra
     $script:window = Read-Xaml 'UI.xaml'
     # Versione in coda al titolo: il nome resta in UI.xaml con le altre stringhe visibili.
-    $script:window.Title = "$($script:window.Title) [$AppVersion]"
+    # La "v" sta qui e non nella costante: build.ps1 passa a ps2exe un numero, non "v1.2.3".
+    $script:window.Title = "$($script:window.Title) [v$AppVersion]"
 
     # 3) Riferimenti ai controlli
     foreach ($n in @(
         'BtnRefresh', 'ChkUnknown', 'BtnToggleAll', 'BtnUpdate', 'TxtAvailable',
-        'TxtSelected', 'Grid', 'TxtEmpty', 'TopSpinner', 'Progress', 'TxtLog', 'BtnTheme'
+        'TxtSelected', 'Grid', 'TxtEmpty', 'TopSpinner', 'Progress', 'TxtLog', 'BtnTheme',
+        'TxtSearch', 'BtnSearch', 'ChkStore', 'BtnScope', 'SearchSpinner',
+        'GridSearch', 'TxtSearchEmpty', 'TxtSearchInfo', 'BtnInstall'
     )) {
         $c = $script:window.FindName($n)
         if (-not $c) { throw "Control not found in UI.xaml: $n" }
@@ -138,6 +141,7 @@ function Start-App([switch]$NoShow) {
     # 5) Aggancio dei controlli: da qui in poi i moduli possono lavorare.
     Initialize-Theme
     Initialize-UpdatesTab
+    Initialize-InstallTab
 
     # Alla chiusura: ferma timer e chiudi i job pendenti, cosi' il processo termina
     # davvero (niente thread in background lasciati vivi).

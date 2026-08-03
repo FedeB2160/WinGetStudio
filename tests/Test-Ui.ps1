@@ -226,7 +226,7 @@ $AppVersion = $mv.Groups[1].Value
 Start-App -NoShow
 
 if (-not $script:window) { throw "Start-App non ha costruito la finestra" }
-if ($script:window.Title -notmatch [regex]::Escape("[$AppVersion]")) { throw "titolo senza versione: $($script:window.Title)" }
+if ($script:window.Title -notmatch [regex]::Escape("[v$AppVersion]")) { throw "titolo senza versione: $($script:window.Title)" }
 # I moduli leggono i controlli senza prefisso: se lo scope e' sbagliato, $Grid e' $null
 # e ItemsSource resta tale.
 # NB: confronto con $null e non "-not", perche' una collezione VUOTA e' falsy in
@@ -258,27 +258,72 @@ foreach ($t in @($script:themeTimer)) { if ($t) { $t.Stop() } }
 # in un colpo: le -Vars arrivano nel runspace, le -Functions vengono ricreate la'
 # dentro (senza, muoiono con "termine non riconosciuto"), OnDone gira sul thread UI col
 # risultato, e il job si sgancia dalla lista invece di restare a tenere vivo il processo.
+# "DoEvents" WPF: i tick dei DispatcherTimer restano in coda finche' il dispatcher non
+# la processa, e qui non c'e' nessuna finestra a farlo per noi. Torna $false su timeout.
+function Wait-For([scriptblock]$Condition, [int]$Seconds = 30) {
+    $deadline = (Get-Date).AddSeconds($Seconds)
+    while (-not (& $Condition)) {
+        if ((Get-Date) -gt $deadline) { return $false }
+        # $script: e non una locale: il delegate non cattura le variabili locali (lo
+        # stesso motivo per cui App.Jobs evita GetNewClosure sul suo Tick).
+        $script:frame = New-Object System.Windows.Threading.DispatcherFrame
+        [void][System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke(
+            [System.Windows.Threading.DispatcherPriority]::Background, [action]{ $script:frame.Continue = $false })
+        [System.Windows.Threading.Dispatcher]::PushFrame($script:frame)
+        Start-Sleep -Milliseconds 50
+    }
+    return $true
+}
+
 $script:jobOut = $null
 [void](Start-BackgroundJob -Vars @{ x = 21 } -Functions 'Get-UpdateStatus' `
     -Script { "$($x * 2)|$(Get-UpdateStatus 0)" } `
     -OnDone { param($r) $script:jobOut = "$r" })
 
-# "DoEvents" WPF: il tick di un DispatcherTimer resta in coda finche' il dispatcher non
-# la processa, e qui non c'e' nessuna finestra a farlo gestire.
-$deadline = (Get-Date).AddSeconds(30)
-while ($null -eq $script:jobOut -and (Get-Date) -lt $deadline) {
-    # $script: e non una locale: il delegate non cattura le variabili locali (lo stesso
-    # motivo per cui Start-BackgroundJob usa GetNewClosure sul suo Tick).
-    $script:frame = New-Object System.Windows.Threading.DispatcherFrame
-    [void][System.Windows.Threading.Dispatcher]::CurrentDispatcher.BeginInvoke(
-        [System.Windows.Threading.DispatcherPriority]::Background, [action]{ $script:frame.Continue = $false })
-    [System.Windows.Threading.Dispatcher]::PushFrame($script:frame)
-    Start-Sleep -Milliseconds 50
-}
-if ($null -eq $script:jobOut) { throw "Start-BackgroundJob: OnDone non e' mai stato richiamato (30s)" }
+if (-not (Wait-For { $null -ne $script:jobOut })) { throw "Start-BackgroundJob: OnDone non e' mai stato richiamato (30s)" }
 if ($script:jobOut -ne '42|ok') { throw "Start-BackgroundJob: risultato inatteso '$($script:jobOut)' (atteso '42|ok')" }
 if ($script:jobs.Count -ne 0) { throw "job non rimosso dalla lista: $($script:jobs.Count) ancora attivi" }
 Stop-AllJobs
 "OK job    runspace, -Vars, -Functions, OnDone sul thread UI e cleanup"
+
+# 14) La ricerca della scheda Install: debounce, soglia dei 3 caratteri e scarto dei
+# risultati superati. E' l'unica parte della suite che chiama winget davvero, ma solo in
+# lettura e sul solo indice LOCALE (--source winget), quindi non tocca la rete.
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    "SKIP search  winget non presente su questa macchina"
+}
+else {
+    # Sotto i 3 caratteri non deve partire nulla: solo il messaggio guida.
+    $TxtSearch.Text = 'vl'
+    if (-not (Wait-For { $script:searchInFlight -eq 0 } 3)) { throw "una ricerca e' partita con meno di 3 caratteri" }
+    if ($TxtSearchEmpty.Visibility -ne [System.Windows.Visibility]::Visible) { throw "sotto la soglia deve comparire il messaggio guida" }
+
+    # Query buona: la ricerca parte dopo il debounce e popola la griglia.
+    $TxtSearch.Text = 'vlc'
+    if (-not (Wait-For { $searchItems.Count -gt 0 } 60)) { throw "la ricerca di 'vlc' non ha prodotto risultati" }
+    if (-not @($searchItems | Where-Object { $_.Id -eq 'VideoLAN.VLC' })) {
+        throw "'vlc' non ha trovato VideoLAN.VLC: $(@($searchItems | ForEach-Object { $_.Id }) -join ', ')"
+    }
+    if ($GridSearch.Visibility -ne [System.Windows.Visibility]::Visible) { throw "con risultati la griglia deve essere visibile" }
+    $found = $searchItems.Count
+
+    # RISULTATI SUPERATI: si cambia query due volte di fila, cosi' il debounce annulla la
+    # prima e in griglia devono finire SOLO i risultati dell'ultima.
+    # Si attende un ID che solo l'ultima query puo' produrre: aspettare "una ricerca
+    # finita" non basterebbe, entro i 350ms di debounce nessuna e' ancora partita e i
+    # risultati vecchi sono ancora la' (di proposito: evita di sfarfallare a ogni tasto,
+    # ed e' lo spinner a dire che si sta cercando).
+    $TxtSearch.Text = 'firefox'
+    $TxtSearch.Text = '7zip'
+    if (-not (Wait-For { @($searchItems | Where-Object { $_.Id -eq '7zip.7zip' }).Count -gt 0 } 60)) {
+        throw "la ricerca finale ('7zip') non ha prodotto i suoi risultati"
+    }
+    if (-not (Wait-For { $script:searchInFlight -eq 0 } 60)) { throw "una ricerca e' rimasta in volo" }
+    $stale = @($searchItems | Where-Object { $_.Id -eq 'VideoLAN.VLC' -or $_.Id -like 'Mozilla.Firefox*' })
+    if ($stale) { throw "in griglia sono rimasti risultati di una query superata: $(@($stale | ForEach-Object { $_.Id }) -join ', ')" }
+    if ($SearchSpinner.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "a ricerche finite lo spinner deve essere spento" }
+    Stop-AllJobs
+    "OK search  soglia 3 caratteri, $found risultati per 'vlc', nessun risultato superato in griglia"
+}
 
 Write-Host "`nTUTTO OK" -ForegroundColor Green

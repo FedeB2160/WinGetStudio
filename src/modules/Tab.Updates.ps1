@@ -12,9 +12,7 @@
 # Collezione dati (ObservableCollection per binding checkbox bidirezionale)
 $items = New-Object System.Collections.ObjectModel.ObservableCollection[object]
 
-# Stato condiviso tra UI e runspace
 $script:allSelected = $false
-$script:isBusy      = $false
 
 # Ricalcola stato pulsanti/etichette in base a elenco e selezione (req 2/3/4).
 function Refresh-SelectionState {
@@ -35,8 +33,10 @@ function Refresh-SelectionState {
     $TxtSelected.Text  = if ($sel -gt 0) { "$sel selected" } else { "" }
 }
 
-function Set-BusyState([bool]$busy) {
-    $script:isBusy = $busy
+# Applica lo stato occupato ai soli controlli di QUESTA scheda. La chiama Set-AppBusy
+# (App.Ui.ps1) per tutte le schede insieme: un update in corso deve spegnere anche i
+# comandi della scheda Install, perche' winget in parallelo non e' affidabile.
+function Set-UpdatesBusy([bool]$busy) {
     $BtnRefresh.IsEnabled = -not $busy
     $ChkUnknown.IsEnabled = -not $busy
     # Sola lettura, NON IsEnabled=$false: un DataGrid disabilitato non risponde piu' a
@@ -58,7 +58,7 @@ function Set-BusyState([bool]$busy) {
 # Carica/ricarica l'elenco upgrade in modo ASINCRONO (req 1): la scansione winget
 # gira in un runspace separato cosi' l'overlay di caricamento resta animato.
 function Load-Upgrades {
-    Set-BusyState $true
+    Set-AppBusy $true
     Write-Log "Searching for updates..."
     $items.Clear()
     $TxtEmpty.Visibility     = [System.Windows.Visibility]::Collapsed
@@ -91,7 +91,7 @@ function Load-Upgrades {
                 $Grid.Visibility = [System.Windows.Visibility]::Visible
                 Write-Log "Found $($items.Count) updates."
             }
-            Set-BusyState $false
+            Set-AppBusy $false
         })
 }
 
@@ -106,7 +106,7 @@ function Start-UpdateSelected {
         return
     }
 
-    Set-BusyState $true
+    Set-AppBusy $true
     Start-WinGetQueue -Rows $selected -Verb 'Update' -ArgsBuilder {
         param($r)
         # Aggiornamento silenzioso, match esatto sull'ID.
@@ -114,12 +114,13 @@ function Start-UpdateSelected {
         # resterebbe in attesa di input per sempre.
         "upgrade --id `"$($r.Id)`" --include-unknown -e --silent --disable-interactivity --accept-source-agreements --accept-package-agreements"
     } -OnDone {
-        Set-BusyState $false
+        Set-AppBusy $false
     }
 }
 
 function Initialize-UpdatesTab {
     $Grid.ItemsSource = $items
+    Register-BusyHandler { param($busy) Set-UpdatesBusy $busy }
 
     $BtnRefresh.Add_Click({ Load-Upgrades })
 
@@ -156,3 +157,4 @@ function Initialize-UpdatesTab {
     # perdita di focus della cella.
     $Grid.Add_PreviewMouseLeftButtonUp($queueSelectionRefresh)
 }
+

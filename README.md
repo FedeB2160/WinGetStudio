@@ -14,10 +14,11 @@ src\   main.ps1                 entry point: version, elevation, module loading,
    modules\
        WinGet.Exec.ps1          running winget: Invoke-WinGet, exit code mapping
        WinGet.Parse.ps1         reading winget's fixed-width tables
-       App.Ui.ps1               helpers shared by every tab (Write-Log)
+       App.Ui.ps1               shared helpers: Write-Log, global busy state
        App.Jobs.ps1             background runspaces: Start-BackgroundJob, Start-WinGetQueue
        App.Theme.ps1            Light / Dark / Auto theme
        Tab.Updates.ps1          the Updates tab
+       Tab.Install.ps1          the Install tab: search-as-you-type, scope, install
        App.Bootstrap.ps1        WgtRow, XAML loading, Start-App
 ui\    UI.xaml                  window: layout and styles
        Theme.Light.xaml         light palette
@@ -91,6 +92,19 @@ The window is **resizable** (`ResizeMode="CanResize"`, minimum 760x520): with mo
    - The table stays **scrollable** during the update: it goes read-only (ticks cannot be changed), not disabled.
    - "Select all" is enabled only with at least one entry; "Update" only with at least one selected.
 4. **Columns can be resized** by dragging their border in the header.
+
+### Install tab
+Type in the search box and results appear as you type — no autocomplete popup: the results grid *is* the suggestion list, so you also see version and ID before choosing.
+
+1. **Type at least 3 characters.** The search fires ~350ms after you stop typing, not on every keystroke, and only against `--source winget` — the local index, ~0.4s. A 2-letter query returns over a thousand rows, hence both the threshold and the 25-result cap.
+2. **Store** (checkbox, off by default) also searches the Microsoft Store. It applies only to an explicit search (**Enter** or the **Search** button), never to the as-you-type one: msstore goes online and takes ~5s.
+3. **Scope** cycles `Auto` → `User` → `Machine`. `Auto` passes no flag and behaves like the Updates tab; `Machine` passes `--scope machine` (all users); `User` passes `--scope user`. It is a cycling button rather than a combo box because a `ComboBox` template has to be rewritten from scratch to survive dark mode, while a button does not.
+   - The tool always runs elevated. If the elevated account is **not** the signed-in user, per-user packages would land in the wrong profile — the log warns about it once, and only when the chosen scope can actually cause it.
+4. Tick rows and press **Install**, or **double click a row** to install just that one. Installs run through the same sequential queue as updates, so the per-row Result column and the log work the same way.
+
+While the search is still typing-in-progress the grid keeps showing the previous results on purpose — clearing on every keystroke would flicker — and the spinner is what tells you a search is running. Results that come back after you have already typed something else are discarded: they carry their own query and it is compared against what is in the box. `Test-Ui.ps1` covers this with a real winget search.
+
+Only one winget operation runs at a time (winget is not reliable in parallel), so an update in progress greys out the Install tab's controls too, and vice versa. Each tab registers a handler with `Set-AppBusy`.
 
 ### Theme
 The icon button in the top right **cycles** through three modes (the tooltip names the active one):

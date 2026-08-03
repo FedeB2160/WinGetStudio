@@ -115,12 +115,16 @@ function Stop-AllJobs {
 #   -Rows        righe WgtRow su cui lavorare (aggiornate per riferimento)
 #   -ArgsBuilder param($row) -> riga di argomenti per winget
 #   -Verb        parola usata nei messaggi di log ("Update", "Install", ...)
+#   -Vars        variabili extra visibili dentro il runspace, quindi anche dentro
+#                -ArgsBuilder: e' cosi' che l'install passa lo --scope scelto, senza
+#                doverlo interpolare nel testo dello scriptblock
 #   -OnDone      scriptblock sul thread UI a coda finita
 function Start-WinGetQueue {
     param(
         [Parameter(Mandatory)][object[]]$Rows,
         [Parameter(Mandatory)][scriptblock]$ArgsBuilder,
         [string]$Verb = 'Update',
+        [hashtable]$Vars = @{},
         [scriptblock]$OnDone
     )
 
@@ -131,8 +135,7 @@ function Start-WinGetQueue {
     $Progress.Maximum = $Rows.Count
     Write-Log "Starting $($Verb.ToLower()) of $($Rows.Count) packages..."
 
-    # [void]: il job non deve finire sulla pipeline del chiamante.
-    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet' -Vars @{
+    $jobVars = @{
         window     = $window
         rows       = $Rows
         progress   = $Progress
@@ -141,7 +144,16 @@ function Start-WinGetQueue {
         verb       = $Verb
         # Come le funzioni: il corpo come testo, ricreato dentro il runspace.
         argsFnBody = $ArgsBuilder.ToString()
-    } -Script {
+    }
+    # Le variabili del chiamante NON sovrascrivono quelle della coda: un nome ripetuto
+    # sarebbe un errore da segnalare, non da risolvere in silenzio.
+    foreach ($kv in $Vars.GetEnumerator()) {
+        if ($jobVars.ContainsKey($kv.Key)) { throw "Start-WinGetQueue: -Vars usa un nome riservato '$($kv.Key)'" }
+        $jobVars[$kv.Key] = $kv.Value
+    }
+
+    # [void]: il job non deve finire sulla pipeline del chiamante.
+    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet' -Vars $jobVars -Script {
         Invoke-Expression "function Get-WinGetArgs { $argsFnBody }"
 
         # Helper per aggiornare la UI dal thread di lavoro

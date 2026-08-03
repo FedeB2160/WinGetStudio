@@ -99,6 +99,31 @@ function Get-WinGetTable([string]$raw) {
     return $results
 }
 
+# Ricerca nel catalogo. Colonne: Nome | Id | Versione | [Corrispondenza] | [Origine] —
+# si usano solo le prime tre, le altre compaiono o no a seconda del risultato.
+#
+# --source winget: interroga il solo indice LOCALE (~0.4s). Con msstore la stessa ricerca
+#   va in rete e passa a ~5s, troppo per aggiornare l'elenco mentre si digita.
+# --count: senza un tetto una query di 2-3 lettere torna oltre mille righe (misurato:
+#   "ab" -> 1288) e la griglia annega.
+function Get-WinGetSearch([string]$Query, [bool]$IncludeStore = $false, [int]$Count = 25) {
+    if ([string]::IsNullOrWhiteSpace($Query)) { return @() }
+    $wgArgs = @('search', $Query, '--count', "$Count", '--accept-source-agreements')
+    if (-not $IncludeStore) { $wgArgs += @('--source', 'winget') }
+    $raw = & winget @wgArgs 2>&1 | Out-String -Width 4096
+
+    $results = New-Object System.Collections.ArrayList
+    foreach ($f in Get-WinGetTable $raw) {
+        [void]$results.Add([WgtRow]@{
+            Selected = $false
+            Name     = $f[0]
+            Id       = $f[1]
+            Version  = $f[2]
+        })
+    }
+    return $results
+}
+
 # Elenco degli upgrade disponibili. Colonne: Nome | Id | Versione | Disponibile | [Origine].
 function Get-WinGetUpgrades([bool]$IncludeUnknown = $false) {
     # --include-unknown: include pacchetti con versione installata sconosciuta (opzionale,

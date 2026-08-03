@@ -272,6 +272,57 @@
             </Setter>
         </Style>
 
+        <!-- Cella "Result": spinner mentre l'operazione gira, poi un glifo colorato.
+             Sta qui come risorsa perche' la usano tutte le griglie (Updates, Install e
+             le prossime), sempre identica. -->
+        <DataTemplate x:Key="ResultCell">
+            <Grid HorizontalAlignment="Center" ToolTip="{Binding StatusDetail}">
+                <Control x:Name="cellSpinner" Width="18" Height="18"
+                         Style="{StaticResource Spinner}" Visibility="Collapsed"/>
+                <!-- Icone di stato dal set di sistema di Windows 11 (fallback a
+                     Segoe MDL2 Assets su Win10): forme PIENE e distinte fra loro,
+                     leggibili anche senza distinguere i colori. Niente FontWeight:
+                     un icon font in Bold viene ingrassato per sintesi e sbava. -->
+                <TextBlock x:Name="cellIcon" FontSize="16"
+                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="Collapsed"/>
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Status}" Value="updating">
+                    <Setter TargetName="cellSpinner" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+                <!-- EC61 CompletedSolid: cerchio pieno con spunta bianca -->
+                <DataTrigger Binding="{Binding Status}" Value="ok">
+                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="cellIcon" Property="Text" Value="&#xEC61;"/>
+                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource OkBrush}"/>
+                </DataTrigger>
+                <!-- EB90 StatusErrorFull: cerchio pieno con X bianca -->
+                <DataTrigger Binding="{Binding Status}" Value="error">
+                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="cellIcon" Property="Text" Value="&#xEB90;"/>
+                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource ErrBrush}"/>
+                </DataTrigger>
+                <!-- E814 IncidentTriangle: triangolo pieno con ! bianco -->
+                <DataTrigger Binding="{Binding Status}" Value="warning">
+                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="cellIcon" Property="Text" Value="&#xE814;"/>
+                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource WarnBrush}"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Campo di testo: la TextBox di sistema ha sfondo bianco cablato e in Dark-Mode
+             resterebbe bianca col testo bianco. Serve solo impostare i colori. -->
+        <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource FgBrush}"/>
+            <Setter Property="Padding" Value="4,3"/>
+        </Style>
+
         <Style TargetType="ProgressBar">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
@@ -358,47 +409,8 @@
                                 <DataGridTextColumn Header="Available version" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
                                 <DataGridTextColumn Header="ID"                Width="2*"   IsReadOnly="True" Binding="{Binding Id}"/>
                                 <!-- Esito: spinner (in corso) oppure glyph colorato -->
-                                <DataGridTemplateColumn Header="Result" Width="70">
-                                    <DataGridTemplateColumn.CellTemplate>
-                                        <DataTemplate>
-                                            <Grid HorizontalAlignment="Center" ToolTip="{Binding StatusDetail}">
-                                                <Control x:Name="cellSpinner" Width="18" Height="18"
-                                                         Style="{StaticResource Spinner}" Visibility="Collapsed"/>
-                                                <!-- Icone di stato dal set di sistema di Windows 11 (fallback a
-                                                     Segoe MDL2 Assets su Win10): forme PIENE e distinte fra loro,
-                                                     leggibili anche senza distinguere i colori. Niente FontWeight:
-                                                     un icon font in Bold viene ingrassato per sintesi e sbava. -->
-                                                <TextBlock x:Name="cellIcon" FontSize="16"
-                                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                           Visibility="Collapsed"/>
-                                            </Grid>
-                                            <DataTemplate.Triggers>
-                                                <DataTrigger Binding="{Binding Status}" Value="updating">
-                                                    <Setter TargetName="cellSpinner" Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                                <!-- EC61 CompletedSolid: cerchio pieno con spunta bianca -->
-                                                <DataTrigger Binding="{Binding Status}" Value="ok">
-                                                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
-                                                    <Setter TargetName="cellIcon" Property="Text" Value="&#xEC61;"/>
-                                                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource OkBrush}"/>
-                                                </DataTrigger>
-                                                <!-- EB90 StatusErrorFull: cerchio pieno con X bianca -->
-                                                <DataTrigger Binding="{Binding Status}" Value="error">
-                                                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
-                                                    <Setter TargetName="cellIcon" Property="Text" Value="&#xEB90;"/>
-                                                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource ErrBrush}"/>
-                                                </DataTrigger>
-                                                <!-- E814 IncidentTriangle: triangolo pieno con ! bianco -->
-                                                <DataTrigger Binding="{Binding Status}" Value="warning">
-                                                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
-                                                    <Setter TargetName="cellIcon" Property="Text" Value="&#xE814;"/>
-                                                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource WarnBrush}"/>
-                                                </DataTrigger>
-                                            </DataTemplate.Triggers>
-                                        </DataTemplate>
-                                    </DataGridTemplateColumn.CellTemplate>
-                                </DataGridTemplateColumn>
+                                <DataGridTemplateColumn Header="Result" Width="70"
+                                                        CellTemplate="{StaticResource ResultCell}"/>
                             </DataGrid.Columns>
                         </DataGrid>
 
@@ -416,6 +428,101 @@
                             <Button x:Name="BtnUpdate" Content="Update" Width="104" Height="26"
                                     DockPanel.Dock="Left" Margin="8,0,0,0" IsEnabled="False"/>
                             <TextBlock x:Name="TxtSelected" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       Foreground="{DynamicResource SubtleFgBrush}"/>
+                        </DockPanel>
+                    </Grid>
+                </TabItem>
+
+                <TabItem Header="Install">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>   <!-- ricerca -->
+                            <RowDefinition Height="*"/>      <!-- risultati -->
+                            <RowDefinition Height="Auto"/>   <!-- action bar -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Barra di ricerca: il campo si allarga, il resto sta a destra. -->
+                        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                            <!-- Spunta ON = interroga anche il Microsoft Store. Vale solo per la
+                                 ricerca lanciata con Invio o col pulsante: msstore va in rete
+                                 (~5s misurati) e non regge l'aggiornamento a ogni tasto. -->
+                            <CheckBox x:Name="ChkStore" DockPanel.Dock="Right" IsChecked="False"
+                                      VerticalAlignment="Center" Margin="10,0,2,0"
+                                      Content="Store" Style="{StaticResource ThemedCheckBox}"
+                                      ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"
+                                      Foreground="{DynamicResource FgBrush}"/>
+                            <!-- Ambito di installazione. Pulsante ciclico Auto -> User -> Machine
+                                 invece di una ComboBox: il template di sistema della ComboBox va
+                                 riscritto per intero per il tema scuro, un pulsante no. Testo e
+                                 ToolTip li scrive Tab.Install.ps1. -->
+                            <Button x:Name="BtnScope" DockPanel.Dock="Right" Width="124" Height="26"
+                                    Margin="8,0,0,0"/>
+                            <Button x:Name="BtnSearch" Content="Search" DockPanel.Dock="Right"
+                                    Width="104" Height="26" Margin="8,0,0,0"/>
+                            <Control x:Name="SearchSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                     DockPanel.Dock="Right" Margin="8,0,0,0" Visibility="Collapsed"/>
+                            <!-- Il campo e il suo testo guida sovrapposto: WPF non ha un
+                                 placeholder nativo, quindi e' un TextBlock non cliccabile che
+                                 compare solo a campo vuoto. -->
+                            <Grid>
+                                <TextBox x:Name="TxtSearch" Height="26" VerticalContentAlignment="Center"/>
+                                <TextBlock Text="Type a package name or ID, at least 3 characters"
+                                           IsHitTestVisible="False" Margin="7,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SubtleFgBrush}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=TxtSearch}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                        </DockPanel>
+
+                        <!-- Risultati della ricerca: stessa struttura e stessi stili della griglia
+                             degli aggiornamenti, senza la colonna "Available". -->
+                        <DataGrid x:Name="GridSearch" Grid.Row="1"
+                                  AutoGenerateColumns="False" CanUserAddRows="False"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                  IsReadOnly="False" SelectionMode="Extended"
+                                  Background="{DynamicResource BgBrush}"
+                                  Foreground="{DynamicResource FgBrush}"
+                                  BorderBrush="{DynamicResource BorderBrush2}"
+                                  RowBackground="{DynamicResource BgBrush}"
+                                  AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
+                                  HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
+                                  ColumnHeaderStyle="{StaticResource GridHeader}"
+                                  CellStyle="{StaticResource GridCell}">
+                            <DataGrid.Columns>
+                                <DataGridCheckBoxColumn Header="" Width="40"
+                                    ElementStyle="{StaticResource ThemedCheckBox}"
+                                    EditingElementStyle="{StaticResource ThemedCheckBox}"
+                                    Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                <DataGridTextColumn Header="Name"    Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
+                                <DataGridTextColumn Header="Version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
+                                <DataGridTextColumn Header="ID"      Width="2.4*" IsReadOnly="True" Binding="{Binding Id}"/>
+                                <DataGridTemplateColumn Header="Result" Width="70"
+                                                        CellTemplate="{StaticResource ResultCell}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Messaggio di stato al posto della griglia: guida iniziale, "nessun
+                             risultato", ricerca troppo corta. -->
+                        <TextBlock x:Name="TxtSearchEmpty" Grid.Row="1"
+                                   Text="Type a package name to search the winget catalog."
+                                   FontSize="16" Foreground="{DynamicResource SubtleFgBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextWrapping="Wrap" TextAlignment="Center"/>
+
+                        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+                            <Button x:Name="BtnInstall" Content="Install" Width="104" Height="26"
+                                    DockPanel.Dock="Left" IsEnabled="False"/>
+                            <TextBlock x:Name="TxtSearchInfo" VerticalAlignment="Center" Margin="12,0,0,0"
                                        Foreground="{DynamicResource SubtleFgBrush}"/>
                         </DockPanel>
                     </Grid>
