@@ -22,6 +22,14 @@ dist\  WinGetUpdateTool.exe  build output
 
 The three `.xaml` files are **not** a runtime requirement: `build.ps1` injects them into the exe, which stays a single file you can copy to another machine on its own. If a `.xaml` file *is* present on disk it wins over the embedded copy — handy for tweaking the UI without recompiling. Lookup order: `..\ui\<file>`, `<exe folder>\ui\<file>`, `<exe folder>\<file>`.
 
+## Version
+
+The version lives in **one** place, the `$AppVersion` constant at the top of `src\WinGetUpdateTool.ps1`. From there it reaches:
+- the **window title**, as `WinGet Update Tool [1.0.1]`;
+- the **exe properties** (right click → Properties → Details): `build.ps1` reads the constant with a regex and passes it to ps2exe, so the two can never disagree. A missing or renamed constant fails the build instead of producing an unversioned exe.
+
+Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still found, that it is `x.y.z`, that it reaches the title and that `build.ps1` still forwards it.
+
 ## Requirements
 - Windows 10/11 with **winget** (App Installer from the Microsoft Store).
 - PowerShell 5.1+.

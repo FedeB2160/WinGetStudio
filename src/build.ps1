@@ -23,6 +23,14 @@ New-Item -ItemType Directory -Force -Path (Split-Path $out) | Out-Null
 # marcatori ###nome### cosi' l'exe resta un file solo (a runtime lo script preferisce
 # comunque il .xaml su disco, se presente accanto all'eseguibile o in un suo ui\).
 $code = Get-Content $src -Raw -Encoding UTF8
+
+# Versione dall'unica fonte di verita' (la costante nello script), cosi' titolo della
+# finestra e proprieta' dell'exe non possono divergere. Se la costante viene rinominata
+# la build si ferma qui invece di produrre un exe senza versione.
+$mv = [regex]::Match($code, "(?m)^\s*\`$AppVersion\s*=\s*'([\d.]+)'")
+if (-not $mv.Success) { throw "Costante `$AppVersion non trovata in $src" }
+$version = $mv.Groups[1].Value
+
 foreach ($f in 'UI.xaml', 'Theme.Light.xaml', 'Theme.Dark.xaml') {
     $path = Join-Path $root "ui\$f"
     if (-not (Test-Path $path)) { throw "File mancante: $f" }
@@ -48,6 +56,7 @@ $params = @{
     title       = 'WinGet Update Tool'
     product     = 'WinGet Update Tool'
     description = 'Aggiorna pacchetti winget con selezione'
+    version     = $version
 }
 if (Test-Path $icon) { $params.iconFile = $icon }
 $before = if (Test-Path $out) { (Get-Item $out).LastWriteTimeUtc } else { [datetime]::MinValue }
@@ -59,4 +68,4 @@ finally { Remove-Item -LiteralPath $src -Force -ErrorAction SilentlyContinue }
 if (-not (Test-Path $out) -or (Get-Item $out).LastWriteTimeUtc -le $before) {
     throw "Compilazione fallita: $out non e' stato aggiornato."
 }
-Write-Host "`nFatto: $out" -ForegroundColor Green
+Write-Host "`nFatto: $out (versione $version)" -ForegroundColor Green

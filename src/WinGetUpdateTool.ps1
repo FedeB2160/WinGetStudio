@@ -14,6 +14,14 @@
 #>
 
 # ------------------------------------------------------------------
+# VERSIONE
+# ------------------------------------------------------------------
+# UNICA fonte di verita': finisce nel titolo della finestra come "[x.y.z]" e, letta
+# da build.ps1 con questa stessa regex, nelle proprieta' dell'exe (scheda Dettagli).
+# Aggiornarla qui e basta; Test-Ui.ps1 verifica che la regex la trovi ancora.
+$AppVersion = '1.0.1'
+
+# ------------------------------------------------------------------
 # 1) SELF-ELEVATION (fallback al manifest UAC generato da ps2exe)
 # ------------------------------------------------------------------
 # Se lo script/exe non gira come amministratore, si rilancia elevato e termina.
@@ -323,6 +331,9 @@ function Read-Xaml([string]$name) {
 }
 
 $window = Read-Xaml 'UI.xaml'
+
+# Versione in coda al titolo: il nome resta in UI.xaml con le altre stringhe visibili.
+$window.Title = "$($window.Title) [$AppVersion]"
 
 # Riferimenti ai controlli
 $BtnRefresh   = $window.FindName('BtnRefresh')

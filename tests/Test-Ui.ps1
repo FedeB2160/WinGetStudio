@@ -112,4 +112,15 @@ foreach ($g in 'PART_LeftHeaderGripper', 'PART_RightHeaderGripper') {
 }
 "OK resize  entrambi i gripper presenti nel template dell'header"
 
+# 11) La versione e' una sola e arriva sia al titolo sia all'exe? build.ps1 la pesca
+# dalla costante con una regex: se qualcuno la rinomina o la sposta, la build morirebbe
+# (o l'exe uscirebbe senza versione) e il titolo mostrerebbe "[]" in silenzio.
+$mv = [regex]::Match($code, "(?m)^\s*\`$AppVersion\s*=\s*'([\d.]+)'")
+if (-not $mv.Success) { throw "costante `$AppVersion non trovata in src\WinGetUpdateTool.ps1" }
+if ($mv.Groups[1].Value -notmatch '^\d+\.\d+\.\d+$') { throw "versione non x.y.z: '$($mv.Groups[1].Value)'" }
+if ($code -notmatch '\$window\.Title\s*=.*\$AppVersion') { throw "la versione non finisce nel titolo della finestra" }
+$buildText = Get-Content (Join-Path $root 'src\build.ps1') -Raw -Encoding UTF8
+if ($buildText -notmatch '(?m)^\s*version\s*=\s*\$version') { throw "build.ps1 non passa la versione a ps2exe" }
+"OK ver    versione $($mv.Groups[1].Value) nel titolo e nelle proprieta' dell'exe"
+
 Write-Host "`nTUTTO OK" -ForegroundColor Green
