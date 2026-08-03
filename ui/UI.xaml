@@ -1,9 +1,12 @@
 <!--
     UI.xaml — finestra principale di WinGet Update Tool.
 
-    Caricato da WinGetUpdateTool.ps1: se questo file esiste accanto allo script/exe vince
+    Caricato da App.Bootstrap.ps1: se questo file esiste accanto allo script/exe vince
     su quello embeddato, quindi si puo' ritoccare la UI e rilanciare senza ricompilare.
     build.ps1 lo inietta nell'exe per mantenerlo single-file.
+
+    Struttura: TabControl con una scheda per area funzionale; barra di avanzamento e log
+    stanno FUORI dalle schede, in fondo alla finestra, e sono condivisi da tutte.
 
     I colori arrivano da Theme.Light.xaml / Theme.Dark.xaml, montati a runtime in
     Resources.MergedDictionaries. Usare SEMPRE {DynamicResource ...} per i colori:
@@ -13,7 +16,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="WinGet Update Tool" Height="620" Width="900"
         WindowStartupLocation="CenterScreen"
-        ResizeMode="CanMinimize"
+        ResizeMode="CanResize" MinWidth="760" MinHeight="520"
         Background="{DynamicResource BgBrush}"
         Foreground="{DynamicResource FgBrush}">
 
@@ -203,6 +206,72 @@
             </Setter>
         </Style>
 
+        <!-- Schede. Come per Button e DataGridColumnHeader il template di sistema (Aero2)
+             disegna gradienti chiari cablati e ignora Background: in Dark-Mode le linguette
+             sarebbero bianche col testo bianco. Quindi template minimo per entrambi.
+             HeaderPanel con Margin inferiore -1: il bordo basso della linguetta attiva
+             copre quello alto del contenuto, cosi' i due si fondono. -->
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="{DynamicResource BgBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <!-- IsItemsHost: e' qui che il TabControl mette le linguette. -->
+                            <TabPanel Grid.Row="0" Panel.ZIndex="1" IsItemsHost="True"
+                                      Margin="0,0,0,-1" Background="Transparent"/>
+                            <Border Grid.Row="1" BorderThickness="1" CornerRadius="0,4,4,4"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}">
+                                <!-- PART_SelectedContentHost: nome richiesto da TabControl per
+                                     mostrare il contenuto della scheda attiva. -->
+                                <ContentPresenter x:Name="PART_SelectedContentHost"
+                                                  ContentSource="SelectedContent" Margin="8"/>
+                            </Border>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="TabItem">
+            <Setter Property="Foreground" Value="{DynamicResource SubtleFgBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabItem">
+                        <Border x:Name="bd" Margin="0,0,2,0" CornerRadius="4,4,0,0"
+                                BorderThickness="1,1,1,0"
+                                Background="{DynamicResource CtrlBgBrush}"
+                                BorderBrush="{DynamicResource BorderBrush2}">
+                            <ContentPresenter ContentSource="Header" Margin="14,6"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- Attiva: stesso sfondo del contenuto (continuita') e testo pieno. -->
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource BgBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
+                                <Setter Property="FontWeight" Value="SemiBold"/>
+                            </Trigger>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="IsSelected" Value="False"/>
+                                    <Condition Property="IsMouseOver" Value="True"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CtrlHoverBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="ProgressBar">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
@@ -227,130 +296,148 @@
         </Style>
     </Window.Resources>
 
+    <!-- Layout: le schede occupano tutto lo spazio elastico; barra di avanzamento e log
+         stanno FUORI dal TabControl, in fondo, e sono condivisi da ogni scheda. -->
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>   <!-- 0 top bar -->
-            <RowDefinition Height="*"/>      <!-- 1 elenco -->
-            <RowDefinition Height="Auto"/>   <!-- 2 action bar -->
-            <RowDefinition Height="Auto"/>   <!-- 3 progress -->
-            <RowDefinition Height="Auto"/>   <!-- 4 log label -->
-            <RowDefinition Height="140"/>    <!-- 5 log -->
+            <RowDefinition Height="*"/>      <!-- 0 schede -->
+            <RowDefinition Height="Auto"/>   <!-- 1 progress -->
+            <RowDefinition Height="Auto"/>   <!-- 2 log label -->
+            <RowDefinition Height="140"/>    <!-- 3 log -->
         </Grid.RowDefinitions>
 
-        <!-- Top bar: ricerca + conteggio disponibili + selettore tema -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,8">
-            <Button x:Name="BtnRefresh" Content="Check for updates" Width="124" Height="26" DockPanel.Dock="Left"/>
-            <!-- Spunta ON = flag include-unknown passato a "winget upgrade"; spenta di
-                 default. Foreground esplicito: la CheckBox di sistema forza il testo nero e
-                 in Dark-Mode sparirebbe. Ha effetto alla ricerca successiva. -->
-            <CheckBox x:Name="ChkUnknown" DockPanel.Dock="Left" IsChecked="False"
-                      VerticalAlignment="Center" Margin="10,0,0,0"
-                      Content="Unknown" Style="{StaticResource ThemedCheckBox}"
-                      ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"
-                      Foreground="{DynamicResource FgBrush}"/>
-            <Control x:Name="TopSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
-                     DockPanel.Dock="Left" Margin="10,0,0,0" Visibility="Collapsed"/>
-            <!-- Pulsante ciclico Chiaro -> Scuro -> Auto. Glifo e ToolTip li scrive lo script.
+        <Grid Grid.Row="0">
+            <TabControl x:Name="TabMain">
+                <TabItem Header="Updates">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>   <!-- top bar -->
+                            <RowDefinition Height="*"/>      <!-- elenco -->
+                            <RowDefinition Height="Auto"/>   <!-- action bar -->
+                        </Grid.RowDefinitions>
+
+                        <!-- Top bar della scheda: ricerca aggiornamenti + conteggio -->
+                        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                            <Button x:Name="BtnRefresh" Content="Check for updates" Width="124" Height="26" DockPanel.Dock="Left"/>
+                            <!-- Spunta ON = flag include-unknown passato a "winget upgrade"; spenta di
+                                 default. Foreground esplicito: la CheckBox di sistema forza il testo nero e
+                                 in Dark-Mode sparirebbe. Ha effetto alla ricerca successiva. -->
+                            <CheckBox x:Name="ChkUnknown" DockPanel.Dock="Left" IsChecked="False"
+                                      VerticalAlignment="Center" Margin="10,0,0,0"
+                                      Content="Unknown" Style="{StaticResource ThemedCheckBox}"
+                                      ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"
+                                      Foreground="{DynamicResource FgBrush}"/>
+                            <Control x:Name="TopSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                     DockPanel.Dock="Left" Margin="10,0,0,0" Visibility="Collapsed"/>
+                            <TextBlock x:Name="TxtAvailable" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
+                        </DockPanel>
+
+                        <!-- Tabella upgrade -->
+                        <DataGrid x:Name="Grid" Grid.Row="1"
+                                  AutoGenerateColumns="False" CanUserAddRows="False"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                  IsReadOnly="False" SelectionMode="Extended"
+                                  Background="{DynamicResource BgBrush}"
+                                  Foreground="{DynamicResource FgBrush}"
+                                  BorderBrush="{DynamicResource BorderBrush2}"
+                                  RowBackground="{DynamicResource BgBrush}"
+                                  AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
+                                  HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
+                                  ColumnHeaderStyle="{StaticResource GridHeader}"
+                                  CellStyle="{StaticResource GridCell}">
+                            <DataGrid.Columns>
+                                <DataGridCheckBoxColumn Header="" Width="40"
+                                    ElementStyle="{StaticResource ThemedCheckBox}"
+                                    EditingElementStyle="{StaticResource ThemedCheckBox}"
+                                    Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                <DataGridTextColumn Header="Name"              Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
+                                <DataGridTextColumn Header="Installed version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
+                                <DataGridTextColumn Header="Available version" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
+                                <DataGridTextColumn Header="ID"                Width="2*"   IsReadOnly="True" Binding="{Binding Id}"/>
+                                <!-- Esito: spinner (in corso) oppure glyph colorato -->
+                                <DataGridTemplateColumn Header="Result" Width="70">
+                                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataTemplate>
+                                            <Grid HorizontalAlignment="Center" ToolTip="{Binding StatusDetail}">
+                                                <Control x:Name="cellSpinner" Width="18" Height="18"
+                                                         Style="{StaticResource Spinner}" Visibility="Collapsed"/>
+                                                <!-- Icone di stato dal set di sistema di Windows 11 (fallback a
+                                                     Segoe MDL2 Assets su Win10): forme PIENE e distinte fra loro,
+                                                     leggibili anche senza distinguere i colori. Niente FontWeight:
+                                                     un icon font in Bold viene ingrassato per sintesi e sbava. -->
+                                                <TextBlock x:Name="cellIcon" FontSize="16"
+                                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                           Visibility="Collapsed"/>
+                                            </Grid>
+                                            <DataTemplate.Triggers>
+                                                <DataTrigger Binding="{Binding Status}" Value="updating">
+                                                    <Setter TargetName="cellSpinner" Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                                <!-- EC61 CompletedSolid: cerchio pieno con spunta bianca -->
+                                                <DataTrigger Binding="{Binding Status}" Value="ok">
+                                                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
+                                                    <Setter TargetName="cellIcon" Property="Text" Value="&#xEC61;"/>
+                                                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource OkBrush}"/>
+                                                </DataTrigger>
+                                                <!-- EB90 StatusErrorFull: cerchio pieno con X bianca -->
+                                                <DataTrigger Binding="{Binding Status}" Value="error">
+                                                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
+                                                    <Setter TargetName="cellIcon" Property="Text" Value="&#xEB90;"/>
+                                                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource ErrBrush}"/>
+                                                </DataTrigger>
+                                                <!-- E814 IncidentTriangle: triangolo pieno con ! bianco -->
+                                                <DataTrigger Binding="{Binding Status}" Value="warning">
+                                                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
+                                                    <Setter TargetName="cellIcon" Property="Text" Value="&#xE814;"/>
+                                                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource WarnBrush}"/>
+                                                </DataTrigger>
+                                            </DataTemplate.Triggers>
+                                        </DataTemplate>
+                                    </DataGridTemplateColumn.CellTemplate>
+                                </DataGridTemplateColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Messaggio "nessun aggiornamento" (nascosto di default) -->
+                        <TextBlock x:Name="TxtEmpty" Grid.Row="1"
+                                   Text="No updates available."
+                                   FontSize="16" Foreground="{DynamicResource SubtleFgBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="Collapsed"/>
+
+                        <!-- Action bar: selezione + aggiorna + conteggio selezionati -->
+                        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+                            <Button x:Name="BtnToggleAll" Content="Select all" Width="104" Height="26"
+                                    DockPanel.Dock="Left" IsEnabled="False"/>
+                            <Button x:Name="BtnUpdate" Content="Update" Width="104" Height="26"
+                                    DockPanel.Dock="Left" Margin="8,0,0,0" IsEnabled="False"/>
+                            <TextBlock x:Name="TxtSelected" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       Foreground="{DynamicResource SubtleFgBrush}"/>
+                        </DockPanel>
+                    </Grid>
+                </TabItem>
+            </TabControl>
+
+            <!-- Selettore tema: vale per tutta la finestra, quindi sta FUORI dalle schede,
+                 sovrapposto a destra all'altezza delle linguette. Pulsante ciclico
+                 Chiaro -> Scuro -> Auto; glifo e ToolTip li scrive App.Theme.ps1.
                  Icone dal set di sistema (Segoe Fluent Icons, fallback Segoe MDL2 Assets). -->
-            <Button x:Name="BtnTheme" Width="30" Height="26" DockPanel.Dock="Right"
+            <Button x:Name="BtnTheme" Width="30" Height="24" Panel.ZIndex="2"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
                     FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"/>
-            <TextBlock x:Name="TxtAvailable" VerticalAlignment="Center" Margin="12,0,0,0"
-                       FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
-        </DockPanel>
+        </Grid>
 
-        <!-- Tabella upgrade -->
-        <DataGrid x:Name="Grid" Grid.Row="1"
-                  AutoGenerateColumns="False" CanUserAddRows="False"
-                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                  IsReadOnly="False" SelectionMode="Extended"
-                  Background="{DynamicResource BgBrush}"
-                  Foreground="{DynamicResource FgBrush}"
-                  BorderBrush="{DynamicResource BorderBrush2}"
-                  RowBackground="{DynamicResource BgBrush}"
-                  AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
-                  HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
-                  ColumnHeaderStyle="{StaticResource GridHeader}"
-                  CellStyle="{StaticResource GridCell}">
-            <DataGrid.Columns>
-                <DataGridCheckBoxColumn Header="" Width="40"
-                    ElementStyle="{StaticResource ThemedCheckBox}"
-                    EditingElementStyle="{StaticResource ThemedCheckBox}"
-                    Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                <DataGridTextColumn Header="Name"              Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
-                <DataGridTextColumn Header="Installed version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
-                <DataGridTextColumn Header="Available version" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
-                <DataGridTextColumn Header="ID"                Width="2*"   IsReadOnly="True" Binding="{Binding Id}"/>
-                <!-- Esito: spinner (in corso) oppure glyph colorato -->
-                <DataGridTemplateColumn Header="Result" Width="70">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <Grid HorizontalAlignment="Center" ToolTip="{Binding StatusDetail}">
-                                <Control x:Name="cellSpinner" Width="18" Height="18"
-                                         Style="{StaticResource Spinner}" Visibility="Collapsed"/>
-                                <!-- Icone di stato dal set di sistema di Windows 11 (fallback a
-                                     Segoe MDL2 Assets su Win10): forme PIENE e distinte fra loro,
-                                     leggibili anche senza distinguere i colori. Niente FontWeight:
-                                     un icon font in Bold viene ingrassato per sintesi e sbava. -->
-                                <TextBlock x:Name="cellIcon" FontSize="16"
-                                           FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                                           Visibility="Collapsed"/>
-                            </Grid>
-                            <DataTemplate.Triggers>
-                                <DataTrigger Binding="{Binding Status}" Value="updating">
-                                    <Setter TargetName="cellSpinner" Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                                <!-- EC61 CompletedSolid: cerchio pieno con spunta bianca -->
-                                <DataTrigger Binding="{Binding Status}" Value="ok">
-                                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
-                                    <Setter TargetName="cellIcon" Property="Text" Value="&#xEC61;"/>
-                                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource OkBrush}"/>
-                                </DataTrigger>
-                                <!-- EB90 StatusErrorFull: cerchio pieno con X bianca -->
-                                <DataTrigger Binding="{Binding Status}" Value="error">
-                                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
-                                    <Setter TargetName="cellIcon" Property="Text" Value="&#xEB90;"/>
-                                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource ErrBrush}"/>
-                                </DataTrigger>
-                                <!-- E814 IncidentTriangle: triangolo pieno con ! bianco -->
-                                <DataTrigger Binding="{Binding Status}" Value="warning">
-                                    <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
-                                    <Setter TargetName="cellIcon" Property="Text" Value="&#xE814;"/>
-                                    <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource WarnBrush}"/>
-                                </DataTrigger>
-                            </DataTemplate.Triggers>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-            </DataGrid.Columns>
-        </DataGrid>
-
-        <!-- Messaggio "nessun aggiornamento" (nascosto di default) -->
-        <TextBlock x:Name="TxtEmpty" Grid.Row="1"
-                   Text="No updates available."
-                   FontSize="16" Foreground="{DynamicResource SubtleFgBrush}"
-                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                   Visibility="Collapsed"/>
-
-        <!-- Action bar: selezione + aggiorna + conteggio selezionati -->
-        <DockPanel Grid.Row="2" Margin="0,8,0,0">
-            <Button x:Name="BtnToggleAll" Content="Select all" Width="104" Height="26"
-                    DockPanel.Dock="Left" IsEnabled="False"/>
-            <Button x:Name="BtnUpdate" Content="Update" Width="104" Height="26"
-                    DockPanel.Dock="Left" Margin="8,0,0,0" IsEnabled="False"/>
-            <TextBlock x:Name="TxtSelected" VerticalAlignment="Center" Margin="12,0,0,0"
-                       Foreground="{DynamicResource SubtleFgBrush}"/>
-        </DockPanel>
-
-        <!-- Barra avanzamento coda aggiornamenti -->
-        <ProgressBar x:Name="Progress" Grid.Row="3" Height="18" Margin="0,8,0,4"
+        <!-- Barra avanzamento della coda in corso (condivisa da tutte le schede) -->
+        <ProgressBar x:Name="Progress" Grid.Row="1" Height="18" Margin="0,8,0,4"
                      Minimum="0" Maximum="100" Value="0"/>
 
-        <TextBlock Grid.Row="4" Text="Log:" Margin="0,4,0,2" FontWeight="Bold"
+        <TextBlock Grid.Row="2" Text="Log:" Margin="0,4,0,2" FontWeight="Bold"
                    Foreground="{DynamicResource FgBrush}"/>
 
-        <!-- Log -->
-        <TextBox x:Name="TxtLog" Grid.Row="5"
+        <!-- Log (condiviso da tutte le schede) -->
+        <TextBox x:Name="TxtLog" Grid.Row="3"
                  IsReadOnly="True" VerticalScrollBarVisibility="Auto"
                  TextWrapping="NoWrap" HorizontalScrollBarVisibility="Auto"
                  FontFamily="Consolas" FontSize="12"

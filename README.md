@@ -77,6 +77,12 @@ powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
 - `Test-InvokeWinGet.ps1` — exercises winget execution (wait bound to the process, exit code available, output read back as UTF-8) and parses three fixtures through the real code: the two-table `upgrade` output, a 3-column `search` result, and a 4-column `list` where the fourth column is *Source* and the version carries a `>` prefix. Needs no admin rights and installs nothing.
 
 ## Usage
+
+The window is a **TabControl**, one tab per area of work. The **progress bar and the log sit outside the tabs**, at the bottom: they belong to whatever operation is running, whichever tab you are looking at, so you can start an update and switch tab without losing sight of it. The theme button stays in the top right, outside the tabs, because it applies to the whole window. `Test-Ui.ps1` fails if the log or the progress bar ever ends up inside a tab.
+
+The window is **resizable** (`ResizeMode="CanResize"`, minimum 760x520): with more than one tab a fixed 900x620 was too tight. The log keeps a fixed height, so enlarging the window grows the table.
+
+### Updates tab
 1. **Check for updates** (top left) — runs `winget upgrade` with a loading spinner; "N updates available" appears at the top. The progress bar resets: it belongs to the previous queue, not to the new list.
    - **Unknown** (checkbox right next to the button, **off by default**, with an explanatory tooltip) adds `--include-unknown`: without it, winget only lists packages whose installed version it can determine. It takes effect on the *next* search — toggling it does not start a scan by itself.
 2. Tick the rows to upgrade, or use **Select all** (below the list). "M selected" appears next to it.
@@ -84,8 +90,7 @@ powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
    - No timeout: slow installers are never cut off. During a long wait the log writes a line every 30s (`...name running for Ns`), so a stall is visible while it happens.
    - The table stays **scrollable** during the update: it goes read-only (ticks cannot be changed), not disabled.
    - "Select all" is enabled only with at least one entry; "Update" only with at least one selected.
-4. **Columns can be resized** by dragging their border in the header (the window keeps a fixed width, so widening one column narrows the others).
-5. The window can be **minimized** (`ResizeMode="CanMinimize"`): still a fixed size, but the title bar has the minimize button.
+4. **Columns can be resized** by dragging their border in the header.
 
 ### Theme
 The icon button in the top right **cycles** through three modes (the tooltip names the active one):
@@ -120,6 +125,7 @@ Icons from the system set (**Segoe Fluent Icons**, falling back to **Segoe MDL2 
 - The upgrade list is parsed by **column position, one table at a time** (`Get-WinGetTable`): winget prints a second table for packages that need explicit targeting, with its own column widths. Columns are re-anchored at every separator row, and a data row is told apart from localized prose by its grid alignment — not by counting runs of two or more spaces, a heuristic that also dropped rows whose columns are exactly full.
 - `Get-WinGetTable` returns the **raw fields per row**, and each caller maps them, because the meaning of the columns changes with the command: the 4th is *Available* in `upgrade`, *Match* in `search`, *Source* in `list`. The count varies even within one command — `search vlc` has a Match column, `search ab --count 5` does not. Only the first three (Name, Id, Version) are the same everywhere, and they are all `search` and `list` need. The table is accepted from **3** columns up: `winget list --source winget` prints exactly three, and the old threshold of four discarded it silently.
 - Background jobs pass what they need through the **job object**, not through a `GetNewClosure()` capture. A closure gets its own module scope, and inside it `$script:` no longer refers to the script — `$script:jobs` came back `$null` and the cleanup died on `.Remove()`, leaving the job polling forever. The tick finds its job from the sender (the timer that raised it) instead. `Test-Ui.ps1` covers this.
+- `TabControl` and `TabItem` are re-templated for the same reason as the buttons and the grid header: the system template (Aero2) paints hardcoded light gradients and ignores `Background`, so in dark mode the tabs would be white with white text on them. The active tab is filled with `BgBrush`, the same colour as the content area, and the header panel carries a `-1` bottom margin so the tab's lower border covers the content's upper one and the two read as one surface.
 - The checkbox uses a **custom `ControlTemplate`**: the system one (Aero2) fills the tick with a hardcoded `#FF212121` declared as a `StaticResource` inside the theme dictionary, so no external setter can reach it and in dark mode the tick was black on black. The template binds the tick to `FgBrush` and restores the hover border and disabled opacity that re-templating throws away.
 - Column resizing lives in the `ControlTemplate` of `DataGridColumnHeader`: re-templating the header (which is necessary — the system `DataGridHeaderBorder` ignores `Background`) throws away the two `Thumb` elements `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` that DataGrid hooks for the drag, and the columns silently become fixed, **with no error at all**. They have to be added back by hand under those exact names; `Test-Ui.ps1` verifies they are there.
 - Table rows are instances of the `WgtRow` class (`INotifyPropertyChanged`, compiled with `Add-Type` at startup), not `PSCustomObject`: `NoteProperty` values do not notify WPF, which forced a `$Grid.Items.Refresh()` on every state change — and that regenerates the view and sends the scroll back to the top. `Test-Ui.ps1` checks both the event and the absence of `Items.Refresh()` / `$Grid.IsEnabled = ...` in the code.

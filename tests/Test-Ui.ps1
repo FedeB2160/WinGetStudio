@@ -237,6 +237,18 @@ if ($null -eq $BtnTheme.Content) { throw "Initialize-Theme non ha scritto il gli
 # Le funzioni delle schede girano senza esplodere sui controlli?
 Write-Log 'test'
 if ($TxtLog.Text -notmatch 'test') { throw "Write-Log non scrive nel TextBox del log" }
+# Log e barra di avanzamento sono condivisi da tutte le schede: devono stare FUORI dal
+# TabControl. Se finissero dentro una scheda, cambiando scheda sparirebbero.
+# LogicalTreeHelper e non VisualTreeHelper: il visual tree non esiste senza rendering.
+$tabMain = $window.FindName('TabMain')
+if (-not $tabMain) { throw "TabControl 'TabMain' assente da UI.xaml" }
+foreach ($shared in @{ TxtLog = $TxtLog; Progress = $Progress }.GetEnumerator()) {
+    $p = $shared.Value
+    while ($p) {
+        if ($p -eq $tabMain) { throw "$($shared.Key) e' dentro il TabControl: non sarebbe piu' condiviso fra le schede" }
+        $p = [System.Windows.LogicalTreeHelper]::GetParent($p)
+    }
+}
 Refresh-SelectionState
 if ($BtnUpdate.IsEnabled) { throw "con la lista vuota il pulsante Update deve restare spento" }
 foreach ($t in @($script:themeTimer)) { if ($t) { $t.Stop() } }
