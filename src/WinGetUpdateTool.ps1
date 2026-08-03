@@ -110,35 +110,12 @@ function Get-WinGetUpgrades([bool]$IncludeUnknown = $false) {
     # --accept-source-agreements: evita prompt interattivi al primo uso della sorgente
     $wgArgs = @('upgrade', '--accept-source-agreements')
     if ($IncludeUnknown) { $wgArgs += '--include-unknown' }
-    $raw = & winget @wgArgs 2>&1 | Out-String
+    # -Width alto: senza console (exe -noConsole) o con finestra stretta Out-String
+    # manderebbe a capo le righe alla larghezza dell'host, spezzando la tabella.
+    $raw = & winget @wgArgs 2>&1 | Out-String -Width 4096
 
     # Normalizza in righe; winget usa \r di progresso -> tieni solo l'ultimo segmento
     $lines = $raw -split "`r`n|`n" | ForEach-Object { ($_ -split "`r")[-1] }
-
-    # INDIPENDENTE DALLA LINGUA: winget localizza gli header (Nome/ID/Versione/...)
-    # ma la riga separatore e' sempre una sequenza di trattini. La usiamo come ancora:
-    # header = riga subito prima del separatore; dati = righe subito dopo.
-    $sepIndex = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) {
-        if ($lines[$i].Trim() -match '^-{3,}$') { $sepIndex = $i; break }
-    }
-    if ($sepIndex -lt 1) { return @() }   # nessuna tabella -> nessun upgrade
-
-    $header = $lines[$sepIndex - 1]
-
-    # Offset di inizio colonna: posizioni nella riga header dove inizia un token
-    # (carattere non-spazio preceduto da spazio o inizio riga). L'ORDINE delle
-    # colonne e' fisso: Nome, Id, Versione, Disponibile, [Origine].
-    $colStarts = New-Object System.Collections.ArrayList
-    for ($c = 0; $c -lt $header.Length; $c++) {
-        $isStart = ($header[$c] -ne ' ') -and ($c -eq 0 -or $header[$c-1] -eq ' ')
-        if ($isStart) { [void]$colStarts.Add($c) }
-    }
-    if ($colStarts.Count -lt 4) { return @() }   # tabella inattesa
-
-    $oName = $colStarts[0]; $oId = $colStarts[1]
-    $oVer  = $colStarts[2]; $oAvail = $colStarts[3]
-    $oEnd  = if ($colStarts.Count -ge 5) { $colStarts[4] } else { -1 }  # inizio Origine o fine riga
 
     # Estrae in sicurezza una sottostringa [start, end) gestendo righe corte.
     function Get-Field([string]$line, [int]$start, [int]$end) {
@@ -148,14 +125,57 @@ function Get-WinGetUpgrades([bool]$IncludeUnknown = $false) {
         return $line.Substring($start, $end - $start).Trim()
     }
 
+    # INDIPENDENTE DALLA LINGUA: winget localizza gli header (Nome/ID/Versione/...)
+    # ma la riga separatore e' sempre una sequenza di trattini. La usiamo come ancora:
+    # header = riga subito prima del separatore; dati = righe subito dopo.
+    # MULTI-TABELLA: l'output puo' contenere PIU' tabelle — dopo gli upgrade normali
+    # winget ne stampa una seconda per i pacchetti che richiedono targeting esplicito
+    # ("...ma e' necessario un targeting esplicito per l'aggiornamento"), con larghezze
+    # di colonna PROPRIE. Con una sola ancora fissa quella tabella veniva letta con gli
+    # offset della prima: il suo header finiva in griglia come riga fantasma e i suoi
+    # pacchetti (es. Discord) sparivano. Quindi si ri-ancora a ogni separatore.
     $results = New-Object System.Collections.ArrayList
-    for ($i = $sepIndex + 1; $i -lt $lines.Count; $i++) {
+    $oName = -1; $oId = -1; $oVer = -1; $oAvail = -1; $oEnd = -1
+
+    for ($i = 0; $i -lt $lines.Count; $i++) {
         $line = $lines[$i]
         if ([string]::IsNullOrWhiteSpace($line)) { continue }
-        # Filtro riepilogo/testo localizzato ("N aggiornamenti disponibili." ecc.):
-        # una riga dati ha colonne separate da 2+ spazi -> >= 3 token; una frase no.
-        $tokens = @($line -split '\s{2,}' | Where-Object { $_.Trim() })
-        if ($tokens.Count -lt 3) { continue }
+
+        # Separatore: apre una tabella, gli offset arrivano dalla riga di header sopra.
+        if ($line.Trim() -match '^-{3,}$') {
+            $oName = -1   # tabella inattesa fino a prova contraria
+            $header = if ($i -gt 0) { $lines[$i - 1] } else { '' }
+
+            # Offset di inizio colonna: posizioni nella riga header dove inizia un token
+            # (carattere non-spazio preceduto da spazio o inizio riga). L'ORDINE delle
+            # colonne e' fisso: Nome, Id, Versione, Disponibile, [Origine].
+            $colStarts = New-Object System.Collections.ArrayList
+            for ($c = 0; $c -lt $header.Length; $c++) {
+                $isStart = ($header[$c] -ne ' ') -and ($c -eq 0 -or $header[$c-1] -eq ' ')
+                if ($isStart) { [void]$colStarts.Add($c) }
+            }
+            if ($colStarts.Count -ge 4) {
+                $oName = $colStarts[0]; $oId = $colStarts[1]
+                $oVer  = $colStarts[2]; $oAvail = $colStarts[3]
+                $oEnd  = if ($colStarts.Count -ge 5) { $colStarts[4] } else { -1 }  # inizio Origine o fine riga
+            }
+            continue
+        }
+
+        if ($oName -lt 0) { continue }   # fuori da una tabella riconosciuta
+        # Riga di header (la prossima e' il separatore): non e' un dato.
+        if ($i + 1 -lt $lines.Count -and $lines[$i + 1].Trim() -match '^-{3,}$') { continue }
+
+        # Filtro riepilogo/prose localizzata ("N aggiornamenti disponibili.", la frase
+        # sul targeting esplicito, ecc.): una riga dati rispetta la griglia, cioe' ogni
+        # inizio colonna e' preceduto da almeno uno spazio di padding. Una frase no.
+        # NB: NON si filtra sul numero di token separati da 2+ spazi — nella seconda
+        # tabella le colonne sono strette e distano un solo spazio.
+        $aligned = $true
+        foreach ($o in @($oId, $oVer, $oAvail, $oEnd)) {
+            if ($o -gt 0 -and $o -le $line.Length -and $line[$o - 1] -ne ' ') { $aligned = $false; break }
+        }
+        if (-not $aligned) { continue }
 
         $name      = Get-Field $line $oName  $oId
         $id        = Get-Field $line $oId    $oVer
@@ -210,18 +230,29 @@ function Invoke-WinGet([string]$exePath, [string]$argLine, [scriptblock]$Tick) {
     $outFile = Join-Path ([IO.Path]::GetTempPath()) "wgt_$([Guid]::NewGuid().ToString('N')).out"
     $errFile = [IO.Path]::ChangeExtension($outFile, 'err')
     try {
-        $p = Start-Process -FilePath $exePath -ArgumentList $argLine -PassThru -NoNewWindow `
-                 -RedirectStandardOutput $outFile -RedirectStandardError $errFile
-        # Legge (e quindi mette in cache) il handle nativo: senza questo l'oggetto Process
-        # di Start-Process -PassThru non espone ExitCode dopo l'uscita -> $code vuoto ->
-        # Get-UpdateStatus lo leggerebbe come 0 e marcherebbe 'ok' qualsiasi esito.
-        $null = $p.Handle
+        # PERCHE' NON Start-Process -PassThru: il suo oggetto Process perde ExitCode se il
+        # processo esce prima che il handle nativo sia stato letto (race vinta dai comandi
+        # rapidi). ExitCode vuoto castato a int fa 0 -> Get-UpdateStatus dice 'ok' e un
+        # fallimento risulta verde. Con Process.Start il handle e' nostro dall'inizio.
+        # Il redirect su file lo fa cmd (/s /c + tutta la riga tra apici: cmd toglie solo
+        # gli apici esterni e passa il resto verbatim), cosi' non ci sono pipe da svuotare
+        # e l'attesa dipende dal solo processo.
+        $psi = New-Object Diagnostics.ProcessStartInfo
+        $psi.FileName        = 'cmd.exe'
+        $psi.Arguments       = "/d /s /c `"`"$exePath`" $argLine >`"$outFile`" 2>`"$errFile`"`""
+        $psi.UseShellExecute = $false
+        $psi.CreateNoWindow  = $true
+        $p = [Diagnostics.Process]::Start($psi)
         $sw = [Diagnostics.Stopwatch]::StartNew()
         while (-not $p.WaitForExit(30000)) {
             if ($Tick) { & $Tick ([int]$sw.Elapsed.TotalSeconds) }
         }
-        $text = [string](Get-Content $outFile -Raw -ErrorAction SilentlyContinue) +
-                [string](Get-Content $errFile -Raw -ErrorAction SilentlyContinue)
+        # -Encoding UTF8 OBBLIGATORIO: winget scrive UTF-8, ma Get-Content in
+        # PowerShell 5.1 assume il codepage ANSI del sistema -> i messaggi localizzati
+        # arrivavano a mojibake ("Ã¨ stata trovata una versione piÃ¹ recente").
+        # NB: -Encoding UTF8 legge correttamente anche senza BOM.
+        $text = [string](Get-Content $outFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue) +
+                [string](Get-Content $errFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
         return [PSCustomObject]@{
             ExitCode = $p.ExitCode
             Output   = $text
@@ -606,9 +637,12 @@ function Start-UpdateSelected {
                     'warning' { LogUI "   WARNING (exit $code): $name" }
                     default {
                         LogUI "   ERROR (exit $code): $name"
-                        # Ultima riga significativa dell'output winget, se presente
-                        $lastLine = ($r.Output -split "`r`n|`n" | Where-Object { $_.Trim() } | Select-Object -Last 1)
-                        if ($lastLine) { LogUI "      $($lastLine.Trim())" }
+                        # Ultime DUE righe significative dell'output winget: quando
+                        # l'installer fallisce, winget stampa il percorso del suo log
+                        # DOPO il messaggio d'errore, quindi l'ultima riga da sola
+                        # riportava solo il path e nascondeva la causa.
+                        $tail = @($r.Output -split "`r`n|`n" | Where-Object { $_.Trim() } | Select-Object -Last 2)
+                        foreach ($l in $tail) { LogUI "      $($l.Trim())" }
                     }
                 }
             }
