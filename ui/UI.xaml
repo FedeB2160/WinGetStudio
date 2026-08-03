@@ -156,14 +156,51 @@
             </Style.Triggers>
         </Style>
 
-        <!-- ponytail: la CheckBox tiene il template di sistema, si ricolora solo la cornice.
-             In Dark-Mode il quadratino non spuntato resta chiarino: ri-templarla solo se da'
-             davvero fastidio. -->
-        <Style x:Key="GridCheckBox" TargetType="CheckBox">
+        <!-- Il template di sistema (Aero2) disegna la spunta con un colore FISSO scuro
+             (OptionMark.Static.Glyph = #FF212121): sul quadratino scuro del tema Dark
+             era invisibile, e nessun Setter dall'esterno puo' cambiarlo perche' e' una
+             StaticResource interna al dizionario di tema. Quindi template minimo:
+             cornice + spunta che segue FgBrush (bianca in Dark, scura in Light).
+             Il ContentPresenter serve alla CheckBox "Unknown", che ha un'etichetta;
+             nelle celle della griglia il contenuto e' vuoto e non occupa spazio. -->
+        <Style x:Key="ThemedCheckBox" TargetType="CheckBox">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal" Background="Transparent">
+                            <Border x:Name="Box" Width="16" Height="16" CornerRadius="3"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="1">
+                                <Path x:Name="Mark" Visibility="Collapsed"
+                                      Data="M 3,7.5 L 6,10.5 L 11,3.5"
+                                      Stretch="None" StrokeThickness="1.6"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Stroke="{TemplateBinding Foreground}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ContentPresenter Margin="7,0,0,0" VerticalAlignment="Center"
+                                              RecognizesAccessKey="True"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Mark" Property="Visibility" Value="Visible"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Box" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style TargetType="ProgressBar">
@@ -208,7 +245,7 @@
                  in Dark-Mode sparirebbe. Ha effetto alla ricerca successiva. -->
             <CheckBox x:Name="ChkUnknown" DockPanel.Dock="Left" IsChecked="False"
                       VerticalAlignment="Center" Margin="10,0,0,0"
-                      Content="Unknown"
+                      Content="Unknown" Style="{StaticResource ThemedCheckBox}"
                       ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"
                       Foreground="{DynamicResource FgBrush}"/>
             <Control x:Name="TopSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
@@ -236,8 +273,8 @@
                   CellStyle="{StaticResource GridCell}">
             <DataGrid.Columns>
                 <DataGridCheckBoxColumn Header="" Width="40"
-                    ElementStyle="{StaticResource GridCheckBox}"
-                    EditingElementStyle="{StaticResource GridCheckBox}"
+                    ElementStyle="{StaticResource ThemedCheckBox}"
+                    EditingElementStyle="{StaticResource ThemedCheckBox}"
                     Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
                 <DataGridTextColumn Header="Name"              Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
                 <DataGridTextColumn Header="Installed version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
