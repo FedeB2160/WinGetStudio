@@ -326,4 +326,25 @@ else {
     "OK search  soglia 3 caratteri, $found risultati per 'vlc', nessun risultato superato in griglia"
 }
 
+# 15) Lo spinner della ricerca non deve rubare spazio al campo comparendo: sta in coda
+# alla riga, dopo la spunta MS Store. Quando era agganciato a destra del DockPanel, ogni
+# ricerca restringeva il campo di 20px e lo riallargava al termine.
+# Il TabControl realizza solo il contenuto della scheda attiva: senza selezionare
+# Install, i suoi controlli misurano 0 e il confronto non proverebbe nulla.
+$tabMain.SelectedIndex = 1
+$window.Content.Measure([System.Windows.Size]::new(900, 620))
+$window.Content.Arrange([System.Windows.Rect]::new(0, 0, 900, 620))
+$window.Content.UpdateLayout()
+$wBefore = $TxtSearch.ActualWidth
+$xStoreBefore = $ChkStore.TranslatePoint([System.Windows.Point]::new(0, 0), $window.Content).X
+if ($wBefore -le 0) { throw "layout non calcolato: ActualWidth del campo di ricerca e' $wBefore" }
+$SearchSpinner.Visibility = [System.Windows.Visibility]::Visible
+$window.Content.UpdateLayout()
+$wAfter = $TxtSearch.ActualWidth
+$xStoreAfter = $ChkStore.TranslatePoint([System.Windows.Point]::new(0, 0), $window.Content).X
+$SearchSpinner.Visibility = [System.Windows.Visibility]::Collapsed
+if ($wAfter -ne $wBefore) { throw "lo spinner ha ristretto il campo di ricerca: $wBefore -> $wAfter" }
+if ($xStoreAfter -ne $xStoreBefore) { throw "lo spinner ha spostato la spunta MS Store: $xStoreBefore -> $xStoreAfter" }
+"OK spin   lo spinner compare senza muovere campo di ricerca ne' spunta (campo $([int]$wBefore)px)"
+
 Write-Host "`nTUTTO OK" -ForegroundColor Green

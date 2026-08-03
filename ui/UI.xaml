@@ -441,32 +441,18 @@
                             <RowDefinition Height="Auto"/>   <!-- action bar -->
                         </Grid.RowDefinitions>
 
-                        <!-- Barra di ricerca: il campo si allarga, il resto sta a destra. -->
-                        <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                            <!-- Spunta ON = interroga anche il Microsoft Store. Vale solo per la
-                                 ricerca lanciata con Invio o col pulsante: msstore va in rete
-                                 (~5s misurati) e non regge l'aggiornamento a ogni tasto. -->
-                            <CheckBox x:Name="ChkStore" DockPanel.Dock="Right" IsChecked="False"
-                                      VerticalAlignment="Center" Margin="10,0,2,0"
-                                      Content="Store" Style="{StaticResource ThemedCheckBox}"
-                                      ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"
-                                      Foreground="{DynamicResource FgBrush}"/>
-                            <!-- Ambito di installazione. Pulsante ciclico Auto -> User -> Machine
-                                 invece di una ComboBox: il template di sistema della ComboBox va
-                                 riscritto per intero per il tema scuro, un pulsante no. Testo e
-                                 ToolTip li scrive Tab.Install.ps1. -->
-                            <Button x:Name="BtnScope" DockPanel.Dock="Right" Width="124" Height="26"
-                                    Margin="8,0,0,0"/>
-                            <Button x:Name="BtnSearch" Content="Search" DockPanel.Dock="Right"
-                                    Width="104" Height="26" Margin="8,0,0,0"/>
-                            <Control x:Name="SearchSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
-                                     DockPanel.Dock="Right" Margin="8,0,0,0" Visibility="Collapsed"/>
+                        <!-- Barra di ricerca, tutto allineato a sinistra in fila. StackPanel e non
+                             DockPanel: con un campo a larghezza fissa non serve nulla che si
+                             allarghi, e lo spinner in coda puo' comparire e sparire senza
+                             spostare niente. Prima, agganciato a destra, comparendo rubava 20px
+                             al campo di ricerca. -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
                             <!-- Il campo e il suo testo guida sovrapposto: WPF non ha un
                                  placeholder nativo, quindi e' un TextBlock non cliccabile che
                                  compare solo a campo vuoto. -->
-                            <Grid>
+                            <Grid Width="380">
                                 <TextBox x:Name="TxtSearch" Height="26" VerticalContentAlignment="Center"/>
-                                <TextBlock Text="Type a package name or ID, at least 3 characters"
+                                <TextBlock Text="Package name or ID, at least 3 characters"
                                            IsHitTestVisible="False" Margin="7,0,0,0"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource SubtleFgBrush}">
@@ -482,7 +468,19 @@
                                     </TextBlock.Style>
                                 </TextBlock>
                             </Grid>
-                        </DockPanel>
+                            <Button x:Name="BtnSearch" Content="Search" Width="104" Height="26" Margin="8,0,0,0"/>
+                            <!-- Spunta ON = interroga anche il Microsoft Store. Vale solo per la
+                                 ricerca lanciata con Invio o col pulsante: msstore va in rete
+                                 (~5s misurati) e non regge l'aggiornamento a ogni tasto.
+                                 Accanto a Search perche' ne modifica il comportamento. -->
+                            <CheckBox x:Name="ChkStore" IsChecked="False"
+                                      VerticalAlignment="Center" Margin="12,0,0,0"
+                                      Content="MS Store" Style="{StaticResource ThemedCheckBox}"
+                                      ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"
+                                      Foreground="{DynamicResource FgBrush}"/>
+                            <Control x:Name="SearchSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                     Margin="12,0,0,0" Visibility="Collapsed"/>
+                        </StackPanel>
 
                         <!-- Risultati della ricerca: stessa struttura e stessi stili della griglia
                              degli aggiornamenti, senza la colonna "Available". -->
@@ -520,8 +518,13 @@
                                    TextWrapping="Wrap" TextAlignment="Center"/>
 
                         <DockPanel Grid.Row="2" Margin="0,8,0,0">
+                            <!-- Ambito di installazione, accanto al pulsante che lo usa. Pulsante
+                                 ciclico Auto -> User -> Machine invece di una ComboBox: il template
+                                 di sistema della ComboBox va riscritto per intero per il tema
+                                 scuro, un pulsante no. Testo e ToolTip li scrive Tab.Install.ps1. -->
+                            <Button x:Name="BtnScope" Width="124" Height="26" DockPanel.Dock="Left"/>
                             <Button x:Name="BtnInstall" Content="Install" Width="104" Height="26"
-                                    DockPanel.Dock="Left" IsEnabled="False"/>
+                                    DockPanel.Dock="Left" Margin="8,0,0,0" IsEnabled="False"/>
                             <TextBlock x:Name="TxtSearchInfo" VerticalAlignment="Center" Margin="12,0,0,0"
                                        Foreground="{DynamicResource SubtleFgBrush}"/>
                         </DockPanel>
