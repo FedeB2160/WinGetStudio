@@ -83,7 +83,7 @@ The window is a **TabControl**, one tab per area of work. The **progress bar and
 The window is **resizable** (`ResizeMode="CanResize"`, minimum 760x520): with more than one tab a fixed 900x620 was too tight. The log keeps a fixed height, so enlarging the window grows the table.
 
 ### Updates tab
-1. **Check for updates** (top left) — runs `winget upgrade` with a loading spinner; "N updates available" appears at the top. The progress bar resets: it belongs to the previous queue, not to the new list.
+1. **Check** (top left) — runs `winget upgrade` with a loading spinner; "N updates available" appears at the top. The progress bar resets: it belongs to the previous queue, not to the new list.
    - **Unknown** (checkbox right next to the button, **off by default**, with an explanatory tooltip) adds `--include-unknown`: without it, winget only lists packages whose installed version it can determine. It takes effect on the *next* search — toggling it does not start a scan by itself.
 2. Tick the rows to upgrade, or use **Select all** (below the list). "M selected" appears next to it.
 3. **Update** (below the list) — runs the upgrades in sequence, **one package at a time, by ID**; progress in the bar, per-row state in the **Result** column.

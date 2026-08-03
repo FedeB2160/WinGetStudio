@@ -318,7 +318,9 @@
 
                         <!-- Top bar della scheda: ricerca aggiornamenti + conteggio -->
                         <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                            <Button x:Name="BtnRefresh" Content="Check for updates" Width="124" Height="26" DockPanel.Dock="Left"/>
+                            <!-- "Check" e non "Check for updates": la scheda si chiama gia'
+                                 Updates. Larghezza uguale agli altri pulsanti della scheda. -->
+                            <Button x:Name="BtnRefresh" Content="Check" Width="104" Height="26" DockPanel.Dock="Left"/>
                             <!-- Spunta ON = flag include-unknown passato a "winget upgrade"; spenta di
                                  default. Foreground esplicito: la CheckBox di sistema forza il testo nero e
                                  in Dark-Mode sparirebbe. Ha effetto alla ricerca successiva. -->
