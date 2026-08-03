@@ -14,7 +14,7 @@ if (-not (Get-Module -ListAvailable -Name ps2exe)) {
 Import-Module ps2exe
 
 $root = Split-Path -Parent $PSScriptRoot   # build.ps1 sta in src\
-$src  = Join-Path $PSScriptRoot 'WinGetUpdateTool.ps1'
+$src  = Join-Path $PSScriptRoot 'main.ps1'
 $out  = Join-Path $root 'dist\WinGetUpdateTool.exe'
 $icon = Join-Path $root 'assets\icon.ico'
 New-Item -ItemType Directory -Force -Path (Split-Path $out) | Out-Null
@@ -30,6 +30,26 @@ $code = Get-Content $src -Raw -Encoding UTF8
 $mv = [regex]::Match($code, "(?m)^\s*\`$AppVersion\s*=\s*'([\d.]+)'")
 if (-not $mv.Success) { throw "Costante `$AppVersion non trovata in $src" }
 $version = $mv.Groups[1].Value
+
+# I moduli vivono in src\modules\ per poterli leggere e modificare uno per volta; ps2exe
+# accetta un solo file di input, quindi qui vengono CONCATENATI al posto del marcatore
+# ###MODULES###. La lista NON si ripete qui: si legge da $moduleNames nel bootstrap,
+# altrimenti le due copie divergono e un modulo nuovo finisce fuori dall'exe in silenzio.
+$mm = [regex]::Match($code, "(?ms)^\s*\`$moduleNames\s*=\s*@\((.*?)^\)")
+if (-not $mm.Success) { throw "Array `$moduleNames non trovato in $src" }
+$modules = @([regex]::Matches($mm.Groups[1].Value, "'([^']+)'") | ForEach-Object { $_.Groups[1].Value })
+if ($modules.Count -eq 0) { throw "`$moduleNames e' vuoto in $src" }
+if ($code -notmatch [regex]::Escape('###MODULES###')) { throw "Marcatore ###MODULES### non trovato in $src" }
+
+$moduleCode = foreach ($m in $modules) {
+    $path = Join-Path $PSScriptRoot "modules\$m"
+    if (-not (Test-Path $path)) { throw "Modulo mancante: $m" }
+    "# --- $m ---"
+    (Get-Content $path -Raw -Encoding UTF8).TrimEnd()
+    ''
+}
+$code = $code.Replace('###MODULES###', ($moduleCode -join "`r`n"))
+Write-Host "Moduli iniettati: $($modules -join ', ')" -ForegroundColor Cyan
 
 foreach ($f in 'UI.xaml', 'Theme.Light.xaml', 'Theme.Dark.xaml') {
     $path = Join-Path $root "ui\$f"

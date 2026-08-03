@@ -16,16 +16,31 @@ function Check([string]$what, [bool]$ok, [string]$detail = '') {
     else     { Write-Host "  FAIL $what $detail" -ForegroundColor Red; $script:failures++ }
 }
 
-# Estrae Invoke-WinGet dallo script reale (via AST): il test gira sul codice di
-# produzione, non su una copia che puo' divergere.
-$src = Join-Path (Split-Path -Parent $PSScriptRoot) 'src\WinGetUpdateTool.ps1'
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($src, [ref]$null, [ref]$null)
-$fn  = $ast.Find({
-    param($n)
-    $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Invoke-WinGet'
-}, $true)
-if (-not $fn) { Write-Host "Invoke-WinGet non trovata in $src" -ForegroundColor Red; exit 1 }
-Invoke-Expression $fn.Extent.Text
+# Estrae le funzioni dal codice reale (via AST): il test gira sulla produzione, non su
+# una copia che puo' divergere. La logica sta nei moduli, quindi si cerca in tutti i
+# file dell'app — il bootstrap da solo non contiene piu' nessuna di queste funzioni.
+$root    = Split-Path -Parent $PSScriptRoot
+$srcFiles = @((Join-Path $root 'src\main.ps1')) +
+            @(Get-ChildItem (Join-Path $root 'src\modules') -Filter *.ps1 -ErrorAction SilentlyContinue |
+              ForEach-Object { $_.FullName })
+
+# Ritorna il testo sorgente di una funzione, cercandola in tutti i file. Esce con
+# errore chiaro se non c'e': una funzione rinominata deve fermare il test, non farlo
+# passare per assenza di verifiche.
+function Get-FunctionText([string]$name) {
+    foreach ($f in $srcFiles) {
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$null, [ref]$null)
+        $fn  = $ast.Find({
+            param($n)
+            $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name
+        }.GetNewClosure(), $true)
+        if ($fn) { return $fn.Extent.Text }
+    }
+    Write-Host "$name non trovata in src\ (bootstrap + moduli)" -ForegroundColor Red
+    exit 1
+}
+
+Invoke-Expression (Get-FunctionText 'Invoke-WinGet')
 
 # ------------------------------------------------------------------
 Write-Host "`n1) Attesa legata al processo, non alla pipe" -ForegroundColor Cyan
@@ -67,8 +82,11 @@ Check "forma buggata riconoscibile (Priority=$($bad.Priority), attesa Normal)" (
 Check "forma corretta priority-first (Priority=$($good.Priority))" ($good.Priority -eq 'Background')
 
 # Solo codice, non commenti (il commento esplicativo cita la forma sbagliata).
-$badCalls = @(Get-Content $src | Where-Object { $_ -notmatch '^\s*#' -and $_ -match 'BeginInvoke\(\[action\]' })
-Check "nessun BeginInvoke([action]...) nel codice dello script" ($badCalls.Count -eq 0) $badCalls
+# Su tutti i file: la chiamata vive in Tab.Updates.ps1, non nel bootstrap.
+$badCalls = @(foreach ($f in $srcFiles) {
+    Get-Content $f | Where-Object { $_ -notmatch '^\s*#' -and $_ -match 'BeginInvoke\(\[action\]' }
+})
+Check "nessun BeginInvoke([action]...) nel codice dell'app" ($badCalls.Count -eq 0) $badCalls
 
 # ------------------------------------------------------------------
 Write-Host "`n3) Smoke test su winget" -ForegroundColor Cyan
@@ -85,21 +103,17 @@ Write-Host "`n4) Parsing di un output winget con DUE tabelle" -ForegroundColor C
 # winget stampa una seconda tabella per i pacchetti che richiedono targeting esplicito,
 # con larghezze di colonna proprie (colonne a un solo spazio di distanza). Con una sola
 # ancora il suo header finiva in griglia come riga fantasma e i suoi pacchetti sparivano.
-$fnUp = $ast.Find({
-    param($n)
-    $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-WinGetUpgrades'
-}, $true)
-if (-not $fnUp) { Write-Host "Get-WinGetUpgrades non trovata in $src" -ForegroundColor Red; exit 1 }
-
-# Riga della griglia: al parser serve solo un tipo con le 5 proprieta' assegnabili.
+# Riga della griglia: al parser serve solo un tipo con le proprieta' assegnabili.
 if (-not ('WgtRow' -as [type])) {
     Add-Type -TypeDefinition 'public class WgtRow {
-        public bool Selected; public string Name, Version, Available, Id, Status, StatusDetail; }'
+        public bool Selected, Pinned; public string Name, Version, Available, Id, Status, StatusDetail; }'
 }
 # Stub di winget: il parser fa "& winget @wgArgs", quindi una funzione con questo nome
 # ha la precedenza sull'eseguibile e nessuna modifica al codice di produzione serve.
 function winget { $fixture }
-Invoke-Expression $fnUp.Extent.Text
+# Get-WinGetTable serve perche' Get-WinGetUpgrades la chiama.
+Invoke-Expression (Get-FunctionText 'Get-WinGetTable')
+Invoke-Expression (Get-FunctionText 'Get-WinGetUpgrades')
 
 $fixture = @'
 Nome                                  Id                                        Versione       Disponibile    Origine
@@ -135,6 +149,46 @@ $dc = $rows | Where-Object { $_.Id -eq 'Discord.Discord' }
 Check "pacchetto della 2a tabella presente e parsato (Discord 1.0.9249 -> 1.0.9250)" `
       ($dc -and $dc.Name -eq 'Discord' -and $dc.Version -eq '1.0.9249' -and $dc.Available -eq '1.0.9250') `
       "($($dc.Name)|$($dc.Version)|$($dc.Available))"
+
+# ------------------------------------------------------------------
+Write-Host "`n5) Tabelle di search e list (3 e 4 colonne)" -ForegroundColor Cyan
+# Il numero di colonne varia col comando E col risultato: "winget list --source winget"
+# ne ha 3, "search vlc" 5, "search ab --count 5" 3. Con la vecchia soglia a 4 colonne le
+# tabelle a 3 venivano scartate in silenzio. Le prime tre colonne (Nome|Id|Versione)
+# sono le uniche affidabili, ed e' tutto cio' che servira' a Install e Installed.
+
+# search troncato: 3 colonne, piu' la riga di prosa che winget aggiunge in coda.
+$searchFixture = @'
+Nome        Id                      Versione
+--------------------------------------------
+Robo 3T     3TSoftwareLabs.Robo3T   1.4.4
+Studio 3T   3TSoftwareLabs.Studio3T 2026.12.0
+<voci aggiuntive troncate a causa del limite dei risultati>
+'@
+$sr = @(Get-WinGetTable $searchFixture)
+Check "3 colonne: 2 righe lette (trovate $($sr.Count))" ($sr.Count -eq 2) ($sr | ForEach-Object { $_ -join '|' })
+Check "prosa di troncamento scartata" (@($sr | Where-Object { $_[0] -like '<voci*' }).Count -eq 0)
+Check "campi corretti (Studio 3T | 3TSoftwareLabs.Studio3T | 2026.12.0)" `
+      ($sr.Count -eq 2 -and $sr[1][0] -eq 'Studio 3T' -and $sr[1][1] -eq '3TSoftwareLabs.Studio3T' -and $sr[1][2] -eq '2026.12.0') `
+      "($($sr[1] -join '|'))"
+
+# list: 4 colonne dove la QUARTA e' Origine, non Disponibile come in upgrade. La
+# versione puo' avere il prefisso "> " (upgrade disponibile), che resta nel campo:
+# chi lo mostra lo togliera'.
+$listFixture = @'
+Nome              Id                   Versione       Origine
+-------------------------------------------------------------
+1Password         AgileBits.1Password  > 8.12.30.21   winget
+7-Zip 26.02 (x64) 7zip.7zip            26.02          winget
+'@
+$lr = @(Get-WinGetTable $listFixture)
+Check "4 colonne: 2 righe lette (trovate $($lr.Count))" ($lr.Count -eq 2) ($lr | ForEach-Object { $_ -join '|' })
+Check "nome con spazi e parentesi non troncato (7-Zip 26.02 (x64))" `
+      ($lr.Count -eq 2 -and $lr[1][0] -eq '7-Zip 26.02 (x64)') "($($lr[1][0]))"
+Check "prefisso '>' preservato nella versione (> 8.12.30.21)" `
+      ($lr.Count -ge 1 -and $lr[0][2] -eq '> 8.12.30.21') "($($lr[0][2]))"
+Check "la 4a colonna di list e' Origine (winget), non una versione disponibile" `
+      ($lr.Count -ge 1 -and $lr[0][3] -eq 'winget') "($($lr[0][3]))"
 
 # ------------------------------------------------------------------
 if ($failures -eq 0) { Write-Host "`nTutti i test passati.`n" -ForegroundColor Green; exit 0 }

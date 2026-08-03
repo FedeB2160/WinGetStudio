@@ -7,25 +7,41 @@ The **UI and this documentation are in English**; the in-code comments are in It
 ## Layout
 
 ```
-build.bat                    double click -> produces dist\WinGetUpdateTool.exe
+build.bat                       double click -> produces dist\WinGetUpdateTool.exe
 README.md
-src\   WinGetUpdateTool.ps1  main script (logic + winget)
-       build.ps1             ps2exe compilation
-ui\    UI.xaml               window: layout and styles
-       Theme.Light.xaml      light palette
-       Theme.Dark.xaml       dark palette
-assets\icon.ico              app icon (embedded in the exe)
-tests\ Test-Ui.ps1           headless check of XAML and themes
-       Test-InvokeWinGet.ps1 winget execution tests
-dist\  WinGetUpdateTool.exe  build output
+src\   main.ps1                 entry point: version, elevation, module loading, Start-App
+       build.ps1                ps2exe compilation
+   modules\
+       WinGet.Exec.ps1          running winget: Invoke-WinGet, exit code mapping
+       WinGet.Parse.ps1         reading winget's fixed-width tables
+       App.Ui.ps1               helpers shared by every tab (Write-Log)
+       App.Jobs.ps1             background runspaces: Start-BackgroundJob, Start-WinGetQueue
+       App.Theme.ps1            Light / Dark / Auto theme
+       Tab.Updates.ps1          the Updates tab
+       App.Bootstrap.ps1        WgtRow, XAML loading, Start-App
+ui\    UI.xaml                  window: layout and styles
+       Theme.Light.xaml         light palette
+       Theme.Dark.xaml          dark palette
+assets\icon.ico                 app icon (embedded in the exe)
+tests\ Test-Ui.ps1              headless check of code, XAML, themes and startup
+       Test-InvokeWinGet.ps1    winget execution and table parsing
+dist\  WinGetUpdateTool.exe     build output
 ```
 
-The three `.xaml` files are **not** a runtime requirement: `build.ps1` injects them into the exe, which stays a single file you can copy to another machine on its own. If a `.xaml` file *is* present on disk it wins over the embedded copy — handy for tweaking the UI without recompiling. Lookup order: `..\ui\<file>`, `<exe folder>\ui\<file>`, `<exe folder>\<file>`.
+`src\main.ps1` holds no logic: it elevates, loads the modules and calls `Start-App`. It exists as a separate file because ps2exe takes a single input file and the self-elevation has to run before anything else.
+
+### How the modules reach the exe
+
+ps2exe compiles **one** file, so `build.ps1` concatenates the modules in place of the `###MODULES###` marker in `main.ps1`. That marker is a **PowerShell comment line**: run as a `.ps1` it stays harmless and the modules are dot-sourced from disk instead, so you can edit one module and relaunch without recompiling. The module list is *not* duplicated in `build.ps1` — it is read from the `$moduleNames` array in `main.ps1` with a regex, so a new module cannot silently be left out of the exe.
+
+Dot-sourcing creates no scope of its own, so the modules see each other's variables exactly as they do when concatenated. `Start-App` assigns the controls with `$script:` for the same reason: a plain `$Grid = ...` inside a function would be local, and every module reading `$Grid` would get `$null`.
+
+The three `.xaml` files are **not** a runtime requirement either: `build.ps1` injects them the same way, and the exe stays a single file you can copy to another machine on its own. If a `.xaml` file *is* present on disk it wins over the embedded copy. Lookup order: `..\ui\<file>`, `<exe folder>\ui\<file>`, `<exe folder>\<file>`.
 
 ## Version
 
-The version lives in **one** place, the `$AppVersion` constant at the top of `src\WinGetUpdateTool.ps1`. From there it reaches:
-- the **window title**, as `WinGet Update Tool [1.0.0]`;
+The version lives in **one** place, the `$AppVersion` constant at the top of `src\main.ps1`. From there it reaches:
+- the **window title**, as `WinGet Update Tool [1.1.0]`;
 - the **exe properties** (right click → Properties → Details): `build.ps1` reads the constant with a regex and passes it to ps2exe, so the two can never disagree. A missing or renamed constant fails the build instead of producing an unversioned exe.
 
 Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still found, that it is `x.y.z`, that it reaches the title and that `build.ps1` still forwards it.
@@ -37,7 +53,7 @@ Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still fo
 
 ## Running without compiling
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\src\WinGetUpdateTool.ps1
+powershell -ExecutionPolicy Bypass -File .\src\main.ps1
 ```
 The UAC prompt appears first, then the window opens with the update list.
 
@@ -48,15 +64,17 @@ powershell -ExecutionPolicy Bypass -File .\src\build.ps1
 ```
 Produces `dist\WinGetUpdateTool.exe`. Double click → UAC prompt → same UI.
 
-The build replaces the `###UI.xaml###`, `###Theme.Light.xaml###` and `###Theme.Dark.xaml###` markers in `src\WinGetUpdateTool.ps1` with the file contents, writes a temporary source to `%TEMP%` and hands that to ps2exe (`-requireAdmin` → UAC manifest, `-noConsole` → WPF window only, `-iconFile` → embedded icon). It fails with an explicit error if a marker is missing or the exe is not rewritten.
+The build replaces the `###MODULES###` marker in `src\main.ps1` with the concatenated modules and the `###UI.xaml###`, `###Theme.Light.xaml###`, `###Theme.Dark.xaml###` markers with the file contents (modules first, since the XAML markers live inside `App.Bootstrap.ps1`), writes a temporary source to `%TEMP%` and hands that to ps2exe (`-requireAdmin` → UAC manifest, `-noConsole` → WPF window only, `-iconFile` → embedded icon). It fails with an explicit error if a marker is missing, a listed module is absent, or the exe is not rewritten.
 
 ## Tests
 ```powershell
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
 ```
-- `Test-Ui.ps1` — headless, opens no windows: checks that the scripts parse, that `UI.xaml` loads with every expected `x:Name`, that both themes define the same keys, that every `DynamicResource` resolves, that the build markers are in place, that `WgtRow` raises `PropertyChanged`, and that the two grid-freeze regressions have not come back.
-- `Test-InvokeWinGet.ps1` — exercises winget execution (wait bound to the process, exit code available, output read back as UTF-8) and parses a two-table fixture through the real `Get-WinGetUpgrades`; needs no admin rights and installs nothing.
+- `Test-Ui.ps1` — headless, opens no windows: checks that every file parses, that no module is missing from (or orphaned by) `$moduleNames`, that `UI.xaml` provides every control the code asks for, that both themes define the same keys, that every `DynamicResource` resolves, that the build markers are in place, that `WgtRow` raises `PropertyChanged`, and that the two grid-freeze regressions have not come back. Two checks matter especially after the split:
+  - it re-does the module injection and verifies the **concatenated** source parses and keeps every function — the exe loads code a different way from the `.ps1`, and a failure there would otherwise only show up on a double click;
+  - it calls `Start-App -NoShow`, which builds the window without displaying it, then verifies the modules actually *see* the controls and that `Start-BackgroundJob` completes, returns its result and unhooks itself. These catch scope and closure bugs that every static check happily passes.
+- `Test-InvokeWinGet.ps1` — exercises winget execution (wait bound to the process, exit code available, output read back as UTF-8) and parses three fixtures through the real code: the two-table `upgrade` output, a 3-column `search` result, and a 4-column `list` where the fourth column is *Source* and the version carries a `>` prefix. Needs no admin rights and installs nothing.
 
 ## Usage
 1. **Check for updates** (top left) — runs `winget upgrade` with a loading spinner; "N updates available" appears at the top. The progress bar resets: it belongs to the previous queue, not to the new list.
@@ -99,7 +117,9 @@ Icons from the system set (**Segoe Fluent Icons**, falling back to **Segoe MDL2 
 - Updates run sequentially (winget is not reliable in parallel).
 - winget is launched with its output redirected to a file and the wait bound to the process exit, not to the pipe: child installers that inherit stdout can no longer block the wait indefinitely. The `--disable-interactivity` flag matters because without a console (exe built with `-noConsole`) a prompt would hang the update forever. The process is started with `Process.Start` (with `cmd` performing the redirect) rather than `Start-Process -PassThru`, whose `Process` object loses `ExitCode` when the process exits before the native handle is cached — an empty `ExitCode` casts to `0`, which would paint a failure green.
 - The output file is read back as **UTF-8**: winget writes UTF-8, while `Get-Content` on PowerShell 5.1 assumes the system ANSI codepage, which turned localized messages into mojibake.
-- The upgrade list is parsed by **column position, one table at a time**: winget prints a second table for packages that need explicit targeting, with its own column widths. Columns are re-anchored at every separator row, and a data row is told apart from localized prose by its grid alignment — not by counting runs of two or more spaces, a heuristic that also dropped rows whose columns are exactly full.
+- The upgrade list is parsed by **column position, one table at a time** (`Get-WinGetTable`): winget prints a second table for packages that need explicit targeting, with its own column widths. Columns are re-anchored at every separator row, and a data row is told apart from localized prose by its grid alignment — not by counting runs of two or more spaces, a heuristic that also dropped rows whose columns are exactly full.
+- `Get-WinGetTable` returns the **raw fields per row**, and each caller maps them, because the meaning of the columns changes with the command: the 4th is *Available* in `upgrade`, *Match* in `search`, *Source* in `list`. The count varies even within one command — `search vlc` has a Match column, `search ab --count 5` does not. Only the first three (Name, Id, Version) are the same everywhere, and they are all `search` and `list` need. The table is accepted from **3** columns up: `winget list --source winget` prints exactly three, and the old threshold of four discarded it silently.
+- Background jobs pass what they need through the **job object**, not through a `GetNewClosure()` capture. A closure gets its own module scope, and inside it `$script:` no longer refers to the script — `$script:jobs` came back `$null` and the cleanup died on `.Remove()`, leaving the job polling forever. The tick finds its job from the sender (the timer that raised it) instead. `Test-Ui.ps1` covers this.
 - The checkbox uses a **custom `ControlTemplate`**: the system one (Aero2) fills the tick with a hardcoded `#FF212121` declared as a `StaticResource` inside the theme dictionary, so no external setter can reach it and in dark mode the tick was black on black. The template binds the tick to `FgBrush` and restores the hover border and disabled opacity that re-templating throws away.
 - Column resizing lives in the `ControlTemplate` of `DataGridColumnHeader`: re-templating the header (which is necessary — the system `DataGridHeaderBorder` ignores `Background`) throws away the two `Thumb` elements `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` that DataGrid hooks for the drag, and the columns silently become fixed, **with no error at all**. They have to be added back by hand under those exact names; `Test-Ui.ps1` verifies they are there.
 - Table rows are instances of the `WgtRow` class (`INotifyPropertyChanged`, compiled with `Add-Type` at startup), not `PSCustomObject`: `NoteProperty` values do not notify WPF, which forced a `$Grid.Items.Refresh()` on every state change — and that regenerates the view and sends the scroll back to the top. `Test-Ui.ps1` checks both the event and the absence of `Items.Refresh()` / `$Grid.IsEnabled = ...` in the code.
