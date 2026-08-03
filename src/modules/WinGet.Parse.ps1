@@ -124,6 +124,28 @@ function Get-WinGetSearch([string]$Query, [bool]$IncludeStore = $false, [int]$Co
     return $results
 }
 
+# Inventario dei pacchetti installati. Colonne: Nome | Id | Versione | [Origine].
+# ATTENZIONE: la quarta colonna qui e' Origine, NON "Disponibile" come in upgrade.
+# Include anche cio' che non e' stato installato con winget: quei pacchetti hanno un Id
+# di tipo "ARP\Machine\X64\Nome Prodotto" (con spazi dentro, del tutto legittimi) e
+# Origine vuota.
+function Get-WinGetInstalled {
+    $raw = & winget list --accept-source-agreements 2>&1 | Out-String -Width 4096
+
+    $results = New-Object System.Collections.ArrayList
+    foreach ($f in Get-WinGetTable $raw) {
+        # "> 8.12.30.21" -> "8.12.30.21": il ">" segnala che esiste un aggiornamento, e di
+        # quello si occupa la scheda Updates.
+        [void]$results.Add([WgtRow]@{
+            Selected = $false
+            Name     = $f[0]
+            Id       = $f[1]
+            Version  = ($f[2] -replace '^>\s*', '')
+        })
+    }
+    return $results
+}
+
 # Elenco degli upgrade disponibili. Colonne: Nome | Id | Versione | Disponibile | [Origine].
 function Get-WinGetUpgrades([bool]$IncludeUnknown = $false) {
     # --include-unknown: include pacchetti con versione installata sconosciuta (opzionale,

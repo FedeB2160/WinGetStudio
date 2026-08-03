@@ -1,8 +1,8 @@
 # WinGet Update Tool
 
-Standalone Windows tool (WPF) that lists `winget` updates in a checkbox table and upgrades only the selected entries. Automatic UAC elevation, non-blocking UI, light/dark theme, no branding.
+Standalone Windows tool (WPF) for managing `winget` packages from a checkbox table: **update** what has a newer version, **install** something new by searching as you type, **list and uninstall** what is already there. Automatic UAC elevation, non-blocking UI, light/dark theme, no branding.
 
-The **UI and this documentation are in English**; the in-code comments are in Italian. User-facing strings live in `ui\UI.xaml` (labels, column headers) and in the `Write-Log` / `LogUI` / `MessageBox` calls of `src\WinGetUpdateTool.ps1`.
+The **UI and this documentation are in English**; the in-code comments are in Italian. User-facing strings live in `ui\UI.xaml` (labels, column headers) and in the `Write-Log` / `LogUI` / `MessageBox` calls under `src\modules\`.
 
 ## Layout
 
@@ -19,6 +19,7 @@ src\   main.ps1                 entry point: version, elevation, module loading,
        App.Theme.ps1            Light / Dark / Auto theme
        Tab.Updates.ps1          the Updates tab
        Tab.Install.ps1          the Install tab: search-as-you-type, scope, install
+       Tab.Installed.ps1        the Installed tab: inventory, filter, uninstall
        App.Bootstrap.ps1        WgtRow, XAML loading, Start-App
 ui\    UI.xaml                  window: layout and styles
        Theme.Light.xaml         light palette
@@ -42,7 +43,7 @@ The three `.xaml` files are **not** a runtime requirement either: `build.ps1` in
 ## Version
 
 The version lives in **one** place, the `$AppVersion` constant at the top of `src\main.ps1`. From there it reaches:
-- the **window title**, as `WinGet Update Tool [1.1.0]`;
+- the **window title**, as `WinGet Update Tool [v1.4.0]` (the `v` is added when composing the title, so what reaches the exe properties stays a plain number);
 - the **exe properties** (right click → Properties → Details): `build.ps1` reads the constant with a regex and passes it to ps2exe, so the two can never disagree. A missing or renamed constant fails the build instead of producing an unversioned exe.
 
 Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still found, that it is `x.y.z`, that it reaches the title and that `build.ps1` still forwards it.
@@ -106,6 +107,22 @@ While the search is still typing-in-progress the grid keeps showing the previous
 
 Only one winget operation runs at a time (winget is not reliable in parallel), so an update in progress greys out the Install tab's controls too, and vice versa. Each tab registers a handler with `Set-AppBusy`.
 
+### Installed tab
+The inventory of what is on the machine, and where you remove it.
+
+1. The list **loads by itself the first time you open the tab**, not at startup: `winget list` takes a couple of seconds and returns everything (340 packages on the development machine), so nobody who never opens this tab pays for it. **Refresh** rebuilds it.
+2. The **filter box** narrows the list locally — it does not call winget again. It matches name *and* ID, case-insensitively.
+3. Tick rows and press **Uninstall**.
+
+The list includes packages that were **not** installed through winget: their ID looks like `ARP\Machine\X64\Android Studio` — with spaces inside it, which is legitimate — and their Source column is empty. They uninstall by ID like any other.
+
+Uninstalling is the only irreversible thing this tool does, so it is guarded:
+- a **Yes/No confirmation** listing the actual package names, with **No as the default button** — a stray Enter cannot remove anything;
+- the filter **hides** rows without deselecting them, so a package could be queued while off screen. Both the counter line (`2 selected (1 hidden by the filter)`) and the confirmation dialog say so explicitly.
+- `Test-Ui.ps1` asserts the confirmation exists, is Yes/No, defaults to No, and comes *before* anything is queued.
+
+After an uninstall the list is **not** rebuilt automatically: that would wipe the Result column, which is the record of what actually happened. Press Refresh when you have read it.
+
 ### Theme
 The icon button in the top right **cycles** through three modes (the tooltip names the active one):
 
@@ -143,3 +160,4 @@ Icons from the system set (**Segoe Fluent Icons**, falling back to **Segoe MDL2 
 - The checkbox uses a **custom `ControlTemplate`**: the system one (Aero2) fills the tick with a hardcoded `#FF212121` declared as a `StaticResource` inside the theme dictionary, so no external setter can reach it and in dark mode the tick was black on black. The template binds the tick to `FgBrush` and restores the hover border and disabled opacity that re-templating throws away.
 - Column resizing lives in the `ControlTemplate` of `DataGridColumnHeader`: re-templating the header (which is necessary — the system `DataGridHeaderBorder` ignores `Background`) throws away the two `Thumb` elements `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` that DataGrid hooks for the drag, and the columns silently become fixed, **with no error at all**. They have to be added back by hand under those exact names; `Test-Ui.ps1` verifies they are there.
 - Table rows are instances of the `WgtRow` class (`INotifyPropertyChanged`, compiled with `Add-Type` at startup), not `PSCustomObject`: `NoteProperty` values do not notify WPF, which forced a `$Grid.Items.Refresh()` on every state change — and that regenerates the view and sends the scroll back to the top. `Test-Ui.ps1` checks both the event and the absence of `Items.Refresh()` / `$Grid.IsEnabled = ...` in the code.
+

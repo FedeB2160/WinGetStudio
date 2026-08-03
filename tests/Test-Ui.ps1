@@ -49,6 +49,18 @@ $injected = $mainText.Replace('###MODULES###', (($moduleNames | ForEach-Object {
     (Get-Content (Join-Path $root "src\modules\$_") -Raw -Encoding UTF8).TrimEnd()
 }) -join "`r`n"))
 
+# Testo sorgente di una funzione, per i controlli che devono guardare COME e' scritta
+# (es. che una conferma preceda un'operazione distruttiva).
+function Get-FunctionSource([string]$name) {
+    $a = [System.Management.Automation.Language.Parser]::ParseInput($injected, [ref]$null, [ref]$null)
+    $fn = $a.Find({
+        param($n)
+        $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name
+    }.GetNewClosure(), $true)
+    if (-not $fn) { throw "funzione non trovata nel codice: $name" }
+    return $fn.Extent.Text
+}
+
 # 1) Gli script parsano?
 foreach ($f in $psFiles) {
     $errs = $null
@@ -346,5 +358,63 @@ $SearchSpinner.Visibility = [System.Windows.Visibility]::Collapsed
 if ($wAfter -ne $wBefore) { throw "lo spinner ha ristretto il campo di ricerca: $wBefore -> $wAfter" }
 if ($xStoreAfter -ne $xStoreBefore) { throw "lo spinner ha spostato la spunta MS Store: $xStoreBefore -> $xStoreAfter" }
 "OK spin   lo spinner compare senza muovere campo di ricerca ne' spunta (campo $([int]$wBefore)px)"
+
+# 16) La disinstallazione DEVE restare dietro una conferma, e la conferma deve venire
+# prima di mettere qualcosa in coda. E' l'unica operazione irreversibile del programma:
+# il controllo e' statico perche' una MessageBox headless bloccherebbe la suite.
+$uninstallSrc = Get-FunctionSource 'Start-UninstallSelected'
+$posConfirm = $uninstallSrc.IndexOf('MessageBox')
+$posQueue   = $uninstallSrc.IndexOf('Start-WinGetQueue')
+if ($posConfirm -lt 0) { throw "Start-UninstallSelected non chiede conferma" }
+if ($posQueue -lt 0)   { throw "Start-UninstallSelected non mette nulla in coda" }
+if ($posConfirm -gt $posQueue) { throw "la conferma arriva DOPO l'avvio della coda di disinstallazione" }
+if ($uninstallSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma non ha No come pulsante predefinito" }
+if ($uninstallSrc -notmatch 'MessageBoxButton\]::YesNo') { throw "la conferma non e' una scelta Yes/No" }
+"OK confirm disinstallazione dietro conferma Yes/No con default No, prima della coda"
+
+# 17) Elenco installati e filtro locale. Tocca winget in lettura (winget list).
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    "SKIP list    winget non presente su questa macchina"
+}
+else {
+    # Il caricamento parte da solo al PRIMO ingresso nella scheda: non si chiama la
+    # funzione a mano, si cambia scheda come farebbe l'utente.
+    if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
+    $tabMain.SelectedIndex = 2
+    if (-not (Wait-For { $installedItems.Count -gt 0 -and -not $script:isBusy } 120)) {
+        throw "aprendo la scheda Installed l'elenco non si e' caricato"
+    }
+    $total = $installedItems.Count
+
+    # ...e non deve ripartire ogni volta che si tocca la griglia: l'evento del DataGrid
+    # bubbla fino al TabControl, e senza il controllo sull'originatore rilancerebbe una
+    # scansione a ogni clic su una riga.
+    $GridInstalled.SelectedIndex = 0
+    Start-Sleep -Milliseconds 300
+    if ($script:isBusy) { throw "selezionare una riga ha riavviato il caricamento dell'elenco" }
+
+    # Il filtro nasconde righe senza toglierle dalla collezione.
+    $TxtFilter.Text = '7zip'
+    $shown = @($script:installedView).Count
+    if ($installedItems.Count -ne $total) { throw "il filtro ha rimosso righe dalla collezione invece di nasconderle" }
+    if ($shown -ge $total -or $shown -eq 0) { throw "il filtro '7zip' mostra $shown righe su $total" }
+    foreach ($r in @($script:installedView)) {
+        if ($r.Name -notlike '*7zip*' -and $r.Id -notlike '*7zip*') { throw "il filtro ha lasciato passare '$($r.Name)'" }
+    }
+
+    # PUNTO CRITICO: una riga selezionata e poi nascosta dal filtro resta in coda per la
+    # disinstallazione. Deve essere dichiarato a schermo, non solo nella conferma.
+    $victim = @($installedItems | Where-Object { $_.Name -notlike '*7zip*' -and $_.Id -notlike '*7zip*' })[0]
+    $victim.Selected = $true
+    Refresh-InstalledState
+    if ($TxtInstalledInfo.Text -notmatch 'hidden by the filter') {
+        throw "un pacchetto selezionato ma nascosto dal filtro non viene segnalato: '$($TxtInstalledInfo.Text)'"
+    }
+    $victim.Selected = $false
+    $TxtFilter.Text = ''
+    Refresh-InstalledState
+    Stop-AllJobs
+    "OK list    $total pacchetti installati, filtro locale e avviso sui selezionati nascosti"
+}
 
 Write-Host "`nTUTTO OK" -ForegroundColor Green

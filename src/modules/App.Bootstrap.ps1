@@ -124,7 +124,10 @@ function Start-App([switch]$NoShow) {
         'BtnRefresh', 'ChkUnknown', 'BtnToggleAll', 'BtnUpdate', 'TxtAvailable',
         'TxtSelected', 'Grid', 'TxtEmpty', 'TopSpinner', 'Progress', 'TxtLog', 'BtnTheme',
         'TxtSearch', 'BtnSearch', 'ChkStore', 'BtnScope', 'SearchSpinner',
-        'GridSearch', 'TxtSearchEmpty', 'TxtSearchInfo', 'BtnInstall'
+        'GridSearch', 'TxtSearchEmpty', 'TxtSearchInfo', 'BtnInstall',
+        'TabMain', 'BtnRefreshInstalled', 'TxtFilter', 'InstalledSpinner',
+        'TxtInstalledCount', 'GridInstalled', 'TxtInstalledEmpty',
+        'TxtInstalledInfo', 'BtnUninstall'
     )) {
         $c = $script:window.FindName($n)
         if (-not $c) { throw "Control not found in UI.xaml: $n" }
@@ -142,6 +145,7 @@ function Start-App([switch]$NoShow) {
     Initialize-Theme
     Initialize-UpdatesTab
     Initialize-InstallTab
+    Initialize-InstalledTab
 
     # Alla chiusura: ferma timer e chiudi i job pendenti, cosi' il processo termina
     # davvero (niente thread in background lasciati vivi).

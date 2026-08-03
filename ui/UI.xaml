@@ -530,6 +530,83 @@
                         </DockPanel>
                     </Grid>
                 </TabItem>
+
+                <TabItem Header="Installed">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>   <!-- comandi e filtro -->
+                            <RowDefinition Height="*"/>      <!-- elenco -->
+                            <RowDefinition Height="Auto"/>   <!-- action bar -->
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                            <Button x:Name="BtnRefreshInstalled" Content="Refresh" Width="104" Height="26"/>
+                            <!-- Filtro locale sull'elenco gia' caricato: non richiama winget.
+                                 Con qualche centinaio di pacchetti installati (misurati: 339 su
+                                 questa macchina) scorrere a mano non e' praticabile. -->
+                            <Grid Width="300" Margin="8,0,0,0">
+                                <TextBox x:Name="TxtFilter" Height="26" VerticalContentAlignment="Center"/>
+                                <TextBlock Text="Filter by name or ID"
+                                           IsHitTestVisible="False" Margin="7,0,0,0"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SubtleFgBrush}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Text, ElementName=TxtFilter}" Value="">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </Grid>
+                            <Control x:Name="InstalledSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                     Margin="12,0,0,0" Visibility="Collapsed"/>
+                            <TextBlock x:Name="TxtInstalledCount" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
+                        </StackPanel>
+
+                        <DataGrid x:Name="GridInstalled" Grid.Row="1"
+                                  AutoGenerateColumns="False" CanUserAddRows="False"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                  IsReadOnly="False" SelectionMode="Extended"
+                                  Background="{DynamicResource BgBrush}"
+                                  Foreground="{DynamicResource FgBrush}"
+                                  BorderBrush="{DynamicResource BorderBrush2}"
+                                  RowBackground="{DynamicResource BgBrush}"
+                                  AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
+                                  HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
+                                  ColumnHeaderStyle="{StaticResource GridHeader}"
+                                  CellStyle="{StaticResource GridCell}">
+                            <DataGrid.Columns>
+                                <DataGridCheckBoxColumn Header="" Width="40"
+                                    ElementStyle="{StaticResource ThemedCheckBox}"
+                                    EditingElementStyle="{StaticResource ThemedCheckBox}"
+                                    Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                <DataGridTextColumn Header="Name"    Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
+                                <DataGridTextColumn Header="Version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
+                                <DataGridTextColumn Header="ID"      Width="2.4*" IsReadOnly="True" Binding="{Binding Id}"/>
+                                <DataGridTemplateColumn Header="Result" Width="70"
+                                                        CellTemplate="{StaticResource ResultCell}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <TextBlock x:Name="TxtInstalledEmpty" Grid.Row="1"
+                                   Text="Press Refresh to list the installed packages."
+                                   FontSize="16" Foreground="{DynamicResource SubtleFgBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextWrapping="Wrap" TextAlignment="Center"/>
+
+                        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+                            <Button x:Name="BtnUninstall" Content="Uninstall" Width="104" Height="26"
+                                    DockPanel.Dock="Left" IsEnabled="False"/>
+                            <TextBlock x:Name="TxtInstalledInfo" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       Foreground="{DynamicResource SubtleFgBrush}"/>
+                        </DockPanel>
+                    </Grid>
+                </TabItem>
             </TabControl>
 
             <!-- Selettore tema: vale per tutta la finestra, quindi sta FUORI dalle schede,
