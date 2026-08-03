@@ -25,7 +25,7 @@ The three `.xaml` files are **not** a runtime requirement: `build.ps1` injects t
 ## Version
 
 The version lives in **one** place, the `$AppVersion` constant at the top of `src\WinGetUpdateTool.ps1`. From there it reaches:
-- the **window title**, as `WinGet Update Tool [1.0.1]`;
+- the **window title**, as `WinGet Update Tool [1.0.0]`;
 - the **exe properties** (right click → Properties → Details): `build.ps1` reads the constant with a regex and passes it to ps2exe, so the two can never disagree. A missing or renamed constant fails the build instead of producing an unversioned exe.
 
 Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still found, that it is `x.y.z`, that it reaches the title and that `build.ps1` still forwards it.
