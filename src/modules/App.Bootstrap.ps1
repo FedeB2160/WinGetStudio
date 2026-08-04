@@ -115,21 +115,20 @@ function Start-App([switch]$NoShow) {
 
     # 2) Finestra
     $script:window = Read-Xaml 'UI.xaml'
-    # Versione in coda al titolo: il nome resta in UI.xaml con le altre stringhe visibili.
-    # La "v" sta qui e non nella costante: build.ps1 passa a ps2exe un numero, non "v1.2.3".
-    $script:window.Title = "$($script:window.Title) [v$AppVersion]"
 
     # 3) Riferimenti ai controlli
     foreach ($n in @(
         'BtnRefresh', 'ChkUnknown', 'BtnToggleAll', 'BtnUpdate', 'TxtAvailable',
-        'TxtSelected', 'Grid', 'TxtEmpty', 'TopSpinner', 'Progress', 'TxtLog', 'BtnTheme',
+        'TxtSelected', 'Grid', 'TxtEmpty', 'TopSpinner', 'Progress', 'TxtLog',
         'TxtSearch', 'BtnSearch', 'ChkStore', 'BtnScope', 'SearchSpinner',
         'GridSearch', 'TxtSearchEmpty', 'TxtSearchInfo', 'BtnInstall',
         'TabMain', 'BtnRefreshInstalled', 'TxtFilter', 'InstalledSpinner',
         'TxtInstalledCount', 'GridInstalled', 'TxtInstalledEmpty',
         'TxtInstalledInfo', 'BtnUninstall',
         'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
-        'BtnExport', 'BtnImport'
+        'BtnExport', 'BtnImport',
+        'CmbTheme', 'TxtThemeHint', 'TxtVersion', 'BtnCheckUpdate', 'BtnUpdateApp',
+        'UpdateSpinner', 'TxtUpdateStatus'
     )) {
         $c = $script:window.FindName($n)
         if (-not $c) { throw "Control not found in UI.xaml: $n" }
@@ -149,6 +148,7 @@ function Start-App([switch]$NoShow) {
     Initialize-InstallTab
     Initialize-InstalledTab
     Initialize-Backup
+    Initialize-Update
 
     # Alla chiusura: ferma timer e chiudi i job pendenti, cosi' il processo termina
     # davvero (niente thread in background lasciati vivi).
@@ -159,9 +159,11 @@ function Start-App([switch]$NoShow) {
 
     # Carica gli upgrade all'apertura. Secondo Set-Theme: al primo giro la finestra non
     # aveva ancora un HWND, quindi la barra titolo non era stata colorata.
-    $script:window.Add_ContentRendered({ Set-Theme; Load-Upgrades })
+    $script:window.Add_ContentRendered({ Set-Theme; Load-Upgrades; Start-UpdateCheck })
 
     if ($NoShow) { return }
     $script:window.ShowDialog() | Out-Null
 }
+
+
 

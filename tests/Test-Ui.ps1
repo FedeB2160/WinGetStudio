@@ -233,7 +233,8 @@ if ($uiText -notmatch '(?s)GridHeader.*?HorizontalContentAlignment"\s+Value="Cen
 $mv = [regex]::Match($mainText, "(?m)^\s*\`$AppVersion\s*=\s*'([\d.]+)'")
 if (-not $mv.Success) { throw "costante `$AppVersion non trovata in src\main.ps1" }
 if ($mv.Groups[1].Value -notmatch '^\d+\.\d+\.\d+$') { throw "versione non x.y.z: '$($mv.Groups[1].Value)'" }
-if ($code -notmatch '(?m)window\.Title\s*=.*\$AppVersion') { throw "la versione non finisce nel titolo della finestra" }
+# La versione non sta piu' nel titolo della finestra: e' una riga della scheda Settings.
+if ($code -notmatch 'TxtVersion\.Text\s*=.*\$AppVersion') { throw "la versione non finisce nella scheda Settings" }
 $buildText = Get-Content (Join-Path $root 'src\build.ps1') -Raw -Encoding UTF8
 if ($buildText -notmatch '(?m)^\s*version\s*=\s*\$version') { throw "build.ps1 non passa la versione a ps2exe" }
 "OK ver    versione $($mv.Groups[1].Value) nel titolo e nelle proprieta' dell'exe"
@@ -261,14 +262,15 @@ $AppVersion = $mv.Groups[1].Value
 Start-App -NoShow
 
 if (-not $script:window) { throw "Start-App non ha costruito la finestra" }
-if ($script:window.Title -notmatch [regex]::Escape("[v$AppVersion]")) { throw "titolo senza versione: $($script:window.Title)" }
+if ($TxtVersion.Text -notmatch [regex]::Escape($AppVersion)) { throw "la scheda Settings non mostra la versione: '$($TxtVersion.Text)'" }
 # I moduli leggono i controlli senza prefisso: se lo scope e' sbagliato, $Grid e' $null
 # e ItemsSource resta tale.
 # NB: confronto con $null e non "-not", perche' una collezione VUOTA e' falsy in
 # PowerShell — con -not il controllo fallirebbe anche ad aggancio riuscito.
 if ($null -eq $Grid) { throw "i moduli non vedono `$Grid: controllo assegnato senza `$script:?" }
 if ($null -eq $Grid.ItemsSource) { throw "Initialize-UpdatesTab non ha agganciato la collezione al DataGrid" }
-if ($null -eq $BtnTheme.Content) { throw "Initialize-Theme non ha scritto il glifo: i moduli non vedono `$BtnTheme" }
+if ($CmbTheme.Items.Count -ne 3) { throw "Initialize-Theme non ha riempito la tendina del tema: $($CmbTheme.Items.Count) voci" }
+if ($CmbTheme.SelectedItem -notin @('Light', 'Dark', 'Auto')) { throw "tema selezionato inatteso: '$($CmbTheme.SelectedItem)'" }
 # Le funzioni delle schede girano senza esplodere sui controlli?
 Write-Log 'test'
 if ($TxtLog.Text -notmatch 'test') { throw "Write-Log non scrive nel TextBox del log" }
@@ -516,6 +518,38 @@ else {
         Remove-Item $expFile -Force -ErrorAction SilentlyContinue
         Stop-AllJobs
     }
+}
+
+# 20) Auto-update. Il download e la sostituzione NON si eseguono: rimpiazzerebbero
+# l'eseguibile in uso. Si verificano il confronto fra versioni, la lettura della release
+# da GitHub e i presidi di sicurezza attorno al download.
+if (-not (Test-NewerVersion '1.7.0' '1.6.0'))   { throw "1.7.0 dovrebbe essere piu' recente di 1.6.0" }
+if (-not (Test-NewerVersion 'v1.10.0' '1.9.0')) { throw "1.10.0 e' piu' recente di 1.9.0: confronto fatto da stringa invece che da versione" }
+if (Test-NewerVersion '1.6.0' '1.6.0')          { throw "la stessa versione non e' un aggiornamento" }
+if (Test-NewerVersion '1.5.0' '1.6.0')          { throw "una versione precedente non e' un aggiornamento" }
+if (Test-NewerVersion 'nightly' '1.6.0')        { throw "un tag non numerico non deve proporre nulla" }
+
+# Il download e' l'unico punto in cui il programma ESEGUE codice preso da internet:
+# la conferma deve precederlo e il checksum deve essere confrontato.
+$updSrc = Get-FunctionSource 'Start-SelfUpdate'
+if ($updSrc.IndexOf('MessageBox') -lt 0) { throw "Start-SelfUpdate non chiede conferma" }
+if ($updSrc.IndexOf('MessageBox') -gt $updSrc.IndexOf('Invoke-WebRequest')) { throw "la conferma arriva DOPO il download" }
+if ($updSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma di aggiornamento non ha No come default" }
+if ($updSrc -notmatch 'Get-FileHash.*SHA256|SHA256') { throw "il file scaricato non viene verificato con SHA-256" }
+if ($updSrc -notmatch 'Tls12') { throw "manca TLS 1.2: PowerShell 5.1 negozia TLS 1.0 e GitHub rifiuta" }
+$getRelSrc = Get-FunctionSource 'Get-LatestRelease'
+if ($getRelSrc -notmatch "User-Agent") { throw "manca lo User-Agent: l'API di GitHub risponde 403 senza" }
+
+# Chiamata reale all'API pubblica (una richiesta, limite anonimo 60/ora).
+$rel = Get-LatestRelease 'FedeB2160/WinGetStudio'
+if (-not $rel) {
+    "SKIP rel     nessuna release con asset .exe pubblicata (o rete assente)"
+}
+else {
+    if ($rel.Version -notmatch '^\d+\.\d+') { throw "versione della release non numerica: '$($rel.Version)'" }
+    if ($rel.Url -notmatch '^https://github\.com/') { throw "URL di download non su github.com: $($rel.Url)" }
+    if ($rel.Name -notlike '*.exe') { throw "l'asset scelto non e' un .exe: $($rel.Name)" }
+    "OK rel     release $($rel.Tag) letta da GitHub: $($rel.Name), $([int]($rel.Size/1024)) KB, checksum $(if ($rel.Sha256) { 'presente' } else { 'ASSENTE' })"
 }
 
 Write-Host "`nTUTTO OK" -ForegroundColor Green

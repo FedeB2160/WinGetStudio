@@ -398,6 +398,98 @@
             </Setter>
         </Style>
 
+        <!-- Voce del menu a tendina: il template di sistema evidenzia in azzurro fisso. -->
+        <Style TargetType="ComboBoxItem">
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="bd" Background="Transparent" CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CtrlHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource SelBgBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Menu a tendina. Va ri-templato per intero: quello di sistema (Aero2) disegna
+             sfondo e bordo con colori cablati e in Dark-Mode resta bianco.
+             Struttura minima che ComboBox richiede: un ToggleButton legato a
+             IsDropDownOpen e un Popup di nome PART_Popup. Il ToggleButton e' trasparente e
+             sta SOPRA il bordo, cosi' intercetta il clic su tutta la superficie senza
+             doverne annidare il template dentro quello della ComboBox. -->
+        <Style TargetType="ComboBox">
+            <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="Height" Value="26"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <Border x:Name="bd" CornerRadius="4" BorderThickness="1"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}">
+                                <Grid>
+                                    <ContentPresenter Margin="8,0,26,0" VerticalAlignment="Center"
+                                                      Content="{TemplateBinding SelectionBoxItem}"
+                                                      ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"/>
+                                    <!-- Freccia disegnata a mano: un glifo di font qui
+                                         costringerebbe a gestire il fallback dell'icona. -->
+                                    <Path HorizontalAlignment="Right" VerticalAlignment="Center"
+                                          Margin="0,0,9,0" Data="M 0,0 L 4.5,4.5 L 9,0"
+                                          Stroke="{TemplateBinding Foreground}" StrokeThickness="1.4"/>
+                                </Grid>
+                            </Border>
+                            <ToggleButton Focusable="False" ClickMode="Press" Background="Transparent"
+                                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border Background="Transparent"/>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}" Focusable="False">
+                                <Border Background="{DynamicResource CtrlBgBrush}"
+                                        BorderBrush="{DynamicResource BorderBrush2}"
+                                        BorderThickness="1" CornerRadius="4" Padding="2"
+                                        MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
+                                    <ItemsPresenter/>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="bd" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Titolo di sezione nella scheda Settings -->
+        <Style x:Key="SettingsHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+
         <!-- Campo di testo: la TextBox di sistema ha sfondo bianco cablato e in Dark-Mode
              resterebbe bianca col testo bianco. Serve solo impostare i colori. -->
         <Style TargetType="TextBox">
@@ -721,15 +813,58 @@
                         </DockPanel>
                     </Grid>
                 </TabItem>
+
+                <TabItem Header="Settings">
+                    <!-- Impostazioni in colonna, non in griglia: sono pochi controlli e
+                         crescono in verticale. ScrollViewer per non tagliarli quando la
+                         finestra e' alla dimensione minima. -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,2,4,2">
+                        <StackPanel>
+                            <TextBlock Text="APPEARANCE" Style="{StaticResource SettingsHeader}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
+                                <TextBlock Text="Theme" VerticalAlignment="Center" Width="120"
+                                           Foreground="{DynamicResource FgBrush}"/>
+                                <!-- Le voci le riempie App.Theme.ps1: sono gli stessi valori
+                                     che finiscono nel registro (Light | Dark | Auto). -->
+                                <ComboBox x:Name="CmbTheme" Width="180"/>
+                                <TextBlock x:Name="TxtThemeHint" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           Foreground="{DynamicResource SubtleFgBrush}"/>
+                            </StackPanel>
+
+                            <TextBlock Text="UPDATES" Style="{StaticResource SettingsHeader}"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                <TextBlock Text="Installed version" VerticalAlignment="Center" Width="120"
+                                           Foreground="{DynamicResource FgBrush}"/>
+                                <!-- La versione sta qui, non nel titolo della finestra. -->
+                                <TextBlock x:Name="TxtVersion" VerticalAlignment="Center"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="120,0,0,18">
+                                <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
+                                <!-- Compare solo quando una release e' piu' recente di questa. -->
+                                <Button x:Name="BtnUpdateApp" Height="26" Padding="12,0" Margin="8,0,0,0"
+                                        Visibility="Collapsed"
+                                        Background="{DynamicResource AccentBrush}" Foreground="White"/>
+                                <Control x:Name="UpdateSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                         Margin="10,0,0,0" Visibility="Collapsed"/>
+                                <TextBlock x:Name="TxtUpdateStatus" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           Foreground="{DynamicResource SubtleFgBrush}"/>
+                            </StackPanel>
+
+                            <TextBlock Text="ABOUT" Style="{StaticResource SettingsHeader}"/>
+                            <TextBlock Foreground="{DynamicResource SubtleFgBrush}" TextWrapping="Wrap"
+                                       Text="A graphical front end for winget: update, install, uninstall, pin and export packages. Requires administrator rights, which it asks for at startup."/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
             </TabControl>
 
             <!-- Selettore tema: vale per tutta la finestra, quindi sta FUORI dalle schede,
                  sovrapposto a destra all'altezza delle linguette. Pulsante ciclico
                  Chiaro -> Scuro -> Auto; glifo e ToolTip li scrive App.Theme.ps1.
                  Icone dal set di sistema (Segoe Fluent Icons, fallback Segoe MDL2 Assets). -->
-            <Button x:Name="BtnTheme" Width="30" Height="24" Panel.ZIndex="2"
-                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
-                    FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"/>
+            <!-- Tema e aggiornamento sono nella scheda Settings: sovrapposti all'angolo
+                 stavano stretti e non spiegavano cosa facessero. -->
         </Grid>
 
         <!-- Barra avanzamento della coda in corso (condivisa da tutte le schede) -->

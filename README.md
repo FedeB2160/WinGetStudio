@@ -19,6 +19,7 @@ src\   main.ps1                 entry point: version, elevation, module loading,
        App.Theme.ps1            Light / Dark / Auto theme
        App.Pins.ps1             pins: read, add, remove, flag the rows
        App.Backup.ps1           export / import of the package list
+       App.Update.ps1           self-update from GitHub releases
        Tab.Updates.ps1          the Updates tab
        Tab.Install.ps1          the Install tab: search-as-you-type, scope, install
        Tab.Installed.ps1        the Installed tab: inventory, filter, uninstall
@@ -29,7 +30,7 @@ ui\    UI.xaml                  window: layout and styles
 assets\icon.ico                 app icon (embedded in the exe)
 tests\ Test-Ui.ps1              headless check of code, XAML, themes and startup
        Test-InvokeWinGet.ps1    winget execution and table parsing
-dist\  WinGetStudio.exe     build output
+dist\  WinGetStudio.exe        build output (signed, gitignored)
 ```
 
 `src\main.ps1` holds no logic: it elevates, loads the modules and calls `Start-App`. It exists as a separate file because ps2exe takes a single input file and the self-elevation has to run before anything else.
@@ -45,7 +46,7 @@ The three `.xaml` files are **not** a runtime requirement either: `build.ps1` in
 ## Version
 
 The version lives in **one** place, the `$AppVersion` constant at the top of `src\main.ps1`. From there it reaches:
-- the **window title**, as `WinGet Studio [v1.6.0]` (the `v` is added when composing the title, so what reaches the exe properties stays a plain number);
+- the **window title**, as `WinGet Studio [v1.7.0]` (the `v` is added when composing the title, so what reaches the exe properties stays a plain number);
 - the **exe properties** (right click → Properties → Details): `build.ps1` reads the constant with a regex and passes it to ps2exe, so the two can never disagree. A missing or renamed constant fails the build instead of producing an unversioned exe.
 
 Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still found, that it is `x.y.z`, that it reaches the title and that `build.ps1` still forwards it.
@@ -69,6 +70,24 @@ powershell -ExecutionPolicy Bypass -File .\src\build.ps1
 Produces `dist\WinGetStudio.exe`. Double click → UAC prompt → same UI.
 
 The build replaces the `###MODULES###` marker in `src\main.ps1` with the concatenated modules and the `###UI.xaml###`, `###Theme.Light.xaml###`, `###Theme.Dark.xaml###` markers with the file contents (modules first, since the XAML markers live inside `App.Bootstrap.ps1`), writes a temporary source to `%TEMP%` and hands that to ps2exe (`-requireAdmin` → UAC manifest, `-noConsole` → WPF window only, `-iconFile` → embedded icon). It fails with an explicit error if a marker is missing, a listed module is absent, or the exe is not rewritten.
+
+## Automatic updates
+
+At startup the app asks GitHub for the latest release of `FedeB2160/WinGetStudio`. The repo is public, so **no token is involved** — one anonymous API call (the anonymous limit is 60/hour). If a newer version exists, an accent-coloured **Update to vX.Y.Z** button appears next to the theme button and a line goes into the log. Nothing else happens: no dialog on startup, no automatic download.
+
+No release, no network, a non-numeric tag, or running from source instead of the exe: the check does nothing and says nothing. A missing update is not a fault.
+
+**How it replaces itself, with no external updater:** on Windows a running executable cannot be overwritten, but it *can* be renamed. So the app renames itself to `.old`, writes the new exe in its place, restarts, and deletes the `.old` on the next launch.
+
+Since this is the one place where the program runs code fetched from the internet, it is fenced in:
+- **explicit confirmation**, No by default, showing the file name, size and download URL;
+- the download is verified against the **SHA-256 published with the release** and discarded on mismatch — if a release carries no checksum, the dialog says so before you accept;
+- if replacing the exe fails halfway, the `.old` is put back, so the app is never left without an executable;
+- TLS 1.2 is set explicitly (PowerShell 5.1 still negotiates TLS 1.0, which GitHub refuses) and a User-Agent is sent (the API answers 403 without one).
+
+The asset is found as the **first `.exe` in the release**, not by exact name, so releases published before the rename still work.
+
+`Test-Ui.ps1` covers the version comparison (including `1.10.0 > 1.9.0`, which string comparison gets wrong), reads the real release from GitHub, and asserts that confirmation precedes the download and that the checksum is checked. It does **not** run a download — that would replace the exe under the test.
 
 ## Signing
 
@@ -175,7 +194,17 @@ Two things worth knowing, both learned the hard way:
 
 `Test-Ui.ps1` runs the whole pin cycle against real winget on `7zip.7zip` and removes the pin in a `finally`, so a failure mid-test cannot leave a package silently blocked.
 
-### Theme
+### Settings tab
+Everything that is not a package operation lives here.
+
+- **Theme** — a dropdown with `Light` / `Dark` / `Auto`. In `Auto` the line next to it says which of the two it is currently following, so the choice explains what you see. The list entries *are* the values written to the registry, so there is no label-to-value table to keep in sync.
+- **Installed version** and **Check for updates** — the version is shown here rather than in the window title. The manual check always reports an outcome ("Up to date", "vX is available", "No release found"), while the automatic one at startup stays silent unless there is something to say.
+
+The `ComboBox` is fully re-templated, like the context menu and the checkbox before it: the system one (Aero2) hardcodes a light background and would stay white in dark mode. WPF needs a `ToggleButton` bound to `IsDropDownOpen` and a `Popup` named `PART_Popup`; here the ToggleButton is transparent and sits *over* the border, so it catches clicks across the whole control without nesting one template inside another.
+
+The old cycling theme button in the top-right corner is gone: cramped, and it never explained what it did.
+
+### Theme (how it works)
 The icon button in the top right **cycles** through three modes (the tooltip names the active one):
 
 | Icon | Glyph | Mode | Behaviour |
@@ -212,6 +241,9 @@ Icons from the system set (**Segoe Fluent Icons**, falling back to **Segoe MDL2 
 - The checkbox uses a **custom `ControlTemplate`**: the system one (Aero2) fills the tick with a hardcoded `#FF212121` declared as a `StaticResource` inside the theme dictionary, so no external setter can reach it and in dark mode the tick was black on black. The template binds the tick to `FgBrush` and restores the hover border and disabled opacity that re-templating throws away.
 - Column resizing lives in the `ControlTemplate` of `DataGridColumnHeader`: re-templating the header (which is necessary — the system `DataGridHeaderBorder` ignores `Background`) throws away the two `Thumb` elements `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` that DataGrid hooks for the drag, and the columns silently become fixed, **with no error at all**. They have to be added back by hand under those exact names; `Test-Ui.ps1` verifies they are there.
 - Table rows are instances of the `WgtRow` class (`INotifyPropertyChanged`, compiled with `Add-Type` at startup), not `PSCustomObject`: `NoteProperty` values do not notify WPF, which forced a `$Grid.Items.Refresh()` on every state change — and that regenerates the view and sends the scroll back to the top. `Test-Ui.ps1` checks both the event and the absence of `Items.Refresh()` / `$Grid.IsEnabled = ...` in the code.
+
+
+
 
 
 

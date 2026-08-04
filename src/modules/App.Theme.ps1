@@ -54,17 +54,11 @@ function Set-Theme {
         (Read-Xaml $(if ($dark) { 'Theme.Dark.xaml' } else { 'Theme.Light.xaml' })))
     Set-TitleBarDark $dark
 
-    # Icone dal set di sistema: E706 sole, E708 luna, F08C sole con la luna dentro
-    # (il "mix" per Auto). Presenti sia in Segoe Fluent Icons sia in Segoe MDL2 Assets.
-    # NB: [char]0x.... e non "`u{....}" — l'escape `u esiste solo da PowerShell 6, e
-    # ps2exe compila contro 5.1: la stringa resterebbe il letterale "u{E706}" (tofu).
-    $glyph, $tip = switch ($script:themeMode) {
-        'Light' { [char]0xE706, 'Theme: Light' }
-        'Dark'  { [char]0xE708, 'Theme: Dark' }
-        default { [char]0xF08C, 'Theme: Auto (follows the system)' }
-    }
-    $BtnTheme.Content = $glyph
-    $BtnTheme.ToolTip = $tip
+    # In Auto si dice quale dei due tempi sta seguendo, altrimenti la scelta non spiega
+    # cosa si vede a schermo.
+    $TxtThemeHint.Text = if ($script:themeMode -eq 'Auto') {
+        "following the system: $(if ($dark) { 'dark' } else { 'light' })"
+    } else { '' }
 }
 
 function Initialize-Theme {
@@ -74,12 +68,17 @@ function Initialize-Theme {
         if ($saved -in @('Auto', 'Light', 'Dark')) { $script:themeMode = $saved }
     } catch { }
 
-    $BtnTheme.Add_Click({
-        $script:themeMode = switch ($script:themeMode) {
-            'Light' { 'Dark' }
-            'Dark'  { 'Auto' }
-            default { 'Light' }
-        }
+    # Le voci sono ANCHE i valori salvati nel registro: nessuna tabella di conversione
+    # fra etichetta a schermo e valore memorizzato.
+    foreach ($m in 'Light', 'Dark', 'Auto') { [void]$CmbTheme.Items.Add($m) }
+    $CmbTheme.SelectedItem = $script:themeMode
+
+    # NB: Set-Theme non riscrive la selezione della tendina, altrimenti questo handler
+    # richiamerebbe se stesso a ogni applicazione del tema.
+    $CmbTheme.Add_SelectionChanged({
+        $chosen = [string]$CmbTheme.SelectedItem
+        if (-not $chosen -or $chosen -eq $script:themeMode) { return }
+        $script:themeMode = $chosen
         try {
             if (-not (Test-Path $themeKey)) { New-Item -Path $themeKey -Force | Out-Null }
             Set-ItemProperty -Path $themeKey -Name Theme -Value $script:themeMode
