@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.6.0.schema.json
+
+PackageIdentifier: FedeB2160.WinGetStudio
+PackageVersion: 1.9.0
+
+# portable: l'asset e' un eseguibile singolo, non un installer. winget lo copia nei suoi
+# percorsi e crea l'alias qui sotto nel PATH.
+InstallerType: portable
+# Il binario prodotto da ps2exe e' x86 e gira anche su x64 tramite WOW64.
+InstallerLocale: en-US
+ReleaseDate: 2026-08-04
+
+Installers:
+  - Architecture: x86
+    InstallerUrl: https://github.com/FedeB2160/WinGetStudio/releases/download/v1.9.0/WinGetStudio.exe
+    InstallerSha256: BABF921D3C9C9810266B2207B6F0E48314C197EC3124EB9B0B0B7CD4A1C7C796
+    # L'exe ha un manifest requireAdministrator: si eleva da solo all'avvio, quindi
+    # l'installazione NON richiede privilegi, l'esecuzione si.
+    ElevationRequirement: elevatesSelf
+
+ManifestType: installer
+ManifestVersion: 1.6.0

@@ -117,6 +117,37 @@ The asset is found as the **first `.exe` in the release**, not by exact name, so
 
 `gh release create` would do steps 4-5 from the command line, but the `gh` account on this machine has no push rights on the repo, which belongs to another account — the same reason `git push` works while `gh` does not. Either use the web UI or re-authenticate `gh` as the repo owner.
 
+## Publishing to winget-pkgs
+
+Manifests live in `winget\<version>\` — three files, as the community repository requires. They are kept here so they can be reviewed and versioned with the code; the pull request is a copy of that folder.
+
+Validate before opening anything (this is the same validator the moderators run):
+
+```powershell
+winget validate --manifest .\winget\1.9.0
+```
+
+To install from them locally first, winget needs a feature enabled from an elevated prompt — `winget settings --enable LocalManifestFiles` — then `winget install --manifest .\winget\1.9.0`. Not strictly needed: the winget-pkgs CI installs and uninstalls the package in a sandbox on every pull request.
+
+**Opening the pull request**
+
+1. Fork `microsoft/winget-pkgs`.
+2. Copy the folder to `manifests\f\FedeB2160\WinGetStudio\<version>\` (first letter of the publisher, then publisher, package, version).
+3. Commit, push, open the PR against `master`. The title convention is `New version: FedeB2160.WinGetStudio version 1.9.0`.
+4. Automated validation runs first (schema, URL reachable, hash, sandbox install). A human moderator then reviews it; the first submission of a new package takes longer than later updates.
+
+`wingetcreate update FedeB2160.WinGetStudio --version 1.10.0 --urls <url> --submit` does all of this in one command for subsequent versions, once the package exists in the repository.
+
+**Notes on the manifest**
+
+- `InstallerType: portable` — the asset is a bare executable, so winget copies it and puts an alias on the PATH rather than running an installer.
+- `Architecture: x86` — that is what ps2exe produces by default; it runs on x64 through WOW64.
+- `ElevationRequirement: elevatesSelf` — the exe carries a `requireAdministrator` manifest, so *installing* needs no privileges while *running* asks for them.
+- `PortableCommandAlias` is rejected by the validator as an unknown field, so the alias is left to winget (derived from the file name) and `Commands` is declared in the locale manifest instead.
+- Every value with a `:` inside must be quoted, or the YAML parser fails — `ShortDescription` is the one that bites.
+
+**Once the package is in the repository**, WinGet Studio will appear in its own Updates tab. Upgrading it from there cannot work — the file is in use — so it needs excluding from that list, or routing to the self-update path, which does the rename dance.
+
 ## Tests
 
 ```powershell
