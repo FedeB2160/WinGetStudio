@@ -94,12 +94,16 @@ function Start-UpdateCheck([switch]$Manual) {
         $UpdateSpinner.Visibility    = [System.Windows.Visibility]::Visible
         $BtnCheckUpdate.IsEnabled    = $false
     }
+    # $script: e NON una locale: OnDone gira sul thread UI e non vede le variabili locali
+    # di questa funzione. Con "$manual" locale il controllo manuale non riportava nulla.
+    $script:manualCheck = [bool]$Manual
 
     [void](Start-BackgroundJob -Functions 'Get-LatestRelease' `
-        -Vars @{ repo = $UpdateRepo; manual = [bool]$Manual } `
+        -Vars @{ repo = $UpdateRepo } `
         -Script { Get-LatestRelease $repo } `
         -OnDone {
             param($result)
+            $manual = $script:manualCheck
             $UpdateSpinner.Visibility = [System.Windows.Visibility]::Collapsed
             $BtnCheckUpdate.IsEnabled = -not $script:isBusy
             $rel = @($result)[0]
@@ -145,6 +149,14 @@ function Start-SelfUpdate {
     Write-Log "Downloading $($rel.Name) ..."
     $tmp = Join-Path ([IO.Path]::GetTempPath()) "WinGetStudio-$($rel.Tag).exe"
 
+    # OnDone gira sul thread UI e NON vede le variabili locali di questa funzione: con
+    # $exe, $tmp e $rel locali arrivavano vuote, e l'aggiornamento moriva su
+    # "Remove-Item: Path e' null" e "Start-Process: FilePath e' null".
+    # Stesso inciampo di scope documentato per i job in DEVELOPMENT.md.
+    $script:updExe = $exe
+    $script:updTmp = $tmp
+    $script:updRel = $rel
+
     [void](Start-BackgroundJob -Vars @{ url = $rel.Url; dest = $tmp; expected = $rel.Sha256 } `
         -Script {
             try {
@@ -161,10 +173,13 @@ function Start-SelfUpdate {
         } `
         -OnDone {
             param($result)
+            $exe = $script:updExe
+            $tmp = $script:updTmp
+            $rel = $script:updRel
             $d = @($result)[0]
             if (-not $d -or -not $d.Ok) {
                 Write-Log "Update FAILED: $(if ($d.Error) { $d.Error } else { 'checksum mismatch, the download was discarded' })."
-                Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+                if ($tmp) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
                 Set-AppBusy $false
                 return
             }

@@ -581,6 +581,31 @@ else {
     if ($rel.Url -notmatch '^https://github\.com/') { throw "URL di download non su github.com: $($rel.Url)" }
     if ($rel.Name -notlike '*.exe') { throw "l'asset scelto non e' un .exe: $($rel.Name)" }
     "OK rel     release $($rel.Tag) letta da GitHub: $($rel.Name), $([int]($rel.Size/1024)) KB, checksum $(if ($rel.Sha256) { 'presente' } else { 'ASSENTE' })"
+
+    # Il controllo manuale deve SEMPRE riferire un esito. Serve eseguirlo davvero: il
+    # flag che lo distingue da quello automatico passava per una variabile locale, che
+    # dentro OnDone e' vuota, quindi non riportava nulla e nessun controllo statico lo
+    # vedeva. Lo stesso scope sbagliato rendeva impossibile l'aggiornamento vero e
+    # proprio ($exe e $tmp nulli).
+    # Girando da sorgente il controllo si fermerebbe subito ("da sorgente usa git") e non
+    # attraverserebbe il job: si finge di essere l'exe compilato, cosi' il percorso vero
+    # viene esercitato. Nessun rischio: Start-SelfUpdate non viene mai chiamata.
+    function Get-RunningExePath { Join-Path $root 'dist\WinGetStudio.exe' }
+    $TxtUpdateStatus.Text = ''
+    Start-UpdateCheck -Manual
+    if (-not (Wait-For { $TxtUpdateStatus.Text -and $TxtUpdateStatus.Text -ne 'Checking...' } 60)) {
+        throw "il controllo manuale non ha riportato alcun esito (TxtUpdateStatus: '$($TxtUpdateStatus.Text)')"
+    }
+    if ($UpdateSpinner.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "a controllo finito lo spinner resta acceso" }
+    if (-not $BtnCheckUpdate.IsEnabled) { throw "a controllo finito il pulsante resta disabilitato" }
+    "OK check   controllo manuale: '$($TxtUpdateStatus.Text)'"
+
+    # Le variabili che servono a OnDone devono essere in scope $script:, non locali.
+    $selfSrc = Get-FunctionSource 'Start-SelfUpdate'
+    foreach ($v in 'updExe', 'updTmp', 'updRel') {
+        if ($selfSrc -notmatch "script:$v") { throw "Start-SelfUpdate non passa `$$v a OnDone via `$script:" }
+    }
+    Stop-AllJobs
 }
 
 Write-Host "`nTUTTO OK" -ForegroundColor Green
