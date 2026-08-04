@@ -13,7 +13,7 @@ ReleaseDate: 2026-08-04
 Installers:
   - Architecture: x86
     InstallerUrl: https://github.com/FedeB2160/WinGetStudio/releases/download/v1.9.0/WinGetStudio.exe
-    InstallerSha256: BABF921D3C9C9810266B2207B6F0E48314C197EC3124EB9B0B0B7CD4A1C7C796
+    InstallerSha256: 684EF281781C39B9E4C6330B323BDAFC787B9A832D18F33645A816D71EF2DE0C
     # L'exe ha un manifest requireAdministrator: si eleva da solo all'avvio, quindi
     # l'installazione NON richiede privilegi, l'esecuzione si.
     ElevationRequirement: elevatesSelf
