@@ -88,14 +88,14 @@ The signature is **timestamped** (DigiCert). Without a timestamp a signature sto
 
 ### The current certificate is self-signed
 
-`CN=WinGet Studio, O=EGICON`, valid to 2031. What that does and does not buy:
+`CN=WinGet Studio`, valid to 2031. What that does and does not buy:
 
 - **Does**: proves the exe has not been altered since the build, and shows a publisher name instead of nothing.
 - **Does not**: make Windows trust it. `Get-AuthenticodeSignature` reports `UnknownError` and SmartScreen still says "unknown publisher", because the root is not among the trusted authorities. **This is expected and does not mean the signature is missing.**
 
 To make it trusted, import the public certificate — `assets\WinGetStudio-codesign.cer`, no private key in it — into *Trusted Root Certification Authorities*: per user with `Import-Certificate -CertStoreLocation Cert:\CurrentUser\Root`, or machine-wide by GPO in a domain. Understand what you are doing first: anything signed with that certificate becomes trusted for whoever imports it.
 
-For a signature trusted everywhere without importing anything, a certificate from the company PKI (already trusted domain-wide) or a commercial OV/EV certificate is needed. Both plug into the build through the environment variable above.
+For a signature trusted everywhere without importing anything, a commercial OV or EV certificate is needed (in a managed domain, one from the internal PKI would do as well). Both plug into the build through the environment variable above.
 
 **Private keys never belong in the repo** — `.gitignore` blocks `*.pfx`, `*.p12` and `*.snk`. Only the public `.cer` is committed, and that one is meant to be shared.
 
@@ -209,3 +209,4 @@ Colours are referenced with `{DynamicResource ...}` everywhere: `StaticResource`
 - The settings screen is a panel overlaid on the whole window, **not a second Window**: the theme brushes live in the main window's `MergedDictionaries`, so a separate Window would have to be wired to those dictionaries and re-wired on every theme change, plus owner, modality and placement.
 - The search spinner sits at the **end** of its row: docked right it took 20px off the search box every time a search ran, and gave them back afterwards.
 - During an operation the grids go **read-only, not disabled**: a disabled `DataGrid` stops responding to wheel, scrollbar and keyboard, so the list looked frozen.
+

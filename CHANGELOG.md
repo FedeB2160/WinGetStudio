@@ -34,7 +34,7 @@ The **gear button** in the top-right corner opens a settings screen (closed by t
 The app checks GitHub for newer releases at startup — one anonymous API call, no token. When one exists, an **Update to vX.Y.Z** button appears. The download is confirmed explicitly, verified against the SHA-256 GitHub publishes with the asset, and installed by the app replacing itself and restarting. No external updater.
 
 ### Signed, but by a self-signed certificate
-The exe is signed (`CN=WinGet Studio, O=EGICON`) with a DigiCert timestamp, which proves the file has not been altered since the build.
+The exe is signed (`CN=WinGet Studio`) with a DigiCert timestamp, which proves the file has not been altered since the build.
 
 **Windows still says "unknown publisher"**, because the certificate is self-signed and its root is not trusted. That is expected and does not mean the signature is missing. To make it trusted, import `assets/WinGetStudio-codesign.cer` (public certificate, no private key) into *Trusted Root Certification Authorities*.
 
@@ -48,3 +48,4 @@ The test suite exercises the real thing where it matters — a real winget searc
 First release, as **WinGet Update Tool**: `winget upgrade` in a checkbox table, upgrading only the selected entries, with automatic UAC elevation, a non-blocking UI and a light/dark theme.
 
 This release was removed from GitHub after the rename: it carried the pre-rename binary, so the update check would have offered users a downgrade.
+

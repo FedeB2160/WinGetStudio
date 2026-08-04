@@ -15,6 +15,20 @@
 
 $UpdateRepo = 'FedeB2160/WinGetStudio'
 
+# ID con cui l'app e' pubblicata nel catalogo winget. Serve a TENERSI FUORI dalla propria
+# lista di aggiornamenti: winget non puo' sovrascrivere un eseguibile in esecuzione,
+# quindi spuntarsi nella scheda Updates fallirebbe sempre. Ci si aggiorna dal pulsante
+# nelle impostazioni, che si rinomina e riavvia.
+$SelfPackageId = 'FedeB2160.WinGetStudio'
+
+function Test-IsSelfPackage($row) {
+    if ($null -eq $row -or -not $row.Id) { return $false }
+    # Confronto per CONTENUTO e non per uguaglianza: installato dal catalogo l'ID e'
+    # "FedeB2160.WinGetStudio", ma installato da un manifest locale winget lo registra
+    # come "ARP\User\X64\FedeB2160.WinGetStudio__DefaultSource".
+    return $row.Id -like "*$SelfPackageId*"
+}
+
 # Release piu' recente, o $null se non c'e' rete, non ci sono release, o la risposta non
 # ha un asset .exe. Nessun errore a video: un aggiornamento non trovato non e' un guasto.
 # Gira in un runspace, quindi non tocca la UI.

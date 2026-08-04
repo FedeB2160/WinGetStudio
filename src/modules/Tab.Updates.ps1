@@ -86,7 +86,18 @@ function Load-Upgrades {
             param($result)
             $TopSpinner.Visibility = [System.Windows.Visibility]::Collapsed
             $r = @($result)[0]
-            if ($r) { foreach ($u in $r.Rows) { if ($u) { $items.Add($u) } } }
+            if ($r) {
+                $self = $false
+                foreach ($u in $r.Rows) {
+                    if (-not $u) { continue }
+                    # L'app non si aggiorna da questa lista: winget non puo' sovrascrivere
+                    # un eseguibile in esecuzione. Se ne occupa il pulsante nelle
+                    # impostazioni, che si rinomina e riavvia.
+                    if (Test-IsSelfPackage $u) { $self = $true; continue }
+                    $items.Add($u)
+                }
+                if ($self) { Write-Log "An update for WinGet Studio itself is available: use the gear button." }
+            }
 
             if ($items.Count -eq 0) {
                 $TxtEmpty.Visibility = [System.Windows.Visibility]::Visible

@@ -554,6 +554,17 @@ else {
 # 20) Auto-update. Il download e la sostituzione NON si eseguono: rimpiazzerebbero
 # l'eseguibile in uso. Si verificano il confronto fra versioni, la lettura della release
 # da GitHub e i presidi di sicurezza attorno al download.
+# L'app deve tenersi FUORI dalla propria lista di aggiornamenti: winget non puo'
+# sovrascrivere un eseguibile in esecuzione, quindi da quella lista fallirebbe sempre.
+if (-not (Test-IsSelfPackage ([WgtRow]@{ Id = 'FedeB2160.WinGetStudio' }))) { throw "il pacchetto proprio non viene riconosciuto" }
+# Forma con cui winget lo registra quando e' installato da un manifest locale, osservata
+# installandolo davvero: l'uguaglianza secca non la prendeva.
+if (-not (Test-IsSelfPackage ([WgtRow]@{ Id = 'ARP\User\X64\FedeB2160.WinGetStudio__DefaultSource' }))) { throw "la forma ARP del pacchetto proprio non viene riconosciuta" }
+if (Test-IsSelfPackage ([WgtRow]@{ Id = 'VideoLAN.VLC' }))                  { throw "un altro pacchetto viene scambiato per il proprio" }
+if (Test-IsSelfPackage ([WgtRow]@{ Id = '' }))                              { throw "un ID vuoto viene scambiato per il proprio pacchetto" }
+if (Test-IsSelfPackage $null)                                              { throw "una riga nulla viene scambiata per il proprio pacchetto" }
+if ((Get-FunctionSource 'Load-Upgrades') -notmatch 'Test-IsSelfPackage') { throw "Load-Upgrades non filtra il pacchetto proprio" }
+
 if (-not (Test-NewerVersion '1.7.0' '1.6.0'))   { throw "1.7.0 dovrebbe essere piu' recente di 1.6.0" }
 if (-not (Test-NewerVersion 'v1.10.0' '1.9.0')) { throw "1.10.0 e' piu' recente di 1.9.0: confronto fatto da stringa invece che da versione" }
 if (Test-NewerVersion '1.6.0' '1.6.0')          { throw "la stessa versione non e' un aggiornamento" }
