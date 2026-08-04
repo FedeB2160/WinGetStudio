@@ -208,16 +208,24 @@ foreach ($g in 'PART_LeftHeaderGripper', 'PART_RightHeaderGripper') {
 }
 "OK resize  entrambi i gripper presenti nel template dell'header"
 
-# 10b) Nessuna colonna senza intestazione: le colonne strette (spunta, pin) erano nate
-# con Header="" e non si capiva a cosa servissero.
-$blankHeaders = @([regex]::Matches($uiText, '<DataGrid\w*Column[^>]*Header=""'))
-if ($blankHeaders.Count -gt 0) { throw "$($blankHeaders.Count) colonne senza intestazione in UI.xaml" }
-# E l'header deve poter essere centrato: il template lo permette solo se lega
-# HorizontalAlignment a HorizontalContentAlignment.
+# 10b) Intestazioni di colonna: nessuna vuota (le colonne strette erano nate con
+# Header="" e non si capiva a cosa servissero) e tutte in MAIUSCOLO.
+$colHeaders = @([regex]::Matches($uiText, '<DataGrid\w*Column[^>]*?Header="([^"]*)"') |
+                ForEach-Object { $_.Groups[1].Value })
+if ($colHeaders.Count -eq 0) { throw "nessuna colonna trovata in UI.xaml: regex da rivedere" }
+$blank = @($colHeaders | Where-Object { -not $_.Trim() })
+if ($blank.Count -gt 0) { throw "$($blank.Count) colonne senza intestazione in UI.xaml" }
+$notUpper = @($colHeaders | Where-Object { $_ -cne $_.ToUpperInvariant() })
+if ($notUpper.Count -gt 0) { throw "intestazioni di colonna non in maiuscolo: $($notUpper -join ', ')" }
+# Il centraggio funziona solo se il template lega HorizontalAlignment a
+# HorizontalContentAlignment: senza, lo stile non ha alcun effetto.
 if ($uiText -notmatch 'HorizontalAlignment="\{TemplateBinding HorizontalContentAlignment\}"') {
-    throw "il template dell'header ignora HorizontalContentAlignment: GridHeaderCenter non centrerebbe nulla"
+    throw "il template dell'header ignora HorizontalContentAlignment: le intestazioni resterebbero a sinistra"
 }
-"OK header  nessuna colonna anonima, allineamento dell'header effettivo"
+if ($uiText -notmatch '(?s)GridHeader.*?HorizontalContentAlignment"\s+Value="Center"') {
+    throw "lo stile dell'header non centra piu' le intestazioni"
+}
+"OK header  $($colHeaders.Count) intestazioni, tutte non vuote, maiuscole e centrate"
 
 # 11) La versione e' una sola e arriva sia al titolo sia all'exe? build.ps1 la pesca
 # dalla costante con una regex: se qualcuno la rinomina o la sposta, la build morirebbe

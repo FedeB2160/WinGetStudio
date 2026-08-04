@@ -125,8 +125,13 @@
         <Style x:Key="GridHeader" TargetType="DataGridColumnHeader">
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="4,6"/>
+            <!-- Intestazioni SEMPRE centrate, anche sopra colonne il cui contenuto e'
+                 allineato a sinistra: sono etichette della colonna, non del testo.
+                 I nomi si scrivono in MAIUSCOLO direttamente negli Header: WPF non ha un
+                 equivalente di text-transform e un converter per questo sarebbe sproporzionato. -->
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="DataGridColumnHeader">
@@ -136,7 +141,8 @@
                                     BorderThickness="0,0,1,1">
                                 <!-- HorizontalAlignment legato a HorizontalContentAlignment:
                                      senza questo binding la proprieta' non arriva al
-                                     contenuto e GridHeaderCenter non centrerebbe nulla. -->
+                                     contenuto e le intestazioni resterebbero a sinistra
+                                     qualunque cosa dica lo stile. -->
                                 <ContentPresenter Margin="{TemplateBinding Padding}"
                                                   VerticalAlignment="Center"
                                                   HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"/>
@@ -150,14 +156,6 @@
                 </Setter.Value>
             </Setter>
         </Style>
-
-        <!-- Header delle colonne strette (spunta, pin): testo centrato sopra un contenuto
-             centrato. Le altre colonne restano allineate a sinistra come il loro testo. -->
-        <Style x:Key="GridHeaderCenter" TargetType="DataGridColumnHeader" BasedOn="{StaticResource GridHeader}">
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="Padding" Value="2,6"/>
-        </Style>
-
         <Style x:Key="GridCell" TargetType="DataGridCell">
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Background" Value="Transparent"/>
@@ -496,19 +494,18 @@
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
-                                <DataGridCheckBoxColumn Header="Sel." Width="46" HeaderStyle="{StaticResource GridHeaderCenter}"
+                                <DataGridCheckBoxColumn Header="SEL." Width="46"
                                     ElementStyle="{StaticResource PinnableCheckBox}"
                                     EditingElementStyle="{StaticResource PinnableCheckBox}"
                                     Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                <DataGridTemplateColumn Header="Pin" Width="42"
-                                                        HeaderStyle="{StaticResource GridHeaderCenter}"
+                                <DataGridTemplateColumn Header="PIN" Width="42"
                                                         CellTemplate="{StaticResource PinCell}"/>
-                                <DataGridTextColumn Header="Name"              Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
-                                <DataGridTextColumn Header="Installed version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
-                                <DataGridTextColumn Header="Available version" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
+                                <DataGridTextColumn Header="NAME"              Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
+                                <DataGridTextColumn Header="INSTALLED VERSION" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
+                                <DataGridTextColumn Header="AVAILABLE VERSION" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
                                 <DataGridTextColumn Header="ID"                Width="2*"   IsReadOnly="True" Binding="{Binding Id}"/>
                                 <!-- Esito: spinner (in corso) oppure glyph colorato -->
-                                <DataGridTemplateColumn Header="Result" Width="70" HeaderStyle="{StaticResource GridHeaderCenter}"
+                                <DataGridTemplateColumn Header="RESULT" Width="70"
                                                         CellTemplate="{StaticResource ResultCell}"/>
                             </DataGrid.Columns>
                         </DataGrid>
@@ -596,14 +593,14 @@
                                   ColumnHeaderStyle="{StaticResource GridHeader}"
                                   CellStyle="{StaticResource GridCell}">
                             <DataGrid.Columns>
-                                <DataGridCheckBoxColumn Header="Sel." Width="46" HeaderStyle="{StaticResource GridHeaderCenter}"
+                                <DataGridCheckBoxColumn Header="SEL." Width="46"
                                     ElementStyle="{StaticResource ThemedCheckBox}"
                                     EditingElementStyle="{StaticResource ThemedCheckBox}"
                                     Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                <DataGridTextColumn Header="Name"    Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
-                                <DataGridTextColumn Header="Version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
+                                <DataGridTextColumn Header="NAME"    Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
+                                <DataGridTextColumn Header="VERSION" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
                                 <DataGridTextColumn Header="ID"      Width="2.4*" IsReadOnly="True" Binding="{Binding Id}"/>
-                                <DataGridTemplateColumn Header="Result" Width="70" HeaderStyle="{StaticResource GridHeaderCenter}"
+                                <DataGridTemplateColumn Header="RESULT" Width="70"
                                                         CellTemplate="{StaticResource ResultCell}"/>
                             </DataGrid.Columns>
                         </DataGrid>
@@ -688,17 +685,16 @@
                             <DataGrid.Columns>
                                 <!-- Qui la spunta resta attiva anche sui pacchetti pinnati: un pin
                                      blocca gli AGGIORNAMENTI, non la disinstallazione. -->
-                                <DataGridCheckBoxColumn Header="Sel." Width="46" HeaderStyle="{StaticResource GridHeaderCenter}"
+                                <DataGridCheckBoxColumn Header="SEL." Width="46"
                                     ElementStyle="{StaticResource ThemedCheckBox}"
                                     EditingElementStyle="{StaticResource ThemedCheckBox}"
                                     Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                <DataGridTemplateColumn Header="Pin" Width="42"
-                                                        HeaderStyle="{StaticResource GridHeaderCenter}"
+                                <DataGridTemplateColumn Header="PIN" Width="42"
                                                         CellTemplate="{StaticResource PinCell}"/>
-                                <DataGridTextColumn Header="Name"    Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
-                                <DataGridTextColumn Header="Version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
+                                <DataGridTextColumn Header="NAME"    Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
+                                <DataGridTextColumn Header="VERSION" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
                                 <DataGridTextColumn Header="ID"      Width="2.4*" IsReadOnly="True" Binding="{Binding Id}"/>
-                                <DataGridTemplateColumn Header="Result" Width="70" HeaderStyle="{StaticResource GridHeaderCenter}"
+                                <DataGridTemplateColumn Header="RESULT" Width="70"
                                                         CellTemplate="{StaticResource ResultCell}"/>
                             </DataGrid.Columns>
                         </DataGrid>
@@ -746,5 +742,6 @@
                  CaretBrush="{DynamicResource FgBrush}"/>
     </Grid>
 </Window>
+
 
 
