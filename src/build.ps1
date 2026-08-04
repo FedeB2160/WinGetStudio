@@ -88,6 +88,60 @@ finally { Remove-Item -LiteralPath $src -Force -ErrorAction SilentlyContinue }
 if (-not (Test-Path $out) -or (Get-Item $out).LastWriteTimeUtc -le $before) {
     throw "Compilazione fallita: $out non e' stato aggiornato."
 }
+
+# ------------------------------------------------------------------
+# FIRMA
+# ------------------------------------------------------------------
+# Quale certificato: prima $env:WINGETSTUDIO_CERT_THUMBPRINT (cosi' si passa a un
+# certificato aziendale o commerciale senza toccare questo file), altrimenti il primo
+# certificato di code signing valido nell'archivio personale.
+# La build NON si ferma se non ne trova: l'exe esce non firmato con un avviso, perche'
+# la firma dipende da una chiave privata che non tutte le postazioni hanno.
+$signCert = $null
+if ($env:WINGETSTUDIO_CERT_THUMBPRINT) {
+    $signCert = Get-ChildItem Cert:\CurrentUser\My, Cert:\LocalMachine\My -CodeSigningCert -ErrorAction SilentlyContinue |
+                Where-Object { $_.Thumbprint -eq $env:WINGETSTUDIO_CERT_THUMBPRINT } | Select-Object -First 1
+    if (-not $signCert) { throw "Certificato $($env:WINGETSTUDIO_CERT_THUMBPRINT) non trovato negli archivi personali" }
+}
+else {
+    $signCert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert -ErrorAction SilentlyContinue |
+                Where-Object { $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey } | Select-Object -First 1
+}
+
+if (-not $signCert) {
+    Write-Host "`nATTENZIONE: nessun certificato di code signing trovato, exe NON firmato." -ForegroundColor Yellow
+    Write-Host "  Windows mostrera' 'editore sconosciuto'. Vedi la sezione Signing del README." -ForegroundColor Yellow
+}
+else {
+    # -TimestampServer: senza marca temporale la firma diventa invalida alla scadenza del
+    # certificato; con la marca resta valida per sempre, perche' prova che la firma
+    # esisteva quando il certificato era ancora buono. Richiede rete.
+    $sig = Set-AuthenticodeSignature -FilePath $out -Certificate $signCert `
+               -HashAlgorithm SHA256 -TimestampServer 'http://timestamp.digicert.com' `
+               -ErrorAction SilentlyContinue
+
+    # Il timestamp si verifica guardando il TIMESTAMP, non lo Status: con un certificato
+    # self-signed lo Status non sara' mai 'Valid' su una macchina che non lo considera
+    # fidato, e usarlo come test faceva scartare una marca temporale perfettamente
+    # applicata per poi rifirmare senza.
+    if ($sig -and -not $sig.TimeStamperCertificate) {
+        Write-Host "Marca temporale non applicata (server non raggiungibile): la firma scadra' col certificato." -ForegroundColor Yellow
+        $sig = Set-AuthenticodeSignature -FilePath $out -Certificate $signCert -HashAlgorithm SHA256
+    }
+
+    $stamp = if ($sig.TimeStamperCertificate) { ', con marca temporale' } else { '' }
+    if ($sig.Status -eq 'Valid') {
+        Write-Host "Firmato: $($signCert.Subject)$stamp" -ForegroundColor Cyan
+    }
+    else {
+        # 'UnknownError' con un self-signed e' NORMALE e non significa firma mancante:
+        # la firma c'e', ma questa macchina non riconosce la radice. Diventa 'Valid'
+        # dove il certificato pubblico e' fra le autorita' attendibili.
+        Write-Host "Firmato: $($signCert.Subject)$stamp" -ForegroundColor Cyan
+        Write-Host "  Catena non fidata su questa macchina (normale con un self-signed): $($sig.Status)" -ForegroundColor Yellow
+    }
+}
+
 Write-Host "`nFatto: $out (versione $version)" -ForegroundColor Green
 
 

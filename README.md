@@ -70,6 +70,29 @@ Produces `dist\WinGetStudio.exe`. Double click → UAC prompt → same UI.
 
 The build replaces the `###MODULES###` marker in `src\main.ps1` with the concatenated modules and the `###UI.xaml###`, `###Theme.Light.xaml###`, `###Theme.Dark.xaml###` markers with the file contents (modules first, since the XAML markers live inside `App.Bootstrap.ps1`), writes a temporary source to `%TEMP%` and hands that to ps2exe (`-requireAdmin` → UAC manifest, `-noConsole` → WPF window only, `-iconFile` → embedded icon). It fails with an explicit error if a marker is missing, a listed module is absent, or the exe is not rewritten.
 
+## Signing
+
+`build.ps1` signs the exe after compiling. It picks the certificate in this order:
+
+1. `$env:WINGETSTUDIO_CERT_THUMBPRINT` — set this to switch to a company or commercial certificate without editing the build;
+2. otherwise the first valid code-signing certificate with a private key in `Cert:\CurrentUser\My`.
+
+If it finds none the build **still succeeds**, printing a warning that the exe is unsigned — signing needs a private key that not every machine has.
+
+The signature is **timestamped** (DigiCert). Without a timestamp a signature stops being valid the day the certificate expires; with one it stays valid forever, because it proves the signature existed while the certificate was still good. If the timestamp server cannot be reached the build signs anyway and says so.
+
+### Current certificate: self-signed
+The certificate in use is self-signed (`CN=WinGet Studio, O=EGICON`, valid to 2031). What that does and does not buy:
+
+- **Does**: proves the exe has not been altered since the build, and shows a publisher name instead of nothing.
+- **Does not**: make Windows trust it. `Get-AuthenticodeSignature` reports `UnknownError` and SmartScreen still says "unknown publisher", because the root is not among the trusted authorities. **This is expected and does not mean the signature is missing.**
+
+To make it trusted, import the public certificate — `assets\WinGetStudio-codesign.cer`, no private key in it — into *Trusted Root Certification Authorities*: per user with `Import-Certificate -CertStoreLocation Cert:\CurrentUser\Root`, or machine-wide by GPO in a domain. Understand what you are doing first: anything signed with that certificate becomes trusted for whoever imports it.
+
+For a signature trusted everywhere without importing anything, a certificate from the company PKI (already trusted domain-wide) or a commercial OV/EV certificate is needed. Both plug into the build through the environment variable above.
+
+**Private keys never belong in the repo** — `.gitignore` blocks `*.pfx`, `*.p12` and `*.snk`. Only the public `.cer` is committed, and that one is meant to be shared.
+
 ## Tests
 ```powershell
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1

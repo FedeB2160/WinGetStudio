@@ -3,3 +3,8 @@ dist/
 
 # Local Claude Code settings
 .claude/settings.local.json
+
+# Chiavi private di firma: MAI nel repo (il .cer pubblico in assets\ si', quello serve)
+*.pfx
+*.p12
+*.snk
