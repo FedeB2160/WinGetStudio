@@ -478,4 +478,45 @@ else {
     }
 }
 
+# 19) Export reale su file temporaneo, e conteggio del file di import.
+# L'import NON si esegue: installerebbe software. Di quello si verifica solo che resti
+# dietro una conferma, come per la disinstallazione.
+$importSrc = Get-FunctionSource 'Start-Import'
+$posConfirm = $importSrc.IndexOf('MessageBox')
+$posRun     = $importSrc.IndexOf('Invoke-PackageImport')
+if ($posConfirm -lt 0 -or $posRun -lt 0) { throw "Start-Import non chiede conferma o non avvia nulla" }
+if ($posConfirm -gt $posRun) { throw "la conferma di import arriva DOPO l'avvio" }
+if ($importSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma di import non ha No come default" }
+if ((Get-FunctionSource 'Invoke-PackageImport') -notmatch '--ignore-unavailable') {
+    throw "manca --ignore-unavailable: un solo pacchetto non piu' pubblicato farebbe fallire tutto l'import"
+}
+
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    "SKIP export  winget non presente su questa macchina"
+}
+else {
+    $expFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-test-export-$PID.json"
+    try {
+        Invoke-PackageExport $expFile
+        if (-not (Wait-For { -not $script:isBusy } 180)) { throw "l'export non e' terminato" }
+        if (-not (Test-Path $expFile)) { throw "l'export non ha scritto il file" }
+        $n = Get-ImportPackageCount $expFile
+        if ($null -eq $n -or $n -le 0) { throw "il file esportato non contiene pacchetti leggibili (conteggio: $n)" }
+
+        # Un file che non e' un export winget deve essere riconosciuto PRIMA di lanciare
+        # winget, altrimenti l'utente vedrebbe un errore incomprensibile.
+        $bad = Join-Path ([IO.Path]::GetTempPath()) "wgt-test-bad-$PID.json"
+        '{ "hello": "world" }' | Set-Content $bad -Encoding UTF8
+        if ($null -ne (Get-ImportPackageCount $bad)) { throw "un JSON senza Sources viene accettato come lista pacchetti" }
+        if ($null -ne (Get-ImportPackageCount (Join-Path ([IO.Path]::GetTempPath()) "manca-$PID.json"))) { throw "un file inesistente viene accettato" }
+        Remove-Item $bad -Force -ErrorAction SilentlyContinue
+        "OK export  export reale di $n pacchetti, file non validi riconosciuti"
+    }
+    finally {
+        Remove-Item $expFile -Force -ErrorAction SilentlyContinue
+        Stop-AllJobs
+    }
+}
+
 Write-Host "`nTUTTO OK" -ForegroundColor Green
+

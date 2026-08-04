@@ -128,7 +128,8 @@ function Start-App([switch]$NoShow) {
         'TabMain', 'BtnRefreshInstalled', 'TxtFilter', 'InstalledSpinner',
         'TxtInstalledCount', 'GridInstalled', 'TxtInstalledEmpty',
         'TxtInstalledInfo', 'BtnUninstall',
-        'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled'
+        'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
+        'BtnExport', 'BtnImport'
     )) {
         $c = $script:window.FindName($n)
         if (-not $c) { throw "Control not found in UI.xaml: $n" }
@@ -147,6 +148,7 @@ function Start-App([switch]$NoShow) {
     Initialize-UpdatesTab
     Initialize-InstallTab
     Initialize-InstalledTab
+    Initialize-Backup
 
     # Alla chiusura: ferma timer e chiudi i job pendenti, cosi' il processo termina
     # davvero (niente thread in background lasciati vivi).
@@ -162,3 +164,4 @@ function Start-App([switch]$NoShow) {
     if ($NoShow) { return }
     $script:window.ShowDialog() | Out-Null
 }
+

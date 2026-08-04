@@ -708,6 +708,14 @@
                         <DockPanel Grid.Row="2" Margin="0,8,0,0">
                             <Button x:Name="BtnUninstall" Content="Uninstall" Width="104" Height="26"
                                     DockPanel.Dock="Left" IsEnabled="False"/>
+                            <!-- Export/Import a destra, staccati da Uninstall: agiscono sulla
+                                 macchina intera, non sulle righe selezionate. -->
+                            <Button x:Name="BtnImport" Content="Import..." Width="104" Height="26"
+                                    DockPanel.Dock="Right" Margin="8,0,2,0"
+                                    ToolTip="Install the packages listed in a .json file exported from winget"/>
+                            <Button x:Name="BtnExport" Content="Export..." Width="104" Height="26"
+                                    DockPanel.Dock="Right"
+                                    ToolTip="Save the list of installed packages to a .json file"/>
                             <TextBlock x:Name="TxtInstalledInfo" VerticalAlignment="Center" Margin="12,0,0,0"
                                        Foreground="{DynamicResource SubtleFgBrush}"/>
                         </DockPanel>

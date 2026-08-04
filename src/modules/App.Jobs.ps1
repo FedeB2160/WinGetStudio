@@ -46,6 +46,10 @@ function Start-BackgroundJob {
     $rs.ThreadOptions  = 'ReuseThread'
     $rs.Open()
     $rs.SessionStateProxy.SetVariable('__fnBodies', $fnBodies)
+    # window e txtLog vanno in OGNI job: sono cio' che serve a UI{} e LogUI{} definite
+    # nel prologo, che ogni job puo' voler usare per scrivere nel log mentre lavora.
+    $rs.SessionStateProxy.SetVariable('window', $window)
+    $rs.SessionStateProxy.SetVariable('txtLog', $TxtLog)
     foreach ($kv in $Vars.GetEnumerator()) { $rs.SessionStateProxy.SetVariable($kv.Key, $kv.Value) }
 
     $ps = [PowerShell]::Create()
@@ -56,6 +60,15 @@ function Start-BackgroundJob {
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 foreach ($__kv in $__fnBodies.GetEnumerator()) {
     Invoke-Expression "function $($__kv.Key) { $($__kv.Value) }"
+}
+# Il codice del runspace NON puo' toccare i controlli: ogni scrittura sulla UI passa da
+# qui. Definite per tutti i job, non copiate in ognuno che serve.
+function UI([scriptblock]$action) {
+    $window.Dispatcher.Invoke([System.Windows.Threading.DispatcherPriority]::Background, [action]$action)
+}
+function LogUI([string]$m) {
+    $ts = (Get-Date).ToString('HH:mm:ss')
+    UI { $txtLog.AppendText("[$ts] $m`r`n"); $txtLog.ScrollToEnd() }
 }
 '@
     [void]$ps.AddScript($prologue + "`r`n" + $Script.ToString())
@@ -135,11 +148,10 @@ function Start-WinGetQueue {
     $Progress.Maximum = $Rows.Count
     Write-Log "Starting $($Verb.ToLower()) of $($Rows.Count) packages..."
 
+    # window e txtLog li passa Start-BackgroundJob a tutti i job: qui non si ripetono.
     $jobVars = @{
-        window     = $window
         rows       = $Rows
         progress   = $Progress
-        txtLog     = $TxtLog
         wingetPath = $wingetPath
         verb       = $Verb
         # Come le funzioni: il corpo come testo, ricreato dentro il runspace.
@@ -155,15 +167,6 @@ function Start-WinGetQueue {
     # [void]: il job non deve finire sulla pipeline del chiamante.
     [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet' -Vars $jobVars -Script {
         Invoke-Expression "function Get-WinGetArgs { $argsFnBody }"
-
-        # Helper per aggiornare la UI dal thread di lavoro
-        function UI([scriptblock]$action) {
-            $window.Dispatcher.Invoke([System.Windows.Threading.DispatcherPriority]::Background, [action]$action)
-        }
-        function LogUI([string]$m) {
-            $ts = (Get-Date).ToString('HH:mm:ss')
-            UI { $txtLog.AppendText("[$ts] $m`r`n"); $txtLog.ScrollToEnd() }
-        }
 
         $done = 0
         foreach ($item in $rows) {

@@ -1,6 +1,6 @@
 # WinGet Update Tool
 
-Standalone Windows tool (WPF) for managing `winget` packages from a checkbox table: **update** what has a newer version, **install** something new by searching as you type, **list and uninstall** what is already there. Automatic UAC elevation, non-blocking UI, light/dark theme, no branding.
+Standalone Windows tool (WPF) for managing `winget` packages from a checkbox table: **update** what has a newer version, **install** something new by searching as you type, **list and uninstall** what is already there, **pin** what must not be touched, and **export/import** the whole package list to rebuild a machine. Automatic UAC elevation, non-blocking UI, light/dark theme, no branding.
 
 The **UI and this documentation are in English**; the in-code comments are in Italian. User-facing strings live in `ui\UI.xaml` (labels, column headers) and in the `Write-Log` / `LogUI` / `MessageBox` calls under `src\modules\`.
 
@@ -18,6 +18,7 @@ src\   main.ps1                 entry point: version, elevation, module loading,
        App.Jobs.ps1             background runspaces: Start-BackgroundJob, Start-WinGetQueue
        App.Theme.ps1            Light / Dark / Auto theme
        App.Pins.ps1             pins: read, add, remove, flag the rows
+       App.Backup.ps1           export / import of the package list
        Tab.Updates.ps1          the Updates tab
        Tab.Install.ps1          the Install tab: search-as-you-type, scope, install
        Tab.Installed.ps1        the Installed tab: inventory, filter, uninstall
@@ -44,7 +45,7 @@ The three `.xaml` files are **not** a runtime requirement either: `build.ps1` in
 ## Version
 
 The version lives in **one** place, the `$AppVersion` constant at the top of `src\main.ps1`. From there it reaches:
-- the **window title**, as `WinGet Update Tool [v1.5.0]` (the `v` is added when composing the title, so what reaches the exe properties stays a plain number);
+- the **window title**, as `WinGet Update Tool [v1.6.0]` (the `v` is added when composing the title, so what reaches the exe properties stays a plain number);
 - the **exe properties** (right click → Properties → Details): `build.ps1` reads the constant with a regex and passes it to ps2exe, so the two can never disagree. A missing or renamed constant fails the build instead of producing an unversioned exe.
 
 Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still found, that it is `x.y.z`, that it reaches the title and that `build.ps1` still forwards it.
@@ -124,6 +125,18 @@ Uninstalling is the only irreversible thing this tool does, so it is guarded:
 
 After an uninstall the list is **not** rebuilt automatically: that would wipe the Result column, which is the record of what actually happened. Press Refresh when you have read it.
 
+### Export / Import (Installed tab)
+**Export...** and **Import...** sit on the right of the Installed action bar, away from Uninstall: they work on the whole machine, not on the selected rows.
+
+- **Export** writes the installed packages to a `.json` file (`winget export`). On the development machine that is **88 packages out of 340 installed** — the rest are in no source, so winget cannot record them; the log says how many were left out. Deliberately **without** `--include-versions`: pinning exact versions makes the import fail as soon as one of them is no longer published, and the point of the file is to rebuild a machine, not to freeze it.
+- **Import** reads such a file and installs what is missing (`winget import`). Always with **`--ignore-unavailable`**: without it a single package that is no longer published aborts the whole import.
+
+Import installs software, so it is guarded like uninstall: a Yes/No dialog, **No by default**, stating how many packages the file contains — a count read from the file, not an estimate. A file that is not a winget export is rejected *before* winget is called, otherwise the user would get an unintelligible error from winget instead.
+
+Both run as a **single long winget invocation**, not as a per-package queue: it is winget that walks the list, so there is no per-row result to show. The log gets a line every 30s while it works, and the spinner stays on.
+
+`Test-Ui.ps1` performs a **real export** to a temp file and checks the package count, plus that invalid files are rejected. It does **not** run an import — that would install software. The dialogs are separated from the actions (`Invoke-PackageExport` / `Invoke-PackageImport`) precisely so the actions can be tested without a dialog to click.
+
 ### Pinning (both grids)
 A pin tells winget to leave a package alone until the pin is removed — the answer to "this one keeps reappearing and I do not want it touched".
 
@@ -176,6 +189,8 @@ Icons from the system set (**Segoe Fluent Icons**, falling back to **Segoe MDL2 
 - The checkbox uses a **custom `ControlTemplate`**: the system one (Aero2) fills the tick with a hardcoded `#FF212121` declared as a `StaticResource` inside the theme dictionary, so no external setter can reach it and in dark mode the tick was black on black. The template binds the tick to `FgBrush` and restores the hover border and disabled opacity that re-templating throws away.
 - Column resizing lives in the `ControlTemplate` of `DataGridColumnHeader`: re-templating the header (which is necessary — the system `DataGridHeaderBorder` ignores `Background`) throws away the two `Thumb` elements `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` that DataGrid hooks for the drag, and the columns silently become fixed, **with no error at all**. They have to be added back by hand under those exact names; `Test-Ui.ps1` verifies they are there.
 - Table rows are instances of the `WgtRow` class (`INotifyPropertyChanged`, compiled with `Add-Type` at startup), not `PSCustomObject`: `NoteProperty` values do not notify WPF, which forced a `$Grid.Items.Refresh()` on every state change — and that regenerates the view and sends the scroll back to the top. `Test-Ui.ps1` checks both the event and the absence of `Items.Refresh()` / `$Grid.IsEnabled = ...` in the code.
+
+
 
 
 
