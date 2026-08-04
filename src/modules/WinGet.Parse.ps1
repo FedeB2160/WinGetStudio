@@ -22,7 +22,13 @@
 # search e list.
 # NB: il numero di colonne varia anche a parita' di comando — "search vlc" ha
 # Corrispondenza, "search ab --count 5" no. Mai contare sulle colonne oltre la terza.
-function Get-WinGetTable([string]$raw) {
+# $MaxColumns limita quante colonne considerare, ed e' necessario quando un'INTESTAZIONE
+# contiene spazi: "winget pin list" chiude con "Tipo di pin", che il rilevamento legge
+# come tre colonne separate. I loro finti offset cadono in mezzo al testo delle righe
+# dati, il controllo di allineamento le giudica disallineate e le butta tutte — quindi
+# l'elenco dei pin risultava sempre vuoto. Con -MaxColumns 3 le colonne oltre la terza
+# non vengono ne' estratte ne' controllate.
+function Get-WinGetTable([string]$raw, [int]$MaxColumns = 0) {
     # Normalizza in righe; winget usa \r di progresso -> tieni solo l'ultimo segmento
     $lines = $raw -split "`r`n|`n" | ForEach-Object { ($_ -split "`r")[-1] }
 
@@ -65,7 +71,14 @@ function Get-WinGetTable([string]$raw) {
             }
             # Soglia a TRE, non quattro: "winget list --source winget" stampa solo
             # Nome|Id|Versione e con la soglia a 4 la tabella veniva scartata in silenzio.
-            if ($starts.Count -ge 3) { $cols = $starts }
+            if ($starts.Count -ge 3) {
+                # Si tiene un offset in piu' del necessario: serve come fine dell'ultimo
+                # campo richiesto, altrimenti si porterebbe dietro il resto della riga.
+                if ($MaxColumns -gt 0 -and $starts.Count -gt $MaxColumns + 1) {
+                    $cols = $starts.GetRange(0, $MaxColumns + 1)
+                }
+                else { $cols = $starts }
+            }
             continue
         }
 
@@ -122,6 +135,19 @@ function Get-WinGetSearch([string]$Query, [bool]$IncludeStore = $false, [int]$Co
         })
     }
     return $results
+}
+
+# ID dei pacchetti con un pin. Colonne: Nome | Id | Versione | Origine | Tipo di pin —
+# serve solo l'ID, il tipo (Pinning / Blocking / Gating) non cambia cosa mostriamo.
+# Senza pin configurati winget stampa una frase e nessuna tabella, quindi esce un array
+# vuoto senza casi speciali.
+function Get-WinGetPins {
+    $raw = & winget pin list --accept-source-agreements 2>&1 | Out-String -Width 4096
+    $ids = New-Object System.Collections.ArrayList
+    # -MaxColumns 3 e' obbligatorio: l'ultima intestazione ("Tipo di pin") contiene spazi
+    # e senza il limite ogni riga verrebbe scartata come disallineata.
+    foreach ($f in Get-WinGetTable $raw -MaxColumns 3) { [void]$ids.Add($f[1]) }
+    return $ids
 }
 
 # Inventario dei pacchetti installati. Colonne: Nome | Id | Versione | [Origine].

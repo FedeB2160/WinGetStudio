@@ -231,9 +231,13 @@ function Resolve-Asset([string]$rel) {
     @((Join-Path $root $rel), (Join-Path $baseDir $rel)) | Where-Object { Test-Path $_ } | Select-Object -First 1
 }
 foreach ($m in $moduleNames) { . (Join-Path $root "src\modules\$m") }
-# Stub: il test non deve dipendere da winget installato ne' aprire la MessageBox
-# d'errore se manca.
-function Get-WinGetPath { 'C:\winget-stub\winget.exe' }
+# Percorso di winget: quello REALE se c'e', altrimenti un finto che serve solo a non far
+# aprire a Start-App la MessageBox "winget not found".
+# Deve essere il vero percorso, perche' le code (update/install/uninstall/pin) lanciano
+# $wingetPath tramite cmd: con un percorso finto cmd esce 1 con "Impossibile trovare il
+# percorso specificato" e sembrerebbe un errore di winget.
+$realWinget = (Get-Command winget -ErrorAction SilentlyContinue).Source
+function Get-WinGetPath { if ($realWinget) { $realWinget } else { 'C:\winget-stub\winget.exe' } }
 $AppVersion = $mv.Groups[1].Value
 Start-App -NoShow
 
@@ -415,6 +419,44 @@ else {
     Refresh-InstalledState
     Stop-AllJobs
     "OK list    $total pacchetti installati, filtro locale e avviso sui selezionati nascosti"
+}
+
+# 18) Ciclo completo del pin su un pacchetto reale: pin add -> winget lo elenca -> il
+# flag sulla riga si accende -> pin remove -> si spegne. E' l'unico test che MODIFICA lo
+# stato della macchina, quindi il pin viene rimosso in ogni caso dal finally, anche se
+# un'asserzione fallisce a meta'.
+$pinTarget = @($installedItems | Where-Object { $_.Id -eq '7zip.7zip' })[0]
+if (-not $pinTarget) {
+    "SKIP pin     7zip.7zip non installato: nessun bersaglio sicuro per il test"
+}
+else {
+    try {
+        Set-PackagePin @($pinTarget) $true
+        if (-not (Wait-For { -not $script:isBusy -and $pinTarget.Pinned } 90)) {
+            # Le ultime righe del log riportano l'output di winget: senza, un errore qui
+            # direbbe solo "exit 1" e non perche'.
+            $tail = @($TxtLog.Text -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 8)
+            throw "dopo il pin la riga non risulta pinnata (Status: $($pinTarget.Status) $($pinTarget.StatusDetail))`nLog:`n$($tail -join "`n")"
+        }
+        if (((winget pin list 2>&1 | Out-String) -notmatch '7zip\.7zip')) {
+            throw "winget non elenca il pin che abbiamo appena aggiunto"
+        }
+
+        Set-PackagePin @($pinTarget) $false
+        if (-not (Wait-For { -not $script:isBusy -and -not $pinTarget.Pinned } 90)) {
+            throw "dopo la rimozione la riga risulta ancora pinnata"
+        }
+        if (((winget pin list 2>&1 | Out-String) -match '7zip\.7zip')) {
+            throw "il pin e' ancora presente in winget dopo la rimozione"
+        }
+        "OK pin     pin add/list/remove su 7zip.7zip, flag della riga allineato a winget"
+    }
+    finally {
+        # Rete di sicurezza: un pin dimenticato bloccherebbe in silenzio gli
+        # aggiornamenti di quel pacchetto.
+        [void](winget pin remove --id 7zip.7zip -e 2>&1)
+        Stop-AllJobs
+    }
 }
 
 Write-Host "`nTUTTO OK" -ForegroundColor Green

@@ -17,6 +17,7 @@ src\   main.ps1                 entry point: version, elevation, module loading,
        App.Ui.ps1               shared helpers: Write-Log, global busy state
        App.Jobs.ps1             background runspaces: Start-BackgroundJob, Start-WinGetQueue
        App.Theme.ps1            Light / Dark / Auto theme
+       App.Pins.ps1             pins: read, add, remove, flag the rows
        Tab.Updates.ps1          the Updates tab
        Tab.Install.ps1          the Install tab: search-as-you-type, scope, install
        Tab.Installed.ps1        the Installed tab: inventory, filter, uninstall
@@ -43,7 +44,7 @@ The three `.xaml` files are **not** a runtime requirement either: `build.ps1` in
 ## Version
 
 The version lives in **one** place, the `$AppVersion` constant at the top of `src\main.ps1`. From there it reaches:
-- the **window title**, as `WinGet Update Tool [v1.4.0]` (the `v` is added when composing the title, so what reaches the exe properties stays a plain number);
+- the **window title**, as `WinGet Update Tool [v1.5.0]` (the `v` is added when composing the title, so what reaches the exe properties stays a plain number);
 - the **exe properties** (right click → Properties → Details): `build.ps1` reads the constant with a regex and passes it to ps2exe, so the two can never disagree. A missing or renamed constant fails the build instead of producing an unversioned exe.
 
 Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still found, that it is `x.y.z`, that it reaches the title and that `build.ps1` still forwards it.
@@ -123,6 +124,21 @@ Uninstalling is the only irreversible thing this tool does, so it is guarded:
 
 After an uninstall the list is **not** rebuilt automatically: that would wipe the Result column, which is the record of what actually happened. Press Refresh when you have read it.
 
+### Pinning (both grids)
+A pin tells winget to leave a package alone until the pin is removed — the answer to "this one keeps reappearing and I do not want it touched".
+
+**Right click a row** in Updates or Installed: *Pin (block upgrades)* / *Remove pin*. It acts on the **highlighted** rows, not the ticked ones, and deliberately so: a pinned row has its checkbox disabled, so with ticks you could never unpin anything.
+
+A pinned row shows a pin glyph and is left out of updates in three places, not one: the checkbox is disabled, **Select all** skips it, and `Start-UpdateSelected` unticks it and says so in the log. Only the last of the three actually protects the queue — `Select all` works on the objects, not on the UI — the other two are there so the state is visible.
+
+In the Installed tab the checkbox stays enabled on pinned packages: a pin blocks **upgrades**, not uninstallation.
+
+Two things worth knowing, both learned the hard way:
+- `winget pin list` ends with the localized header **"Tipo di pin"** ("Pin type"), which *contains spaces*. Column detection counts header tokens, so it saw three phantom columns whose offsets fall in the middle of the data rows, judged every row misaligned and dropped them all — the pin list came back empty while winget had happily created the pin. Hence `Get-WinGetTable -MaxColumns`, and a fixture in `Test-InvokeWinGet.ps1` that reproduces the bug.
+- **Never two winget processes at once.** Reading the pins used to run *after* the busy state was released, so a click on Update in that window ran a second winget and one of the two failed with exit 1. The scans now read the pins inside the same job, and after a pin/unpin the busy state is released by the pin re-read, which is the last step.
+
+`Test-Ui.ps1` runs the whole pin cycle against real winget on `7zip.7zip` and removes the pin in a `finally`, so a failure mid-test cannot leave a package silently blocked.
+
 ### Theme
 The icon button in the top right **cycles** through three modes (the tooltip names the active one):
 
@@ -160,4 +176,6 @@ Icons from the system set (**Segoe Fluent Icons**, falling back to **Segoe MDL2 
 - The checkbox uses a **custom `ControlTemplate`**: the system one (Aero2) fills the tick with a hardcoded `#FF212121` declared as a `StaticResource` inside the theme dictionary, so no external setter can reach it and in dark mode the tick was black on black. The template binds the tick to `FgBrush` and restores the hover border and disabled opacity that re-templating throws away.
 - Column resizing lives in the `ControlTemplate` of `DataGridColumnHeader`: re-templating the header (which is necessary — the system `DataGridHeaderBorder` ignores `Background`) throws away the two `Thumb` elements `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` that DataGrid hooks for the drag, and the columns silently become fixed, **with no error at all**. They have to be added back by hand under those exact names; `Test-Ui.ps1` verifies they are there.
 - Table rows are instances of the `WgtRow` class (`INotifyPropertyChanged`, compiled with `Add-Type` at startup), not `PSCustomObject`: `NoteProperty` values do not notify WPF, which forced a `$Grid.Items.Refresh()` on every state change — and that regenerates the view and sends the scroll back to the top. `Test-Ui.ps1` checks both the event and the absence of `Items.Refresh()` / `$Grid.IsEnabled = ...` in the code.
+
+
 

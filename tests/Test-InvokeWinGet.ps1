@@ -191,6 +191,27 @@ Check "la 4a colonna di list e' Origine (winget), non una versione disponibile" 
       ($lr.Count -ge 1 -and $lr[0][3] -eq 'winget') "($($lr[0][3]))"
 
 # ------------------------------------------------------------------
+Write-Host "`n6) Tabella con un'intestazione che contiene spazi (winget pin list)" -ForegroundColor Cyan
+# "Tipo di pin" (in inglese "Pin type") viene letto come TRE colonne separate: i loro
+# finti offset cadono in mezzo al testo delle righe dati, il controllo di allineamento le
+# giudica disallineate e le scarta tutte. Senza -MaxColumns l'elenco dei pin risultava
+# sempre vuoto, e il pin sembrava non funzionare mentre winget lo aveva creato.
+$pinFixture = @'
+Nome              Id           Versione Origine Tipo di pin
+-----------------------------------------------------------
+7-Zip 26.02 (x64) 7zip.7zip    26.02    winget  Pinning
+VLC media player  VideoLAN.VLC 3.0.23   winget  Blocking
+'@
+$pr = @(Get-WinGetTable $pinFixture -MaxColumns 3)
+Check "con -MaxColumns 3 le righe si leggono (trovate $($pr.Count) su 2)" ($pr.Count -eq 2) ($pr | ForEach-Object { $_[1] })
+Check "ID corretti (7zip.7zip, VideoLAN.VLC)" `
+      ($pr.Count -eq 2 -and $pr[0][1] -eq '7zip.7zip' -and $pr[1][1] -eq 'VideoLAN.VLC') `
+      "($(@($pr | ForEach-Object { $_[1] }) -join ', '))"
+# La riproduzione del bug: senza il limite, l'intestazione con spazi fa perdere le righe.
+$prNoLimit = @(Get-WinGetTable $pinFixture)
+Check "senza -MaxColumns la tabella si perde (era il bug: $($prNoLimit.Count) righe)" ($prNoLimit.Count -lt 2)
+
+# ------------------------------------------------------------------
 if ($failures -eq 0) { Write-Host "`nTutti i test passati.`n" -ForegroundColor Green; exit 0 }
 Write-Host "`n$failures test falliti.`n" -ForegroundColor Red
 exit 1

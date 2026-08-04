@@ -313,6 +313,82 @@
             </DataTemplate.Triggers>
         </DataTemplate>
 
+        <!-- Cella "Pin": E718 (Pin), presente sia in Segoe Fluent Icons sia in Segoe MDL2
+             Assets — Test-Ui.ps1 verifica nei font che ogni glifo usato qui esista, cosi'
+             un codice sbagliato non finisce a video come quadratino. -->
+        <DataTemplate x:Key="PinCell">
+            <TextBlock x:Name="pinIcon" FontSize="13" Text="&#xE718;"
+                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                       Foreground="{DynamicResource AccentBrush}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Visibility="Collapsed"
+                       ToolTip="Pinned: winget will not upgrade it until the pin is removed"/>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Pinned}" Value="True">
+                    <Setter TargetName="pinIcon" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <!-- Spunta delle griglie: come ThemedCheckBox, ma spenta sulle righe con un pin.
+             Non basta come presidio (Select all lavora sugli oggetti, non sulla UI), ma
+             rende visibile subito che quella riga non si tocca. Stile separato perche' le
+             spunte fuori griglia non hanno una riga sotto e non c'e' nulla da leggere. -->
+        <Style x:Key="PinnableCheckBox" TargetType="CheckBox" BasedOn="{StaticResource ThemedCheckBox}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Pinned}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Menu contestuale: quello di sistema (Aero2) disegna sfondo chiaro e testo nero,
+             quindi in Dark-Mode sarebbe illeggibile. Template minimo, come per i pulsanti. -->
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4" Padding="2">
+                            <StackPanel IsItemsHost="True"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="bd" Background="Transparent" CornerRadius="3"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- IsHighlighted, non IsMouseOver: e' la proprieta' che il menu
+                                 usa anche per la navigazione da tastiera. -->
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource CtrlHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{DynamicResource SubtleFgBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Campo di testo: la TextBox di sistema ha sfondo bianco cablato e in Dark-Mode
              resterebbe bianca col testo bianco. Serve solo impostare i colori. -->
         <Style TargetType="TextBox">
@@ -399,11 +475,22 @@
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
                                   ColumnHeaderStyle="{StaticResource GridHeader}"
                                   CellStyle="{StaticResource GridCell}">
+                            <!-- Pin e Unpin agiscono sulle righe EVIDENZIATE, non su quelle
+                                 spuntate: la spunta di una riga pinnata e' disabilitata, quindi
+                                 con le spunte il pin non si potrebbe piu' togliere. -->
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem x:Name="MenuPinUpdates"   Header="Pin (block upgrades)"/>
+                                    <MenuItem x:Name="MenuUnpinUpdates" Header="Remove pin"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <DataGridCheckBoxColumn Header="" Width="40"
-                                    ElementStyle="{StaticResource ThemedCheckBox}"
-                                    EditingElementStyle="{StaticResource ThemedCheckBox}"
+                                    ElementStyle="{StaticResource PinnableCheckBox}"
+                                    EditingElementStyle="{StaticResource PinnableCheckBox}"
                                     Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                <DataGridTemplateColumn Header="" Width="30"
+                                                        CellTemplate="{StaticResource PinCell}"/>
                                 <DataGridTextColumn Header="Name"              Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
                                 <DataGridTextColumn Header="Installed version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
                                 <DataGridTextColumn Header="Available version" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
@@ -580,11 +667,21 @@
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
                                   ColumnHeaderStyle="{StaticResource GridHeader}"
                                   CellStyle="{StaticResource GridCell}">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem x:Name="MenuPinInstalled"   Header="Pin (block upgrades)"/>
+                                    <MenuItem x:Name="MenuUnpinInstalled" Header="Remove pin"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
+                                <!-- Qui la spunta resta attiva anche sui pacchetti pinnati: un pin
+                                     blocca gli AGGIORNAMENTI, non la disinstallazione. -->
                                 <DataGridCheckBoxColumn Header="" Width="40"
                                     ElementStyle="{StaticResource ThemedCheckBox}"
                                     EditingElementStyle="{StaticResource ThemedCheckBox}"
                                     Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                <DataGridTemplateColumn Header="" Width="30"
+                                                        CellTemplate="{StaticResource PinCell}"/>
                                 <DataGridTextColumn Header="Name"    Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
                                 <DataGridTextColumn Header="Version" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
                                 <DataGridTextColumn Header="ID"      Width="2.4*" IsReadOnly="True" Binding="{Binding Id}"/>

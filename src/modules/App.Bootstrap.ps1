@@ -127,7 +127,8 @@ function Start-App([switch]$NoShow) {
         'GridSearch', 'TxtSearchEmpty', 'TxtSearchInfo', 'BtnInstall',
         'TabMain', 'BtnRefreshInstalled', 'TxtFilter', 'InstalledSpinner',
         'TxtInstalledCount', 'GridInstalled', 'TxtInstalledEmpty',
-        'TxtInstalledInfo', 'BtnUninstall'
+        'TxtInstalledInfo', 'BtnUninstall',
+        'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled'
     )) {
         $c = $script:window.FindName($n)
         if (-not $c) { throw "Control not found in UI.xaml: $n" }

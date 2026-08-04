@@ -69,12 +69,20 @@ function Load-Installed {
     $InstalledSpinner.Visibility  = [System.Windows.Visibility]::Visible
     Refresh-InstalledState
 
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetInstalled' `
-        -Script { Get-WinGetInstalled } `
+    # I pin si leggono nello STESSO job dell'inventario: due winget in parallelo si
+    # contendono lo store e uno dei due esce in errore.
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetInstalled', 'Get-WinGetPins' `
+        -Script {
+            [PSCustomObject]@{
+                Rows = @(Get-WinGetInstalled)
+                Pins = @(Get-WinGetPins)
+            }
+        } `
         -OnDone {
             param($result)
             $InstalledSpinner.Visibility = [System.Windows.Visibility]::Collapsed
-            foreach ($p in $result) { if ($p) { $installedItems.Add($p) } }
+            $r = @($result)[0]
+            if ($r) { foreach ($p in $r.Rows) { if ($p) { $installedItems.Add($p) } } }
 
             if ($installedItems.Count -eq 0) {
                 $TxtInstalledEmpty.Text       = "No installed package found."
@@ -86,6 +94,7 @@ function Load-Installed {
                 $GridInstalled.Visibility     = [System.Windows.Visibility]::Visible
                 Write-Log "Found $($installedItems.Count) installed packages."
             }
+            if ($r) { Set-PinFlags @($r.Pins) }
             Set-AppBusy $false
         })
 }
@@ -148,6 +157,10 @@ function Initialize-InstalledTab {
 
     $BtnRefreshInstalled.Add_Click({ Load-Installed })
     $BtnUninstall.Add_Click({ Start-UninstallSelected })
+
+    # Pin/Unpin sulle righe evidenziate, come nella scheda Updates.
+    $MenuPinInstalled.Add_Click({   Set-PackagePin @($GridInstalled.SelectedItems) $true })
+    $MenuUnpinInstalled.Add_Click({ Set-PackagePin @($GridInstalled.SelectedItems) $false })
 
     $queueInstalledRefresh = {
         $window.Dispatcher.BeginInvoke(

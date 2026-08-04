@@ -69,18 +69,24 @@ function Load-Upgrades {
     $Progress.Maximum = 100
     Refresh-SelectionState
 
-    # Get-WinGetTable serve perche' Get-WinGetUpgrades la chiama: nel runspace vanno
-    # ricreate entrambe, altrimenti la scansione muore con "termine non riconosciuto".
+    # Get-WinGetTable serve perche' gli altri due la chiamano: nel runspace vanno ricreate
+    # tutte, altrimenti la scansione muore con "termine non riconosciuto".
+    # I pin si leggono nello STESSO job, non in uno successivo: due processi winget
+    # insieme si contendono lo store e il comando esce in errore.
     # [void]: Start-BackgroundJob torna il job, che altrimenti finirebbe sulla pipeline.
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetUpgrades' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetUpgrades', 'Get-WinGetPins' `
         -Vars @{ incUnknown = [bool]$ChkUnknown.IsChecked } `
         -Script {
-            Get-WinGetUpgrades $incUnknown   # niente virgola: gli elementi devono scorrere singoli sulla pipeline
+            [PSCustomObject]@{
+                Rows = @(Get-WinGetUpgrades $incUnknown)
+                Pins = @(Get-WinGetPins)
+            }
         } `
         -OnDone {
             param($result)
             $TopSpinner.Visibility = [System.Windows.Visibility]::Collapsed
-            foreach ($u in $result) { if ($u) { $items.Add($u) } }
+            $r = @($result)[0]
+            if ($r) { foreach ($u in $r.Rows) { if ($u) { $items.Add($u) } } }
 
             if ($items.Count -eq 0) {
                 $TxtEmpty.Visibility = [System.Windows.Visibility]::Visible
@@ -91,12 +97,22 @@ function Load-Upgrades {
                 $Grid.Visibility = [System.Windows.Visibility]::Visible
                 Write-Log "Found $($items.Count) updates."
             }
+            if ($r) { Set-PinFlags @($r.Pins) }
             Set-AppBusy $false
         })
 }
 
 # Aggiorna i pacchetti spuntati, uno per volta, per ID.
 function Start-UpdateSelected {
+    # I pinnati si escludono QUI e non solo disabilitando la spunta: una riga puo' essere
+    # stata spuntata prima che il pin arrivasse, e "Select all" lavora sugli oggetti.
+    $pinned = @($items | Where-Object { $_.Selected -and $_.Pinned })
+    if ($pinned.Count -gt 0) {
+        foreach ($p in $pinned) { $p.Selected = $false }
+        Write-Log "Skipping $($pinned.Count) pinned package$(if ($pinned.Count -ne 1) { 's' }): remove the pin to update $(if ($pinned.Count -ne 1) { 'them' } else { 'it' })."
+        Refresh-SelectionState
+    }
+
     $selected = @($items | Where-Object { $_.Selected })
     if ($selected.Count -eq 0) {
         [System.Windows.MessageBox]::Show(
@@ -133,11 +149,18 @@ function Initialize-UpdatesTab {
         # Chiude un'eventuale transazione di edit aperta, altrimenti il DataGrid al termine
         # dell'edit riscrive sulla riga il valore che aveva prima del clic sul pulsante.
         [void]$Grid.CommitEdit()
-        foreach ($it in $items) { $it.Selected = $newState }
+        # I pinnati restano fuori: non sono aggiornabili, spuntarli sarebbe una promessa
+        # che la coda non puo' mantenere.
+        foreach ($it in $items) { if (-not $it.Pinned) { $it.Selected = $newState } }
         Refresh-SelectionState
     })
 
     $BtnUpdate.Add_Click({ Start-UpdateSelected })
+
+    # Pin/Unpin dal menu contestuale, sulle righe EVIDENZIATE (non su quelle spuntate:
+    # una riga pinnata ha la spunta disabilitata e non potrebbe piu' essere sbloccata).
+    $MenuPinUpdates.Add_Click({   Set-PackagePin @($Grid.SelectedItems) $true })
+    $MenuUnpinUpdates.Add_Click({ Set-PackagePin @($Grid.SelectedItems) $false })
 
     # Aggiorna stato pulsanti/contatore quando l'utente spunta/despunta manualmente.
     # Il binding e' UpdateSourceTrigger=PropertyChanged, ma il valore arriva sull'oggetto solo
