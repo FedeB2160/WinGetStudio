@@ -111,6 +111,8 @@ The update check reads the **latest** release of the repo, so publishing one is 
 
 **Tag and `$AppVersion` must agree**: the app compares the tag (`v1.9.0`) with its own constant, so a mismatch means it either keeps proposing an update already installed, or never proposes one.
 
+**Builds are not reproducible.** Compiling the same source twice produces two different binaries — ps2exe writes variable metadata into the PE and each signature carries a fresh timestamp — identical in size but not in hash. So a published asset **cannot** be validated by rebuilding and comparing hashes; what is verifiable is the SHA-256 GitHub publishes with the asset (which is what the app checks on download) and the Authenticode signature.
+
 The asset is found as the **first `.exe` in the release**, not by exact name, so renaming the exe does not break older or newer releases.
 
 `gh release create` would do steps 4-5 from the command line, but the `gh` account on this machine has no push rights on the repo, which belongs to another account — the same reason `git push` works while `gh` does not. Either use the web UI or re-authenticate `gh` as the repo owner.
