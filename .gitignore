@@ -8,3 +8,13 @@ dist/
 *.pfx
 *.p12
 *.snk
+
+# graphify: si tengono solo il report leggibile e il grafo, che sono il valore
+# durevole. Tutto il resto e' rigenerabile con un comando (graph.html, vault
+# obsidian) oppure e' stato locale della macchina: manifest.json contiene mtime e
+# hash dei file, cost.json e' un contatore, cache\ e' la cache di estrazione,
+# .graphify_python e .graphify_root sono percorsi di questo PC, 2026-08-03\ e' lo
+# snapshot di un'esecuzione precedente.
+graphify-out/*
+!graphify-out/GRAPH_REPORT.md
+!graphify-out/graph.json

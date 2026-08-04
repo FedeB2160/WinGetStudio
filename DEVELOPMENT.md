@@ -35,6 +35,8 @@ assets\icon.ico                 app icon (embedded in the exe)
 tests\ Test-Ui.ps1              headless check of code, XAML, themes and startup
        Test-InvokeWinGet.ps1    winget execution and table parsing
 dist\  WinGetStudio.exe         build output (signed, gitignored)
+winget\1.9.0\                   winget-pkgs manifests for the published version
+graphify-out\                   knowledge graph (report and graph.json committed, rest ignored)
 ```
 
 `src\main.ps1` holds no logic: it elevates, loads the modules and calls `Start-App`. It exists as a separate file because ps2exe takes a single input file and the self-elevation has to run before anything else.
@@ -166,6 +168,38 @@ powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
 
 **`Test-InvokeWinGet.ps1`** exercises winget execution (wait bound to the process, exit code available, output read back as UTF-8) and parses four fixtures through the real code: the two-table `upgrade` output, a 3-column `search` result, a 4-column `list` where the fourth column is *Source* and the version carries a `>` prefix, and a `pin list` whose last header contains spaces.
 
+## Knowledge graph
+
+`graphify-out\` holds a knowledge graph of this repository: 225 nodes and 392 edges over the code (extracted from the AST) plus the concepts and rationale from the documentation, grouped into 29 communities.
+
+Two files are **committed**, because they are the durable value:
+
+- `GRAPH_REPORT.md` — the readable report: communities, god nodes, surprising connections, suggested questions, and the audit trail of what was extracted versus inferred;
+- `graph.json` — the graph itself, which is what answers queries without rebuilding anything.
+
+Everything else is gitignored, being either regenerable in one command or specific to one machine: `graph.html` and the Obsidian vault (outputs), `cache\` (extraction cache), `manifest.json` (file mtimes and hashes for incremental runs), `cost.json` (token counter), `.graphify_python` and `.graphify_root` (paths on this PC), and `2026-08-03\` (a leftover snapshot from an earlier run — safe to delete).
+
+To regenerate the two ignored outputs:
+
+```powershell
+graphify export html
+graphify export obsidian
+```
+
+To refresh the graph after changing the code — re-extracts only what changed:
+
+```
+/graphify . --update --obsidian
+```
+
+To ask the graph something instead of grepping:
+
+```powershell
+graphify query "how does the self-update replace the running exe?"
+```
+
+The graph is worth having here because the *why* behind this codebase is spread across code comments, this file and the changelog. Asking the graph crosses those boundaries: the pinning feature, for instance, connects to the parser guard for spaced headers, to the "one winget process at a time" rule, and to the test that removes the pin in a `finally` — three files and two documents that no single grep would bring together.
+
 ## Design notes
 
 Things that look odd until you know why. Most of them are bugs that were paid for once.
@@ -209,4 +243,5 @@ Colours are referenced with `{DynamicResource ...}` everywhere: `StaticResource`
 - The settings screen is a panel overlaid on the whole window, **not a second Window**: the theme brushes live in the main window's `MergedDictionaries`, so a separate Window would have to be wired to those dictionaries and re-wired on every theme change, plus owner, modality and placement.
 - The search spinner sits at the **end** of its row: docked right it took 20px off the search box every time a search ran, and gave them back afterwards.
 - During an operation the grids go **read-only, not disabled**: a disabled `DataGrid` stops responding to wheel, scrollbar and keyboard, so the list looked frozen.
+
 
