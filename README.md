@@ -194,15 +194,17 @@ Two things worth knowing, both learned the hard way:
 
 `Test-Ui.ps1` runs the whole pin cycle against real winget on `7zip.7zip` and removes the pin in a `finally`, so a failure mid-test cannot leave a package silently blocked.
 
-### Settings tab
-Everything that is not a package operation lives here.
+### Settings screen
+The **gear button in the top-right corner** opens it; the **X** or **Esc** closes it. Everything that is not a package operation lives here.
 
 - **Theme** — a dropdown with `Light` / `Dark` / `Auto`. In `Auto` the line next to it says which of the two it is currently following, so the choice explains what you see. The list entries *are* the values written to the registry, so there is no label-to-value table to keep in sync.
 - **Installed version** and **Check for updates** — the version is shown here rather than in the window title. The manual check always reports an outcome ("Up to date", "vX is available", "No release found"), while the automatic one at startup stays silent unless there is something to say.
 
 The `ComboBox` is fully re-templated, like the context menu and the checkbox before it: the system one (Aero2) hardcodes a light background and would stay white in dark mode. WPF needs a `ToggleButton` bound to `IsDropDownOpen` and a `Popup` named `PART_Popup`; here the ToggleButton is transparent and sits *over* the border, so it catches clicks across the whole control without nesting one template inside another.
 
-The old cycling theme button in the top-right corner is gone: cramped, and it never explained what it did.
+It is a panel overlaid on the whole window, **not a second Window**: the theme colours live in the main window's `MergedDictionaries`, so a separate Window would have to be wired to those dictionaries and re-wired on every theme change, plus owner, modality and placement. An opaque overlay is the same thing on screen and follows the theme by itself.
+
+The old cycling theme button that used to sit in that corner is gone: cramped, and it never explained what it did.
 
 ### Theme (how it works)
 The icon button in the top right **cycles** through three modes (the tooltip names the active one):
@@ -241,6 +243,7 @@ Icons from the system set (**Segoe Fluent Icons**, falling back to **Segoe MDL2 
 - The checkbox uses a **custom `ControlTemplate`**: the system one (Aero2) fills the tick with a hardcoded `#FF212121` declared as a `StaticResource` inside the theme dictionary, so no external setter can reach it and in dark mode the tick was black on black. The template binds the tick to `FgBrush` and restores the hover border and disabled opacity that re-templating throws away.
 - Column resizing lives in the `ControlTemplate` of `DataGridColumnHeader`: re-templating the header (which is necessary — the system `DataGridHeaderBorder` ignores `Background`) throws away the two `Thumb` elements `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` that DataGrid hooks for the drag, and the columns silently become fixed, **with no error at all**. They have to be added back by hand under those exact names; `Test-Ui.ps1` verifies they are there.
 - Table rows are instances of the `WgtRow` class (`INotifyPropertyChanged`, compiled with `Add-Type` at startup), not `PSCustomObject`: `NoteProperty` values do not notify WPF, which forced a `$Grid.Items.Refresh()` on every state change — and that regenerates the view and sends the scroll back to the top. `Test-Ui.ps1` checks both the event and the absence of `Items.Refresh()` / `$Grid.IsEnabled = ...` in the code.
+
 
 
 

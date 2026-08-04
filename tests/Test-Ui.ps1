@@ -227,6 +227,26 @@ if ($uiText -notmatch '(?s)GridHeader.*?HorizontalContentAlignment"\s+Value="Cen
 }
 "OK header  $($colHeaders.Count) intestazioni, tutte non vuote, maiuscole e centrate"
 
+# 10c) Ogni glifo usato in UI.xaml esiste nei font di sistema? Un codice sbagliato non
+# da' errore: finisce a video come rettangolo vuoto (tofu) e si nota solo guardando.
+# Si controllano entrambi i font perche' UI.xaml li elenca in cascata: Segoe Fluent Icons
+# (Win11) con fallback Segoe MDL2 Assets (Win10).
+$glyphCodes = @([regex]::Matches($uiText, '&#x([0-9A-Fa-f]{4});') |
+                ForEach-Object { [Convert]::ToInt32($_.Groups[1].Value, 16) } | Sort-Object -Unique)
+$iconFonts = @('C:\Windows\Fonts\SegoeIcons.ttf', 'C:\Windows\Fonts\segmdl2.ttf') | Where-Object { Test-Path $_ }
+if ($glyphCodes.Count -eq 0) { throw "nessun glifo trovato in UI.xaml: regex da rivedere" }
+if ($iconFonts.Count -eq 0) {
+    "SKIP glyph   nessun font di icone di sistema trovato"
+}
+else {
+    foreach ($f in $iconFonts) {
+        $gt = New-Object System.Windows.Media.GlyphTypeface([Uri]$f)
+        $missing = @($glyphCodes | Where-Object { -not $gt.CharacterToGlyphMap.ContainsKey($_) })
+        if ($missing) { throw "$(Split-Path $f -Leaf) non ha i glifi: $(($missing | ForEach-Object { 'U+{0:X4}' -f $_ }) -join ', ')" }
+    }
+    "OK glyph   $($glyphCodes.Count) glifi presenti in $($iconFonts.Count) font di icone"
+}
+
 # 11) La versione e' una sola e arriva sia al titolo sia all'exe? build.ps1 la pesca
 # dalla costante con una regex: se qualcuno la rinomina o la sposta, la build morirebbe
 # (o l'exe uscirebbe senza versione) e il titolo mostrerebbe "[]" in silenzio.
@@ -271,6 +291,17 @@ if ($null -eq $Grid) { throw "i moduli non vedono `$Grid: controllo assegnato se
 if ($null -eq $Grid.ItemsSource) { throw "Initialize-UpdatesTab non ha agganciato la collezione al DataGrid" }
 if ($CmbTheme.Items.Count -ne 3) { throw "Initialize-Theme non ha riempito la tendina del tema: $($CmbTheme.Items.Count) voci" }
 if ($CmbTheme.SelectedItem -notin @('Light', 'Dark', 'Auto')) { throw "tema selezionato inatteso: '$($CmbTheme.SelectedItem)'" }
+
+# La schermata delle impostazioni: chiusa all'avvio, si apre e si richiude.
+if ($SettingsPanel.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "le impostazioni sono aperte all'avvio" }
+Show-Settings
+if ($SettingsPanel.Visibility -ne [System.Windows.Visibility]::Visible) { throw "Show-Settings non apre il pannello" }
+Hide-Settings
+if ($SettingsPanel.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "Hide-Settings non chiude il pannello" }
+# Esc non si puo' premere in un test headless: si verifica che l'aggancio ci sia.
+$setSrc = Get-FunctionSource 'Initialize-Settings'
+if ($setSrc -notmatch 'PreviewKeyDown') { throw "Esc non e' agganciato in tunneling sulla finestra" }
+if ($setSrc -notmatch 'Key\]::Escape') { throw "Esc non chiude le impostazioni" }
 # Le funzioni delle schede girano senza esplodere sui controlli?
 Write-Log 'test'
 if ($TxtLog.Text -notmatch 'test') { throw "Write-Log non scrive nel TextBox del log" }

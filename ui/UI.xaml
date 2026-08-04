@@ -814,57 +814,15 @@
                     </Grid>
                 </TabItem>
 
-                <TabItem Header="Settings">
-                    <!-- Impostazioni in colonna, non in griglia: sono pochi controlli e
-                         crescono in verticale. ScrollViewer per non tagliarli quando la
-                         finestra e' alla dimensione minima. -->
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="4,2,4,2">
-                        <StackPanel>
-                            <TextBlock Text="APPEARANCE" Style="{StaticResource SettingsHeader}"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
-                                <TextBlock Text="Theme" VerticalAlignment="Center" Width="120"
-                                           Foreground="{DynamicResource FgBrush}"/>
-                                <!-- Le voci le riempie App.Theme.ps1: sono gli stessi valori
-                                     che finiscono nel registro (Light | Dark | Auto). -->
-                                <ComboBox x:Name="CmbTheme" Width="180"/>
-                                <TextBlock x:Name="TxtThemeHint" VerticalAlignment="Center" Margin="12,0,0,0"
-                                           Foreground="{DynamicResource SubtleFgBrush}"/>
-                            </StackPanel>
-
-                            <TextBlock Text="UPDATES" Style="{StaticResource SettingsHeader}"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="Installed version" VerticalAlignment="Center" Width="120"
-                                           Foreground="{DynamicResource FgBrush}"/>
-                                <!-- La versione sta qui, non nel titolo della finestra. -->
-                                <TextBlock x:Name="TxtVersion" VerticalAlignment="Center"
-                                           FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="120,0,0,18">
-                                <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
-                                <!-- Compare solo quando una release e' piu' recente di questa. -->
-                                <Button x:Name="BtnUpdateApp" Height="26" Padding="12,0" Margin="8,0,0,0"
-                                        Visibility="Collapsed"
-                                        Background="{DynamicResource AccentBrush}" Foreground="White"/>
-                                <Control x:Name="UpdateSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
-                                         Margin="10,0,0,0" Visibility="Collapsed"/>
-                                <TextBlock x:Name="TxtUpdateStatus" VerticalAlignment="Center" Margin="12,0,0,0"
-                                           Foreground="{DynamicResource SubtleFgBrush}"/>
-                            </StackPanel>
-
-                            <TextBlock Text="ABOUT" Style="{StaticResource SettingsHeader}"/>
-                            <TextBlock Foreground="{DynamicResource SubtleFgBrush}" TextWrapping="Wrap"
-                                       Text="A graphical front end for winget: update, install, uninstall, pin and export packages. Requires administrator rights, which it asks for at startup."/>
-                        </StackPanel>
-                    </ScrollViewer>
-                </TabItem>
             </TabControl>
 
-            <!-- Selettore tema: vale per tutta la finestra, quindi sta FUORI dalle schede,
-                 sovrapposto a destra all'altezza delle linguette. Pulsante ciclico
-                 Chiaro -> Scuro -> Auto; glifo e ToolTip li scrive App.Theme.ps1.
-                 Icone dal set di sistema (Segoe Fluent Icons, fallback Segoe MDL2 Assets). -->
-            <!-- Tema e aggiornamento sono nella scheda Settings: sovrapposti all'angolo
-                 stavano stretti e non spiegavano cosa facessero. -->
+            <!-- Ingranaggio in alto a destra: apre la schermata delle impostazioni.
+                 E713 (Settings), presente sia in Segoe Fluent Icons sia in Segoe MDL2
+                 Assets — Test-Ui.ps1 verifica nei font che ogni glifo usato esista. -->
+            <Button x:Name="BtnSettings" Width="30" Height="24" Panel.ZIndex="2"
+                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
+                    FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                    Content="&#xE713;" ToolTip="Settings"/>
         </Grid>
 
         <!-- Barra avanzamento della coda in corso (condivisa da tutte le schede) -->
@@ -883,6 +841,76 @@
                  Foreground="{DynamicResource FgBrush}"
                  BorderBrush="{DynamicResource BorderBrush2}"
                  CaretBrush="{DynamicResource FgBrush}"/>
+
+        <!-- ============================================================
+             SCHERMATA IMPOSTAZIONI
+             ============================================================
+             Sovrapposta a TUTTA la finestra (RowSpan su ogni riga, ZIndex sopra),
+             non una finestra separata: cosi' eredita le risorse del tema senza
+             doverle rimontare su una seconda Window, e non serve gestire
+             proprietario, modalita' e posizione. Il fondo e' opaco, quindi a
+             schermo e' una schermata a se'.
+             La chiude il pulsante in alto a destra oppure Esc. -->
+        <Border x:Name="SettingsPanel" Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="10"
+                Visibility="Collapsed"
+                Background="{DynamicResource BgBrush}">
+            <DockPanel Margin="4,2,4,4">
+                <!-- Intestazione: titolo e chiusura.
+                     LastChildFill="False" obbligatorio: l'ultimo figlio di un DockPanel
+                     riempie lo spazio residuo IGNORANDO il proprio Dock, quindi il
+                     pulsante di chiusura finiva al centro invece che a destra. -->
+                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14" LastChildFill="False">
+                    <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource FgBrush}"/>
+                    <!-- E711 (Cancel): presente in entrambi i set di icone di sistema. -->
+                    <Button x:Name="BtnCloseSettings" Width="30" Height="26" DockPanel.Dock="Right"
+                            FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
+                            Content="&#xE711;" ToolTip="Close settings (Esc)"/>
+                </DockPanel>
+
+                <!-- Impostazioni in colonna: sono pochi controlli e crescono in verticale.
+                     ScrollViewer per non tagliarli a finestra piccola. -->
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="APPEARANCE" Style="{StaticResource SettingsHeader}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
+                            <TextBlock Text="Theme" VerticalAlignment="Center" Width="120"
+                                       Foreground="{DynamicResource FgBrush}"/>
+                            <!-- Le voci le riempie App.Theme.ps1: sono gli stessi valori
+                                 che finiscono nel registro (Light | Dark | Auto). -->
+                            <ComboBox x:Name="CmbTheme" Width="180"/>
+                            <TextBlock x:Name="TxtThemeHint" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       Foreground="{DynamicResource SubtleFgBrush}"/>
+                        </StackPanel>
+
+                        <TextBlock Text="UPDATES" Style="{StaticResource SettingsHeader}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="Installed version" VerticalAlignment="Center" Width="120"
+                                       Foreground="{DynamicResource FgBrush}"/>
+                            <!-- La versione sta qui, non nel titolo della finestra. -->
+                            <TextBlock x:Name="TxtVersion" VerticalAlignment="Center"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="120,0,0,18">
+                            <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
+                            <!-- Compare solo quando una release e' piu' recente di questa. -->
+                            <Button x:Name="BtnUpdateApp" Height="26" Padding="12,0" Margin="8,0,0,0"
+                                    Visibility="Collapsed"
+                                    Background="{DynamicResource AccentBrush}" Foreground="White"/>
+                            <Control x:Name="UpdateSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                     Margin="10,0,0,0" Visibility="Collapsed"/>
+                            <TextBlock x:Name="TxtUpdateStatus" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       Foreground="{DynamicResource SubtleFgBrush}"/>
+                        </StackPanel>
+
+                        <TextBlock Text="ABOUT" Style="{StaticResource SettingsHeader}"/>
+                        <TextBlock Foreground="{DynamicResource SubtleFgBrush}" TextWrapping="Wrap"
+                                   Text="A graphical front end for winget: update, install, uninstall, pin and export packages. Requires administrator rights, which it asks for at startup."/>
+                    </StackPanel>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
     </Grid>
 </Window>
 
