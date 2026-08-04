@@ -1,7 +1,7 @@
 <#
     App.Ui.ps1 — helper di UI condivisi da tutte le schede.
 
-    Caricato dal bootstrap (src\WinGetUpdateTool.ps1): dot-source come .ps1,
+    Caricato dal bootstrap (src\main.ps1): dot-source come .ps1,
     concatenato nell'exe al posto del marcatore ###MODULES###.
 #>
 
@@ -31,3 +31,4 @@ function Set-AppBusy([bool]$busy) {
     $script:isBusy = $busy
     foreach ($h in $script:busyHandlers) { & $h $busy }
 }
+

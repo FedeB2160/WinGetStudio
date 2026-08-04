@@ -1,5 +1,5 @@
 <#
-    build.ps1 — compila WinGetUpdateTool.ps1 in un .exe con elevazione UAC.
+    build.ps1 — compila main.ps1 in un .exe con elevazione UAC.
     Esegui in PowerShell (non serve essere admin per compilare).
 #>
 # Stop al primo errore: senza, un ps2exe mancante lascia passare la build e si finisce
@@ -15,7 +15,7 @@ Import-Module ps2exe
 
 $root = Split-Path -Parent $PSScriptRoot   # build.ps1 sta in src\
 $src  = Join-Path $PSScriptRoot 'main.ps1'
-$out  = Join-Path $root 'dist\WinGetUpdateTool.exe'
+$out  = Join-Path $root 'dist\WinGetStudio.exe'
 $icon = Join-Path $root 'assets\icon.ico'
 New-Item -ItemType Directory -Force -Path (Split-Path $out) | Out-Null
 
@@ -62,7 +62,7 @@ foreach ($f in 'UI.xaml', 'Theme.Light.xaml', 'Theme.Dark.xaml') {
     $code = $code.Replace("###$f###", $text)
 }
 # UTF8 con BOM: senza, PowerShell 5.1 legge il sorgente come ANSI e storpia gli accenti.
-$src = Join-Path ([IO.Path]::GetTempPath()) 'WinGetUpdateTool.build.ps1'
+$src = Join-Path ([IO.Path]::GetTempPath()) 'WinGetStudio.build.ps1'
 Set-Content -LiteralPath $src -Value $code -Encoding UTF8
 
 # -requireAdmin  -> manifest requireAdministrator (prompt UAC automatico)
@@ -73,9 +73,9 @@ $params = @{
     outputFile  = $out
     requireAdmin = $true
     noConsole   = $true
-    title       = 'WinGet Update Tool'
-    product     = 'WinGet Update Tool'
-    description = 'Aggiorna pacchetti winget con selezione'
+    title       = 'WinGet Studio'
+    product     = 'WinGet Studio'
+    description = 'GUI for winget: update, install, uninstall, pin and export packages'
     version     = $version
 }
 if (Test-Path $icon) { $params.iconFile = $icon }
@@ -89,3 +89,5 @@ if (-not (Test-Path $out) -or (Get-Item $out).LastWriteTimeUtc -le $before) {
     throw "Compilazione fallita: $out non e' stato aggiornato."
 }
 Write-Host "`nFatto: $out (versione $version)" -ForegroundColor Green
+
+

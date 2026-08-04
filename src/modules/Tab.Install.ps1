@@ -158,7 +158,7 @@ function Start-InstallSelected {
     $sel = @($searchItems | Where-Object { $_.Selected })
     if ($sel.Count -eq 0) {
         [System.Windows.MessageBox]::Show(
-            "No packages selected.", "WinGet Update Tool",
+            "No packages selected.", "WinGet Studio",
             [System.Windows.MessageBoxButton]::OK,
             [System.Windows.MessageBoxImage]::Information) | Out-Null
         return
@@ -231,3 +231,4 @@ function Initialize-InstallTab {
     $GridSearch.Add_CellEditEnding($queueInstallRefresh)
     $GridSearch.Add_PreviewMouseLeftButtonUp($queueInstallRefresh)
 }
+

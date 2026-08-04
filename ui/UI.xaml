@@ -1,5 +1,5 @@
 <!--
-    UI.xaml — finestra principale di WinGet Update Tool.
+    UI.xaml — finestra principale di WinGet Studio.
 
     Caricato da App.Bootstrap.ps1: se questo file esiste accanto allo script/exe vince
     su quello embeddato, quindi si puo' ritoccare la UI e rilanciare senza ricompilare.
@@ -14,7 +14,7 @@
 -->
 <Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="WinGet Update Tool" Height="620" Width="900"
+        Title="WinGet Studio" Height="620" Width="900"
         WindowStartupLocation="CenterScreen"
         ResizeMode="CanResize" MinWidth="760" MinHeight="520"
         Background="{DynamicResource BgBrush}"
@@ -750,6 +750,7 @@
                  CaretBrush="{DynamicResource FgBrush}"/>
     </Grid>
 </Window>
+
 
 
 

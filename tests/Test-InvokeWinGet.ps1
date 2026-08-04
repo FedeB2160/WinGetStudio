@@ -1,7 +1,7 @@
 <#
     Test-InvokeWinGet.ps1
     ---------------------
-    Verifica eseguibile delle due cause radice corrette in WinGetUpdateTool.ps1.
+    Verifica eseguibile delle due cause radice corrette in main.ps1.
     Non serve admin, non installa nulla.
 
         powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
@@ -215,3 +215,4 @@ Check "senza -MaxColumns la tabella si perde (era il bug: $($prNoLimit.Count) ri
 if ($failures -eq 0) { Write-Host "`nTutti i test passati.`n" -ForegroundColor Green; exit 0 }
 Write-Host "`n$failures test falliti.`n" -ForegroundColor Red
 exit 1
+

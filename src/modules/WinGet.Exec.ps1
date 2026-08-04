@@ -4,7 +4,7 @@
     Qui vive tutto cio' che riguarda il LANCIARE winget; il parsing del suo output
     tabellare sta in WinGet.Parse.ps1.
 
-    Caricato dal bootstrap (src\WinGetUpdateTool.ps1): dot-source come .ps1,
+    Caricato dal bootstrap (src\main.ps1): dot-source come .ps1,
     concatenato nell'exe al posto del marcatore ###MODULES###.
 #>
 
@@ -85,3 +85,4 @@ function Invoke-WinGet([string]$exePath, [string]$argLine, [scriptblock]$Tick) {
         foreach ($f in @($outFile, $errFile)) { Remove-Item $f -Force -ErrorAction SilentlyContinue }
     }
 }
+

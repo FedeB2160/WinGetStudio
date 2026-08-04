@@ -8,11 +8,11 @@
     Initialize-Theme va chiamata dal bootstrap DOPO il FindName: aggancia il pulsante
     e avvia il timer, cose che richiedono i controlli gia' risolti.
 
-    Caricato dal bootstrap (src\WinGetUpdateTool.ps1): dot-source come .ps1,
+    Caricato dal bootstrap (src\main.ps1): dot-source come .ps1,
     concatenato nell'exe al posto del marcatore ###MODULES###.
 #>
 
-$themeKey = 'HKCU:\Software\WinGetUpdateTool'
+$themeKey = 'HKCU:\Software\WinGetStudio'
 
 # Tema di sistema: AppsUseLightTheme = 0 -> scuro. Assente su Win10 vecchi -> chiaro.
 function Test-SystemDark {
@@ -103,3 +103,4 @@ function Initialize-Theme {
 
     Set-Theme
 }
+
