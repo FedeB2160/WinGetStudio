@@ -61,7 +61,7 @@ After an uninstall the list is not rebuilt automatically, so you can read the ou
 
 A pin tells winget to leave a package alone until you remove the pin — for the one that keeps reappearing and that you do not want touched.
 
-**Right click a row** in Updates or Installed → *Pin (block upgrades)* or *Remove pin*. It works on the highlighted rows, not the ticked ones. A pinned package shows a pin icon and is skipped by updates, including *Select all*. It can still be uninstalled: a pin blocks upgrades, not removal.
+**Right click a row** in Updates or Installed → *Pin highlighted* or *Remove pin from highlighted*. It works on the highlighted rows, not the ticked ones, and the entries say so. A pinned package shows a pin icon and is skipped by updates, including *Select all*. It can still be uninstalled: a pin blocks upgrades, not removal.
 
 ### Settings
 
@@ -75,6 +75,10 @@ The **Settings** tab, at the right end of the tab strip, is a tab like the other
 ### About
 
 Its own tab, at the right end of the strip: what the app does function by function, and links to the source, the release notes, the licence and where to report a bug.
+
+### Keyboard
+
+**F5** rescans the active tab — Updates or Installed; it does nothing on the others. **Ctrl+F** jumps to the Install tab with the cursor in the search box.
 
 ### What the Result column means
 

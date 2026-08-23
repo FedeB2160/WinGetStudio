@@ -189,6 +189,25 @@ function Start-App([switch]$NoShow) {
             $e.Handled = $true
         })
 
+    # Scorciatoie. PreviewKeyDown sulla FINESTRA e non sui controlli: in tunneling la finestra
+    # vede il tasto per prima, mentre un DataGrid che ha il fuoco si mangerebbe F5 e Ctrl+F per
+    # conto suo. Il tab attivo decide cosa ricaricare: una scorciatoia che agisce su una scheda
+    # che non si sta guardando sorprende. Load-Upgrades e Load-Installed rifiutano gia' di
+    # partire sopra un altro winget, quindi qui non serve nessun controllo.
+    $script:window.Add_PreviewKeyDown({
+        param($s, $e)
+        if ($e.Key -eq [System.Windows.Input.Key]::F5) {
+            if     ($TabMain.SelectedItem -eq $TabUpdates)   { Load-Upgrades;  $e.Handled = $true }
+            elseif ($TabMain.SelectedItem -eq $TabInstalled) { Load-Installed; $e.Handled = $true }
+        }
+        elseif ($e.Key -eq [System.Windows.Input.Key]::F -and
+                ($e.KeyboardDevice.Modifiers -band [System.Windows.Input.ModifierKeys]::Control)) {
+            $TabInstall.IsSelected = $true
+            [void]$TxtSearch.Focus()
+            $e.Handled = $true
+        }
+    })
+
     # 5) Aggancio dei controlli: da qui in poi i moduli possono lavorare.
     Initialize-Theme
     Initialize-TabHeaders

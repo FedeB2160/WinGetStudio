@@ -860,8 +860,8 @@
                                   CellStyle="{StaticResource GridCell}">
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem x:Name="MenuPinInstalled"   Header="Pin (block upgrades)"/>
-                                    <MenuItem x:Name="MenuUnpinInstalled" Header="Remove pin"/>
+                                    <MenuItem x:Name="MenuPinInstalled"   Header="Pin highlighted (block upgrades)"/>
+                                    <MenuItem x:Name="MenuUnpinInstalled" Header="Remove pin from highlighted"/>
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
@@ -954,8 +954,8 @@
                                  con le spunte il pin non si potrebbe piu' togliere. -->
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem x:Name="MenuPinUpdates"   Header="Pin (block upgrades)"/>
-                                    <MenuItem x:Name="MenuUnpinUpdates" Header="Remove pin"/>
+                                    <MenuItem x:Name="MenuPinUpdates"   Header="Pin highlighted (block upgrades)"/>
+                                    <MenuItem x:Name="MenuUnpinUpdates" Header="Remove pin from highlighted"/>
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>

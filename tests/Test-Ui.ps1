@@ -302,6 +302,16 @@ if ($uiText -notmatch '(?s)GridHeader.*?HorizontalContentAlignment"\s+Value="Cen
 }
 "OK header  $($colHeaders.Count) intestazioni, tutte non vuote, maiuscole e centrate"
 
+# 10b-bis) Le voci del menu contestuale agiscono sulle righe EVIDENZIATE, non su quelle
+# spuntate: se non lo dicono, si spunta una riga e poi non si capisce perche' il pin sia
+# finito altrove. E' documentato nei commenti da sempre, ma il commento non lo legge nessuno
+# col tasto destro premuto.
+$menuHeaders = @([regex]::Matches($uiText, '<MenuItem[^>]*Header="([^"]*)"') | ForEach-Object { $_.Groups[1].Value })
+if ($menuHeaders.Count -eq 0) { throw "nessuna voce di menu trovata: regex da rivedere" }
+$vague = @($menuHeaders | Where-Object { $_ -notmatch 'highlighted' })
+if ($vague.Count -gt 0) { throw "voci di menu che non dicono su cosa agiscono: $($vague -join ', ')" }
+"OK menu   $($menuHeaders.Count) voci di menu dichiarano di agire sulle righe evidenziate"
+
 # 10c) Ogni glifo usato in UI.xaml esiste nei font di sistema? Un codice sbagliato non
 # da' errore: finisce a video come rettangolo vuoto (tofu) e si nota solo guardando.
 # Si controllano entrambi i font perche' UI.xaml li elenca in cascata: Segoe Fluent Icons
@@ -659,7 +669,16 @@ finally {
 # 13c) Entrambi i timer si fermano alla chiusura: uno che resta vivo tiene in piedi il
 # processo dopo che la finestra e' sparita, ed e' la ragione per cui il primo era stato
 # fermato — quindi vale anche per il secondo.
+# F5 ricarica la scheda attiva, Ctrl+F porta al campo di ricerca. Non si possono premere
+# tasti in un test headless: si verifica che l'aggancio ci sia e che sia in tunneling sulla
+# FINESTRA, perche' il tasto arriva prima al controllo che ha il fuoco — e un DataGrid usa F5
+# e Ctrl+F per conto suo.
 $startSrc = Get-FunctionSource 'Start-App'
+if ($startSrc -notmatch 'Add_PreviewKeyDown') { throw "le scorciatoie non sono agganciate in tunneling sulla finestra" }
+foreach ($k in 'Key\]::F5', 'Key\]::F\b', 'ModifierKeys\]::Control') {
+    if ($startSrc -notmatch $k) { throw "scorciatoia mancante o agganciata diversamente: $k" }
+}
+
 foreach ($t in 'themeTimer', 'searchTimer') {
     if ($startSrc -notmatch "Add_Closed[\s\S]*$t") { throw "Add_Closed non ferma `$script:$t" }
 }
