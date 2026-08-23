@@ -246,7 +246,12 @@
                                  la striscia. -->
                             <DockPanel Grid.Row="0" Panel.ZIndex="1" IsItemsHost="True"
                                        LastChildFill="False" Margin="0,0,0,-1" Background="Transparent"/>
-                            <Border Grid.Row="1" BorderThickness="1" CornerRadius="0,4,4,4"
+                            <!-- CornerRadius: ENTRAMBI gli angoli superiori quadrati, perche' su
+                                 entrambi i lati della striscia c'e' una linguetta. A sinistra lo
+                                 era gia' (la prima scheda ci si fonde sopra); a destra il raggio
+                                 di 4 era rimasto da quando lassu' non c'era nulla, e sotto il tab
+                                 Settings affiorava come uno scalino. -->
+                            <Border Grid.Row="1" BorderThickness="1" CornerRadius="0,0,4,4"
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}">
                                 <!-- PART_SelectedContentHost: nome richiesto da TabControl per

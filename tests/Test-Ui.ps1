@@ -547,6 +547,25 @@ if ([Math]::Abs($rightBorder - $rightFrame) -gt 0.5) {
 }
 "OK tabedge bordo del tab Settings allineato al riquadro ($([int]$rightFrame)px)"
 
+# 15d) ...e sotto di lui il riquadro non deve avere un angolo arrotondato. Con un tab fissato
+# a destra, la curva in alto a destra del riquadro affiorava sotto la linguetta come uno
+# scalino. Entrambi gli angoli superiori sono quadrati perche' su entrambi i lati della
+# striscia c'e' una linguetta.
+$tplGrid = [System.Windows.Media.VisualTreeHelper]::GetChild($TabMain, 0)
+$frame = $null
+for ($i = 0; $i -lt [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($tplGrid); $i++) {
+    $ch = [System.Windows.Media.VisualTreeHelper]::GetChild($tplGrid, $i)
+    if ($ch -is [System.Windows.Controls.Border]) { $frame = $ch; break }
+}
+if (-not $frame) { throw "riquadro del contenuto non trovato nel template del TabControl" }
+if ($frame.CornerRadius.TopRight -ne 0) {
+    throw "il riquadro ha l'angolo in alto a destra arrotondato ($($frame.CornerRadius.TopRight)): affiora sotto il tab Settings"
+}
+if ($frame.CornerRadius.TopLeft -ne 0) {
+    throw "il riquadro ha l'angolo in alto a sinistra arrotondato: affiora sotto il primo tab"
+}
+"OK tabjoin angoli superiori del riquadro quadrati sotto le linguette"
+
 # 16) La disinstallazione DEVE restare dietro una conferma, e la conferma deve venire
 # prima di mettere qualcosa in coda. E' l'unica operazione irreversibile del programma:
 # il controllo e' statico perche' una MessageBox headless bloccherebbe la suite.

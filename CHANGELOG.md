@@ -7,7 +7,7 @@
 - The scrollbars follow the theme. In the dark theme they used to stay white — the last piece of the window that Windows still painted its own way — because the system template hardcodes light colours and ignores what the app asks for.
 - The status icons in the RESULT column carry accessible names, so a screen reader announces "Succeeded" or "Failed" instead of reading out the character code behind the icon.
 - **The light theme has structure again.** Buttons, text boxes, the log and the tabs used to sit on a white page with an almost-white fill and a hairline border, so they were nearly invisible — and a disabled button vanished completely. The page is now a light grey with white controls on top of it, the way Windows 11 does it, and the border that marks an interactive control is a separate, stronger colour from the grid lines. Disabled buttons keep their outline and only dim their label.
-- The Settings tab sits flush with the content frame; it used to be 2px short of it.
+- The Settings tab sits flush with the content frame, with no step under it. It used to be 2px short of the frame, and the frame’s rounded top-right corner showed through beneath it.
 
 ## v1.9.0
 
