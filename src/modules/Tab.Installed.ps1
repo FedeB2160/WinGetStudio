@@ -178,6 +178,9 @@ function Initialize-InstalledTab {
         # reagisce solo all'evento del TabControl stesso.
         if ($e.OriginalSource -ne $TabMain) { return }
         if ($script:installedLoaded) { return }
-        if ($TabMain.SelectedItem -and $TabMain.SelectedItem.Header -eq 'Installed') { Load-Installed }
+        # Confronto con l'OGGETTO e non con l'header: una rinomina della linguetta non deve
+        # spegnere in silenzio il caricamento automatico, e l'header del tab Settings non e'
+        # nemmeno una stringa (glifo + parola).
+        if ($TabMain.SelectedItem -eq $TabInstalled) { Load-Installed }
     })
 }

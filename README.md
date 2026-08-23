@@ -17,7 +17,7 @@ Download `WinGetStudio.exe` from the [latest release](https://github.com/FedeB21
 
 ## Using it
 
-The window has three tabs. The **progress bar and the log at the bottom stay visible from every tab**, so you can start a long update, switch tab, and still see how it is going.
+The window has three tabs plus **Settings**, pinned to the right of the strip. The **progress bar and the log at the bottom stay visible from every tab**, so you can start a long update, switch tab, and still see how it is going.
 
 ### Updates
 
@@ -59,7 +59,7 @@ A pin tells winget to leave a package alone until you remove the pin — for the
 
 ### Settings
 
-The **gear button** in the top-right corner opens the settings screen; the **X** or **Esc** closes it.
+The **Settings** tab, at the right end of the tab strip, is a tab like the others — so the progress bar and the log stay visible while you are in it.
 
 - **Theme** — `Light`, `Dark`, or `Auto` to follow Windows (which it keeps following while the window is open).
 - **Installed version** and **Check for updates** — see below.

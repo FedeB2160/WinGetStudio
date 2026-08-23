@@ -87,7 +87,6 @@ $moduleNames = @(
     'App.Pins.ps1'
     'App.Backup.ps1'
     'App.Update.ps1'
-    'App.Settings.ps1'
     'Tab.Updates.ps1'
     'Tab.Install.ps1'
     'Tab.Installed.ps1'

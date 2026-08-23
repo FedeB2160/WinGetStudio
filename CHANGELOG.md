@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Settings is a tab pinned to the right of the strip instead of an overlay covering the window, so the progress bar and the log stay visible while you are in it. The gear button, the close button and Esc are gone with it. The three functional tabs are in alphabetical order — Install, Installed, Updates — and Updates is still the view the app opens on.
+
 ## v1.9.0
 
 **The tool was renamed.** `WinGetUpdateTool.exe` is now **`WinGetStudio.exe`** — the old name only described a third of what it does.

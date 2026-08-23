@@ -22,7 +22,6 @@ src\   main.ps1                 entry point: version, elevation, module loading,
        App.Pins.ps1             pins: read, add, remove, flag the rows
        App.Backup.ps1           export / import of the package list
        App.Update.ps1           self-update from GitHub releases
-       App.Settings.ps1         the settings screen: open and close
        Tab.Updates.ps1          the Updates tab
        Tab.Install.ps1          the Install tab: search-as-you-type, scope, install
        Tab.Installed.ps1        the Installed tab: inventory, filter, uninstall
@@ -242,8 +241,10 @@ Colours are referenced with `{DynamicResource ...}` everywhere: `StaticResource`
 
 ### Layout choices
 
-- The progress bar and the log live **outside** the `TabControl` so they stay visible from every tab.
-- The settings screen is a panel overlaid on the whole window, **not a second Window**: the theme brushes live in the main window's `MergedDictionaries`, so a separate Window would have to be wired to those dictionaries and re-wired on every theme change, plus owner, modality and placement.
+- The progress bar and the log live **outside** the `TabControl` so they stay visible from every tab — including from Settings, which is why Settings is a tab pinned to the right of the strip and not an overlay. It used to be a `Border` with `Grid.RowSpan="4"` covering the whole window, which hid exactly the part that reports how an operation is going, and needed a chain of `ZIndex`, focus and Esc handling to behave like a screen. As a tab it needs none of that, and it is **not** a second Window: the theme brushes live in the main window's `MergedDictionaries`, so a separate Window would have to be wired to those dictionaries and re-wired on every theme change, plus owner, modality and placement.
+- **`TabPanel` cannot right-align a single item**, so the tab strip is a `DockPanel` used as `IsItemsHost`: the three functional tabs take the default `Dock="Left"` and stay in declaration order, `TabSettings` declares `Dock="Right"`, and `LastChildFill="False"` stops it from stretching across the strip — the same trap, with the same fix, as any other `DockPanel` whose last child must respect its own `Dock`. The `Margin="0,0,0,-1"` seam between the active tab and the content border sits on the panel, not on the items, so the swap does not touch it.
+- The tabs are in alphabetical order (**Install | Installed | Updates**) but **Updates is the view the app opens on**, via `IsSelected="True"`: the startup scan fills that list, and opening on a tab nobody is looking at would hide the update count. Navigation order and default view are separate concerns.
+- The lazy load of the Installed tab compares `SelectedItem` with **the `TabInstalled` object**, not with its header string: the Settings tab's header is not even a string (glyph plus word), and a rename must not silently switch the automatic load off.
 - The search spinner sits at the **end** of its row: docked right it took 20px off the search box every time a search ran, and gave them back afterwards.
 - During an operation the grids go **read-only, not disabled**: a disabled `DataGrid` stops responding to wheel, scrollbar and keyboard, so the list looked frozen.
 

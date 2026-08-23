@@ -292,16 +292,24 @@ if ($null -eq $Grid.ItemsSource) { throw "Initialize-UpdatesTab non ha agganciat
 if ($CmbTheme.Items.Count -ne 3) { throw "Initialize-Theme non ha riempito la tendina del tema: $($CmbTheme.Items.Count) voci" }
 if ($CmbTheme.SelectedItem -notin @('Light', 'Dark', 'Auto')) { throw "tema selezionato inatteso: '$($CmbTheme.SelectedItem)'" }
 
-# La schermata delle impostazioni: chiusa all'avvio, si apre e si richiude.
-if ($SettingsPanel.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "le impostazioni sono aperte all'avvio" }
-Show-Settings
-if ($SettingsPanel.Visibility -ne [System.Windows.Visibility]::Visible) { throw "Show-Settings non apre il pannello" }
-Hide-Settings
-if ($SettingsPanel.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "Hide-Settings non chiude il pannello" }
-# Esc non si puo' premere in un test headless: si verifica che l'aggancio ci sia.
-$setSrc = Get-FunctionSource 'Initialize-Settings'
-if ($setSrc -notmatch 'PreviewKeyDown') { throw "Esc non e' agganciato in tunneling sulla finestra" }
-if ($setSrc -notmatch 'Key\]::Escape') { throw "Esc non chiude le impostazioni" }
+# La schermata delle impostazioni e' un TAB come gli altri, l'ultimo, fissato a destra:
+# cosi' barra di avanzamento e log restano visibili anche mentre e' aperta, e non servono
+# ne' un overlay con RowSpan/ZIndex, ne' un tasto per chiuderla, ne' Esc.
+if ($TabMain.Items.Count -ne 4) { throw "attesi 4 tab, trovati $($TabMain.Items.Count)" }
+if ($TabMain.Items[3] -ne $TabSettings) { throw "il tab Settings non e' l'ultimo" }
+# Ordine alfabetico dei tre tab funzionali.
+foreach ($pair in @(@(0, $TabInstall, 'Install'), @(1, $TabInstalled, 'Installed'), @(2, $TabUpdates, 'Updates'))) {
+    if ($TabMain.Items[$pair[0]] -ne $pair[1]) { throw "il tab in posizione $($pair[0]) non e' $($pair[2])" }
+    if ($pair[1].Header -ne $pair[2]) { throw "header inatteso in posizione $($pair[0]): '$($pair[1].Header)'" }
+}
+# Updates resta la vista di apertura: la scansione all'avvio popola proprio quella.
+if (-not $TabUpdates.IsSelected) { throw "all'avvio deve essere selezionato Updates" }
+# I controlli delle impostazioni vivono DENTRO il tab: se restassero fuori, tornerebbero a
+# coprire il resto della finestra.
+$p = $CmbTheme
+while ($p -and $p -ne $TabSettings) { $p = [System.Windows.LogicalTreeHelper]::GetParent($p) }
+if ($p -ne $TabSettings) { throw "la tendina del tema non e' dentro il tab Settings" }
+"OK settab $($TabMain.Items.Count) tab, Settings ultimo, Updates selezionato all'avvio"
 # Le funzioni delle schede girano senza esplodere sui controlli?
 Write-Log 'test'
 if ($TxtLog.Text -notmatch 'test') { throw "Write-Log non scrive nel TextBox del log" }
@@ -399,7 +407,7 @@ else {
 # ricerca restringeva il campo di 20px e lo riallargava al termine.
 # Il TabControl realizza solo il contenuto della scheda attiva: senza selezionare
 # Install, i suoi controlli misurano 0 e il confronto non proverebbe nulla.
-$tabMain.SelectedIndex = 1
+$TabInstall.IsSelected = $true
 $window.Content.Measure([System.Windows.Size]::new(900, 620))
 $window.Content.Arrange([System.Windows.Rect]::new(0, 0, 900, 620))
 $window.Content.UpdateLayout()
@@ -414,6 +422,19 @@ $SearchSpinner.Visibility = [System.Windows.Visibility]::Collapsed
 if ($wAfter -ne $wBefore) { throw "lo spinner ha ristretto il campo di ricerca: $wBefore -> $wAfter" }
 if ($xStoreAfter -ne $xStoreBefore) { throw "lo spinner ha spostato la spunta MS Store: $xStoreBefore -> $xStoreAfter" }
 "OK spin   lo spinner compare senza muovere campo di ricerca ne' spunta (campo $([int]$wBefore)px)"
+
+# 15b) Il tab Settings e' fissato a DESTRA della striscia: un DockPanel come items host
+# (TabPanel non sa allineare a destra un singolo item). Se qualcuno rimette TabPanel, il tab
+# torna in fila subito dopo Updates e questo controllo se ne accorge.
+# Serve il layout gia' calcolato, quindi sta qui e non nella sezione 12.
+$xUpdates  = $TabUpdates.TranslatePoint([System.Windows.Point]::new(0, 0), $window.Content).X
+$xSettings = $TabSettings.TranslatePoint([System.Windows.Point]::new(0, 0), $window.Content).X
+$rightOfUpdates = $xUpdates + $TabUpdates.ActualWidth
+if ($TabSettings.ActualWidth -le 0) { throw "layout della striscia non calcolato: il tab Settings misura 0" }
+if ($xSettings -lt $rightOfUpdates + 100) {
+    throw "il tab Settings non e' fissato a destra (x=$([int]$xSettings), fine di Updates=$([int]$rightOfUpdates))"
+}
+"OK tabdock Settings fissato a destra (x=$([int]$xSettings) contro $([int]$rightOfUpdates) di Updates)"
 
 # 16) La disinstallazione DEVE restare dietro una conferma, e la conferma deve venire
 # prima di mettere qualcosa in coda. E' l'unica operazione irreversibile del programma:
@@ -436,7 +457,7 @@ else {
     # Il caricamento parte da solo al PRIMO ingresso nella scheda: non si chiama la
     # funzione a mano, si cambia scheda come farebbe l'utente.
     if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
-    $tabMain.SelectedIndex = 2
+    $TabInstalled.IsSelected = $true
     if (-not (Wait-For { $installedItems.Count -gt 0 -and -not $script:isBusy } 120)) {
         throw "aprendo la scheda Installed l'elenco non si e' caricato"
     }
