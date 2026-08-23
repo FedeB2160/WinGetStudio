@@ -14,6 +14,21 @@ $items = New-Object System.Collections.ObjectModel.ObservableCollection[object]
 
 $script:allSelected = $false
 
+# L'elenco rispecchia una fotografia della macchina scattata da Load-Upgrades. Appena qualcosa
+# la altera — un aggiornamento, un'installazione, una disinstallazione, un import — le versioni
+# a schermo non valgono piu', e ripremere Update rilancia winget su pacchetti gia' aggiornati:
+# quelli escono con codice non-zero e si dipingono di ROSSO su righe che erano andate bene.
+# Quindi il pulsante si blocca finche' non si rilegge.
+# PERCHE' NON UNA RICARICA AUTOMATICA: cancellerebbe la colonna Result appena scritta, che e'
+# il resoconto di com'e' andata.
+# I PIN non entrano qui: bloccano gli aggiornamenti, non cambiano le versioni installate.
+$script:listStale = $false
+
+function Set-UpdatesStale {
+    $script:listStale = $true
+    Refresh-SelectionState
+}
+
 # Ricalcola stato pulsanti/etichette in base a elenco e selezione (req 2/3/4).
 function Refresh-SelectionState {
     $total = $items.Count
@@ -25,7 +40,7 @@ function Refresh-SelectionState {
     # pulsante e' Cancel e deve restare premibile: Set-PinFlags richiama questa funzione a
     # stato ancora occupato, e senza la guardia spegneva il Cancel appena letti i pin.
     if ($script:queueVerb -ne 'Update') {
-        $BtnUpdate.IsEnabled = (-not $script:isBusy) -and ($sel -gt 0)
+        $BtnUpdate.IsEnabled = (-not $script:isBusy) -and ($sel -gt 0) -and (-not $script:listStale)
     }
 
     # Allinea l'etichetta del toggle allo stato reale della selezione
@@ -34,7 +49,11 @@ function Refresh-SelectionState {
 
     # Due contatori: disponibili (top) e selezionati (action bar)
     $TxtAvailable.Text = if ($total -eq 0) { "" } elseif ($total -eq 1) { "1 update available" } else { "$total updates available" }
-    $TxtSelected.Text  = if ($sel -gt 0) { "$sel selected" } else { "" }
+    # A lista vecchia il contatore dei selezionati cede il posto al motivo per cui Update e'
+    # spento: un pulsante grigio senza spiegazione sembra un guasto.
+    $TxtSelected.Text  = if ($script:listStale) { "list out of date - press Check" }
+                         elseif ($sel -gt 0)    { "$sel selected" }
+                         else                   { "" }
 }
 
 # Applica lo stato occupato ai soli controlli di QUESTA scheda. La chiama Set-AppBusy
@@ -79,6 +98,8 @@ function Load-Upgrades {
     # Non si scansiona sopra un altro winget: la scheda Install non alza lo stato occupato
     # mentre cerca, quindi il solo isBusy non basterebbe.
     if (Test-WinGetBusy) { return }
+    # La lettura che si sta per fare E' la nuova fotografia: da qui il pulsante torna buono.
+    $script:listStale = $false
     Set-AppBusy $true
     Write-Log "Searching for updates..."
     $items.Clear()
@@ -164,6 +185,11 @@ function Start-UpdateSelected {
         "upgrade --id `"$($r.Id)`" --include-unknown -e --silent --disable-interactivity --accept-source-agreements --accept-package-agreements"
     } -OnDone {
         Set-AppBusy $false
+        # L'elenco NON si ricarica da solo: cancellerebbe la colonna Result appena scritta,
+        # che e' il resoconto di com'e' andata. Ma le versioni mostrate ora sono vecchie,
+        # quindi Update si blocca fino al Check.
+        Set-UpdatesStale
+        Write-Log "The versions in this list are stale now: press Check to rescan."
     }
 }
 

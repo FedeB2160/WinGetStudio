@@ -148,6 +148,8 @@ function Invoke-PackageImport([string]$file, [int]$count) {
             }
             Write-Log "Press Refresh to rebuild the installed list."
             Set-AppBusy $false
+            # L'import ha installato software: l'elenco degli aggiornamenti e' di prima.
+            Set-UpdatesStale
         })
 }
 

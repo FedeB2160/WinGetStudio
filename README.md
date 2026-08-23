@@ -26,6 +26,7 @@ The window has three tabs plus **Settings**, pinned to the right of the strip. T
 2. Tick what you want, or **Select all**.
 3. **Update** upgrades them one at a time. Each row shows its own outcome, and slow installers are never cut off — the log writes a line every 30 seconds so you can see it is still working.
    - While the queue runs, **Update** reads **Cancel**. Pressing it lets the package in progress finish and then stops, so nothing is interrupted halfway through an installer; the packages that never ran keep their tick and an empty result.
+4. When the queue ends, **Update** is greyed until you press **Check** again. The versions on screen describe the machine as it was before, so running the queue on them would report failures for packages that had in fact succeeded. The list is not rebuilt automatically on purpose: that would wipe the outcome of each row, which is the point of the Result column.
 
 The list stays scrollable while updating — the ticks and the pin entries are greyed, not the list — and columns can be resized by dragging their edge in the header.
 
@@ -76,7 +77,7 @@ The **Settings** tab, at the right end of the tab strip, is a tab like the other
 
 ## Automatic updates
 
-At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the settings screen, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, the file is verified against the checksum published with the release, and the app then replaces itself and restarts.
+At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the Settings tab, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, the file is verified against the checksum published with the release, and the app then replaces itself and restarts.
 
 If there is no newer release, no network, or you are running from source, the check says nothing at all. You can always ask explicitly with **Check for updates**, which does report the outcome either way.
 

@@ -151,6 +151,7 @@ function Install-Rows([object[]]$Rows) {
     } -OnDone {
         Set-AppBusy $false
         # L'elenco della scheda Updates e' stato calcolato prima di queste installazioni.
+        Set-UpdatesStale
         Write-Log "The Updates list may be out of date now: press Check to rescan."
     }
 }

@@ -569,6 +569,35 @@ else {
     "OK cancel2 coda fermata dopo $ran pacchetti su 5"
 }
 
+# 13f) Dopo un'alterazione della macchina il pulsante Update si blocca fino al Check:
+# ripremerlo rilanciava winget su pacchetti gia' aggiornati, che escono con codice non-zero
+# e finivano in griglia come X ROSSE su righe andate a buon fine.
+$items.Clear()
+$items.Add([WgtRow]@{ Id = 'A.A'; Name = 'A'; Selected = $true })
+$script:listStale = $false
+Refresh-SelectionState
+if (-not $BtnUpdate.IsEnabled) { throw "con una riga selezionata e la lista fresca Update deve essere attivo" }
+
+Set-UpdatesStale
+if ($BtnUpdate.IsEnabled) { throw "dopo un'alterazione Update deve restare bloccato" }
+if ($TxtSelected.Text -notmatch 'press Check') { throw "non viene detto PERCHE' Update e' bloccato: '$($TxtSelected.Text)'" }
+if (-not $BtnRefresh.IsEnabled) { throw "Check deve restare attivo: e' l'unico modo per sbloccare" }
+
+# I pin NON marcano la lista: bloccano gli aggiornamenti, non cambiano le versioni installate.
+$script:listStale = $false
+Set-PinFlags @('A.A')
+if ($script:listStale) { throw "un pin ha marcato la lista come vecchia" }
+$items.Clear()
+$script:listStale = $false
+Refresh-SelectionState
+
+# Le quattro code che alterano la macchina lo dichiarano, e solo il Check sblocca.
+foreach ($fn in 'Start-UpdateSelected', 'Install-Rows', 'Start-UninstallSelected', 'Invoke-PackageImport') {
+    if ((Get-FunctionSource $fn) -notmatch 'Set-UpdatesStale') { throw "$fn non marca la lista come vecchia" }
+}
+if ((Get-FunctionSource 'Load-Upgrades') -notmatch 'listStale\s*=\s*\$false') { throw "Load-Upgrades non sblocca il pulsante" }
+"OK stale   Update bloccato dopo un'alterazione, sbloccato solo dal Check"
+
 # 14) La ricerca della scheda Install: debounce, soglia dei 3 caratteri e scarto dei
 # risultati superati. E' l'unica parte della suite che chiama winget davvero, ma solo in
 # lettura e sul solo indice LOCALE (--source winget), quindi non tocca la rete.

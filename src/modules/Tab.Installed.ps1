@@ -141,6 +141,9 @@ function Start-UninstallSelected {
         "uninstall --id `"$($r.Id)`" -e --silent --disable-interactivity --accept-source-agreements"
     } -OnDone {
         Set-AppBusy $false
+        # Anche la scheda Updates ora mente: un pacchetto disinstallato puo' essere ancora
+        # in quell'elenco, e aggiornarlo fallirebbe.
+        Set-UpdatesStale
         # L'elenco non viene ricaricato da solo: cancellerebbe la colonna Result appena
         # scritta, che e' il resoconto di cosa e' andato come.
         Write-Log "Uninstall finished: press Refresh to rebuild the list."
