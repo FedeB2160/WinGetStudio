@@ -56,7 +56,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps
 | Tab names | Unchanged: `Install`, `Installed`, `Updates`. winget's own vocabulary. |
 | Tab selected at startup | `Updates`, via `IsSelected="True"` in XAML. Navigation order and default view are separate concerns. |
 | Esc | Removed with the overlay. A tab is not modal. |
-| Settings tab header | Gear glyph `&#xE713;` **plus** the word "Settings". The text supplies the accessible name. |
+| Settings tab header | Gear glyph `&#xE713;` **plus** the word "Settings". The text supplies the accessible name. **Superseded by Task 21**, which gives every tab an icon and makes icon/text/both a user choice — the Settings tab stops being the special one. |
 | `Unknown` / `MS Store` / `Scope` | Stay where they are, gain persistence. `Scope` must not move away from the `Install` button it modifies. |
 | "Check for updates at startup" | On by default. Opt-out, matching today's behaviour. |
 | Flags and pins during a queue | Disabled, and visibly so. The grid itself stays scrollable - never `IsEnabled` on a `DataGrid`. |
@@ -2853,6 +2853,244 @@ git branch -d feature/v1.10.0 && git push origin --delete feature/v1.10.0
 
 ---
 
+## Task 21: an icon per tab, and a choice of what the strip shows
+
+Task 1 gave the Settings tab a glyph plus a word while the other three carry bare text, which makes it look like a different kind of thing rather than the last tab. Every tab gets an icon, and the strip's appearance becomes a preference: **Icon**, **Text**, or **Icon + Text** (the default, and what the app does today).
+
+Glyphs, all verified present in **both** `SegoeIcons.ttf` (Win11) and `segmdl2.ttf` (Win10), so none of them can land on screen as an empty box:
+
+| Tab | Glyph | Name |
+|---|---|---|
+| Install | `&#xE896;` | Download — the tab's outcome is installing; search is the means |
+| Installed | `&#xE71D;` | AllApps — the inventory of the machine |
+| Updates | `&#xE777;` | UpdateRestore — literally the update icon |
+| Settings | `&#xE713;` | Settings, already in use |
+
+**Design.** `Header` stays the plain string on every tab, so it remains the accessible name and the existing header assertions keep working. The glyph goes in `Tag`, and one `HeaderTemplate` on the `TabItem` style renders both: the glyph bound to `Tag` through `RelativeSource AncestorType=TabItem`, the word bound to the header itself. That way there is one template rather than four hand-built headers, and adding a fifth tab means adding two attributes.
+
+The mode drives two `Visibility` values held as window resources, which the template reads with `{DynamicResource}` — so switching mode repaints the strip without rebuilding anything. That needs one adjustment to the suite: check 4 currently requires **every** `DynamicResource` key in `UI.xaml` to exist in both theme files, which would reject a non-colour key. It exists to catch a missing colour, so it narrows to keys ending in `Brush`.
+
+**Accessibility.** In **Icon** mode the header has no text, so the tab would announce nothing. `AutomationProperties.Name` on each `TabItem`, bound to its own `Header`, keeps the name regardless of what is drawn — and keeps Task 3's rule satisfied without exempting anything.
+
+**Files:**
+- Modify: `ui\UI.xaml` (`TabItem` style gains a `HeaderTemplate`; four tabs gain `Tag`, `ToolTip` and `AutomationProperties.Name`; the Settings tab loses its hand-built header; two visibility resources)
+- Modify: `src\modules\App.Theme.ps1` or a new `Initialize-TabHeaders` in `App.Bootstrap.ps1` — see step 4
+- Modify: `ui\UI.xaml` Settings body (a `ComboBox` under APPEARANCE)
+- Modify: `src\modules\App.Bootstrap.ps1` (control list)
+- Test: `tests\Test-Ui.ps1`
+
+**Interfaces:**
+- Consumes: `Get-Pref` / `Set-Pref` from Task 5.
+- Produces: preference `TabHeaderStyle` with values `Icon`, `Text`, `Icon + Text` (default). `Set-TabHeaderStyle([string]$mode)` writes the two window resources and is the only thing that decides what the strip shows.
+
+- [ ] **Step 1: Write the failing test**
+
+In `tests\Test-Ui.ps1`, after the `OK settab` block:
+
+```powershell
+# Ogni tab ha la sua icona e un tooltip, e cosa la striscia mostra e' una scelta:
+# Icon | Text | Icon + Text. Il glifo sta in Tag, la parola resta Header — cosi' Header
+# continua a fare da nome accessibile e i controlli sull'ordine dei tab restano validi.
+foreach ($t in $TabMain.Items) {
+    if (-not $t.Tag)     { throw "il tab '$($t.Header)' non ha un glifo in Tag" }
+    if (-not $t.ToolTip) { throw "il tab '$($t.Header)' non ha un tooltip" }
+    $n = [System.Windows.Automation.AutomationProperties]::GetName($t)
+    if (-not $n) { throw "il tab '$($t.Header)' non ha un nome accessibile: in modalita' Icon non annuncerebbe niente" }
+}
+# Le tre modalita' cambiano davvero cosa e' visibile.
+foreach ($case in @(@('Icon', 'Visible', 'Collapsed'), @('Text', 'Collapsed', 'Visible'),
+                    @('Icon + Text', 'Visible', 'Visible'))) {
+    Set-TabHeaderStyle $case[0]
+    if ("$($window.Resources['TabIconVis'])" -ne $case[1]) { throw "modalita' '$($case[0])': icona $($window.Resources['TabIconVis']), attesa $($case[1])" }
+    if ("$($window.Resources['TabTextVis'])" -ne $case[2]) { throw "modalita' '$($case[0])': testo $($window.Resources['TabTextVis']), atteso $($case[2])" }
+}
+Set-TabHeaderStyle 'Icon + Text'
+if ($CmbTabStyle.Items.Count -ne 3) { throw "la tendina della striscia non ha tre voci: $($CmbTabStyle.Items.Count)" }
+$initSrc = Get-FunctionSource 'Initialize-TabHeaders'
+if ($initSrc -notmatch "Get-Pref\s+'TabHeaderStyle'") { throw "la modalita' non si rilegge dalle preferenze" }
+if ($initSrc -notmatch "Set-Pref\s+'TabHeaderStyle'") { throw "la modalita' non si salva" }
+"OK tabicon 4 tab con icona, tooltip e nome accessibile; tre modalita' di visualizzazione"
+```
+
+- [ ] **Step 2: Run it and watch it fail**
+
+Run: `powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1`
+
+Expected: FAIL with `il tab 'Install' non ha un glifo in Tag`.
+
+- [ ] **Step 3: Narrow check 4 to the colour keys**
+
+In `tests\Test-Ui.ps1`, section 4, the key list becomes colour-only — the check exists to catch a colour defined in one theme and not the other, and a `Visibility` held as a window resource is not that:
+
+```powershell
+# Solo le chiavi di COLORE: i temi definiscono pennelli, non tutto cio' che UI.xaml
+# risolve dinamicamente (la visibilita' delle parti dell'header dei tab, per esempio,
+# vive nelle Resources della finestra e la scrive il codice).
+$used = [regex]::Matches((Get-Content (Join-Path $root 'ui\UI.xaml') -Raw),
+                         'DynamicResource\s+(\w+Brush)') |
+        ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+```
+
+- [ ] **Step 4: Build the header template and the switch**
+
+In `ui\UI.xaml`, add the two defaults to `Window.Resources` (the code overwrites them at startup, these are what the designer and a bare `XamlReader.Load` see):
+
+```xml
+        <!-- Cosa mostra la striscia dei tab: le scrive Set-TabHeaderStyle, qui ci sono i
+             valori di partenza (Icon + Text). Sono Visibility e non colori, quindi NON
+             stanno nei file di tema — il controllo sulle chiavi guarda solo i *Brush. -->
+        <Visibility x:Key="TabIconVis">Visible</Visibility>
+        <Visibility x:Key="TabTextVis">Visible</Visibility>
+```
+
+`Visibility` needs the system namespace mapping on the root element:
+
+```xml
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+```
+
+and the two resources become `<Visibility>` from `System.Windows`, which the default XAML namespace already provides — no extra mapping is needed for `Visibility` itself; the `sys` mapping is only required if a plain `String` or `Double` resource is ever added.
+
+Then, in the `TabItem` style, a `HeaderTemplate` replacing the plain `ContentSource="Header"` rendering:
+
+```xml
+            <Setter Property="HeaderTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Il glifo viene da Tag della linguetta: un solo template per
+                                 tutti i tab, e aggiungerne uno costa due attributi.
+                                 AutomationProperties.Name="" perche' il nome lo porta la
+                                 linguetta stessa: qui il glifo e' decorativo. -->
+                            <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       FontSize="14" VerticalAlignment="Center"
+                                       AutomationProperties.Name=""
+                                       Visibility="{DynamicResource TabIconVis}"/>
+                            <!-- Margine sinistro solo quando c'e' anche l'icona: in modalita'
+                                 Text la parola resterebbe spostata di 7px. -->
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center"
+                                       Visibility="{DynamicResource TabTextVis}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Margin" Value="7,0,0,0"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{DynamicResource TabIconVis}" Value="Collapsed">
+                                                <Setter Property="Margin" Value="0"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+```
+
+The four tabs then carry the glyph, the tooltip and the accessible name, and the Settings tab drops the hand-built `TabItem.Header` block Task 1 gave it:
+
+```xml
+                <TabItem x:Name="TabInstall" Header="Install" Tag="&#xE896;"
+                         AutomationProperties.Name="Install"
+                         ToolTip="Search the winget catalogue as you type and install what you pick"/>
+```
+
+```xml
+                <TabItem x:Name="TabInstalled" Header="Installed" Tag="&#xE71D;"
+                         AutomationProperties.Name="Installed"
+                         ToolTip="Everything installed on this machine: filter it, pin it, uninstall it"/>
+```
+
+```xml
+                <TabItem x:Name="TabUpdates" Header="Updates" Tag="&#xE777;" IsSelected="True"
+                         AutomationProperties.Name="Updates"
+                         ToolTip="Packages with a newer version available, and the queue that updates them"/>
+```
+
+```xml
+                <TabItem x:Name="TabSettings" Header="Settings" Tag="&#xE713;" DockPanel.Dock="Right" Margin="0,0,-2,0"
+                         AutomationProperties.Name="Settings"
+                         ToolTip="Theme, tab strip, version and updates"/>
+```
+
+- [ ] **Step 5: The switch and its preference**
+
+A new `Initialize-TabHeaders` in `src\modules\App.Bootstrap.ps1`, called from `Start-App` next to the other `Initialize-*`:
+
+```powershell
+# Cosa mostra la striscia dei tab. Due Visibility nelle Resources della finestra invece di
+# otto controlli nominati: il template dell'header le legge con DynamicResource, quindi
+# riscriverle ridisegna la striscia senza ricostruire niente.
+$script:tabStyles = @('Icon', 'Text', 'Icon + Text')
+
+function Set-TabHeaderStyle([string]$mode) {
+    $window.Resources['TabIconVis'] = if ($mode -eq 'Text') { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible }
+    $window.Resources['TabTextVis'] = if ($mode -eq 'Icon') { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible }
+}
+
+function Initialize-TabHeaders {
+    $saved = [string](Get-Pref 'TabHeaderStyle' 'Icon + Text')
+    if ($saved -notin $script:tabStyles) { $saved = 'Icon + Text' }
+    foreach ($m in $script:tabStyles) { [void]$CmbTabStyle.Items.Add($m) }
+    $CmbTabStyle.SelectedItem = $saved
+    Set-TabHeaderStyle $saved
+    # NB: SelectedItem si imposta PRIMA di agganciare l'handler, altrimenti la scelta
+    # ripristinata verrebbe risalvata a ogni avvio.
+    $CmbTabStyle.Add_SelectionChanged({
+        $chosen = [string]$CmbTabStyle.SelectedItem
+        if (-not $chosen) { return }
+        Set-TabHeaderStyle $chosen
+        Set-Pref 'TabHeaderStyle' $chosen
+    })
+}
+```
+
+- [ ] **Step 6: The control in Settings**
+
+In the APPEARANCE section, a row under Theme — same two-column grid Task 7 introduces:
+
+```xml
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Tab strip" Margin="0,0,12,18"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+                            <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CmbTabStyle" Width="180"
+                                      HorizontalAlignment="Left" Margin="0,0,0,18"
+                                      ToolTip="What the tabs show: the icon, the name, or both"/>
+```
+
+Add `'CmbTabStyle'` to the control list in `Start-App`. If Task 7 has not landed yet, put the row in the existing `StackPanel` instead and let Task 7 move it.
+
+- [ ] **Step 7: Run the tests**
+
+Run: `powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1`
+
+Expected: PASS with `OK tabicon`. Watch `OK settab` and `OK tabedge` too: the header template changes how wide each tab is, and `OK tabedge` measures the last one against the frame.
+
+- [ ] **Step 8: Look at the three modes**
+
+```bash
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\src\main.ps1
+```
+
+Switch between Icon, Text and Icon + Text in Settings. In **Icon** mode check the tabs are still wide enough to click comfortably and the Settings tab stays flush with the frame; in **Text** mode check the word is not left with the icon's 7px gap; hover each tab for its tooltip. Then restart and confirm the choice came back.
+
+- [ ] **Step 9: Docs and commit**
+
+`README.md`, in the Settings section: "**Tab strip** chooses whether the tabs show their icon, their name, or both."
+
+`DEVELOPMENT.md`, next to the re-templated controls: the header is one `HeaderTemplate` reading the glyph from each tab's `Tag`, the mode is two `Visibility` values in the window's resources read with `DynamicResource`, and `AutomationProperties.Name` on the `TabItem` is what keeps icon-only mode announceable. Note that check 4 only looks at `*Brush` keys for this reason.
+
+```bash
+git add ui/UI.xaml src/modules/App.Bootstrap.ps1 tests/Test-Ui.ps1 README.md DEVELOPMENT.md CHANGELOG.md
+git commit -m "feat(ui): an icon per tab, with icon/text/both as a preference"
+```
+
+```bash
+git push
+```
+
+---
+
 ## Execution order
 
 0. **Setup, once.** `git switch -c feature/v1.10.0`; commit `CLAUDE.md` and `docs/` so the plan travels with the work; `git push -u origin feature/v1.10.0`. Confirm `gh api repos/FedeB2160/WinGetStudio --jq .permissions` reports `"push": true` — without it neither the push nor the release will work, and finding out at Task 14 is the wrong time.
@@ -2860,7 +3098,7 @@ git branch -d feature/v1.10.0 && git push origin --delete feature/v1.10.0
 2. **Task 2, Task 15, Task 3** — the measured defects: contrast, white scrollbars, accessible names. Self-contained, no behaviour change.
 3. **Task 4** — the winget concurrency hole. Needs a real run, not just the suite, and everything in step 4 depends on its choke point.
 4. **Task 16, Task 17, Task 18** — in this order. All three touch `Set-UpdatesBusy` and `Refresh-SelectionState`; 18 reads the `$script:queueVerb` that 17 introduces.
-5. **Task 5, Task 6, Task 7** — in this order: `Get-Pref` first, then the checkbox that uses it, then the layout that absorbs the checkbox and rewrites About.
+5. **Task 5, Task 6, Task 7, Task 21** — in this order: `Get-Pref` first, then the checkbox that uses it, then the layout that absorbs the checkbox and rewrites About, then the tab icons and their preference, which need both `Get-Pref` and that layout.
 6. **Task 8, 9, 10, 11, 12** — polish and cleanup, any order.
 7. **Task 13** — consistency and hardening. Optional.
 8. **Task 14** — release: version, changelog promotion, merge into `main`, tag, GitHub release, and the end-to-end proof that a v1.9.0 install updates itself to it.
