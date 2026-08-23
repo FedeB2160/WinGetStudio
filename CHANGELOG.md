@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Settings is a tab pinned to the right of the strip instead of an overlay covering the window, so the progress bar and the log stay visible while you are in it. The gear button, the close button and Esc are gone with it. The three functional tabs are in alphabetical order — Install, Installed, Updates — and Updates is still the view the app opens on.
+- The *Update to vX.Y.Z* button is readable in the dark theme: its label was white on the accent colour, which measured 2.01:1 there. The light theme's warning glyph was also below the threshold and has been darkened. Every foreground/background pair in both themes is now measured by the test suite.
 
 ## v1.9.0
 

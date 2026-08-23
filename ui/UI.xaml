@@ -870,10 +870,15 @@
                             </StackPanel>
                             <StackPanel Orientation="Horizontal" Margin="120,0,0,18">
                                 <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
-                                <!-- Compare solo quando una release e' piu' recente di questa. -->
+                                <!-- Compare solo quando una release e' piu' recente di questa.
+                                     Foreground dal tema e NON "White": l'accento del tema scuro
+                                     e' azzurro chiaro (#4CC2FF) e il bianco sopra faceva 2.01:1,
+                                     cioe' illeggibile sul pulsante piu' importante della
+                                     schermata. Test-Ui.ps1 misura la coppia. -->
                                 <Button x:Name="BtnUpdateApp" Height="26" Padding="12,0" Margin="8,0,0,0"
                                         Visibility="Collapsed"
-                                        Background="{DynamicResource AccentBrush}" Foreground="White"/>
+                                        Background="{DynamicResource AccentBrush}"
+                                        Foreground="{DynamicResource AccentFgBrush}"/>
                                 <Control x:Name="UpdateSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
                                          Margin="10,0,0,0" Visibility="Collapsed"/>
                                 <TextBlock x:Name="TxtUpdateStatus" VerticalAlignment="Center" Margin="12,0,0,0"

@@ -51,7 +51,7 @@ function Get-LatestRelease([string]$Repo) {
 
         return [PSCustomObject]@{
             Tag    = $r.tag_name
-            # I tag sono "v1.6.0": la v va togliesta per confrontare come versione.
+            # I tag sono "v1.6.0": la v va tolta per confrontare come versione.
             Version = ($r.tag_name -replace '^[vV]', '')
             Name   = $asset.name
             Url    = $asset.browser_download_url

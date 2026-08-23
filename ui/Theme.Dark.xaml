@@ -19,5 +19,7 @@
     <SolidColorBrush x:Key="OkBrush"         Color="#6CCB5F"/>  <!-- esito ok -->
     <SolidColorBrush x:Key="WarnBrush"       Color="#FCE100"/>  <!-- esito avviso -->
     <SolidColorBrush x:Key="ErrBrush"        Color="#FF99A4"/>  <!-- esito errore -->
+    <!-- NON bianco: l'accento scuro e' azzurro chiaro e il bianco sopra faceva 2.01:1. -->
+    <SolidColorBrush x:Key="AccentFgBrush"   Color="#00243A"/>  <!-- testo sopra AccentBrush: 7.97:1 -->
 
 </ResourceDictionary>

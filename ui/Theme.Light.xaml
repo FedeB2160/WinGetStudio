@@ -18,7 +18,9 @@
     <SolidColorBrush x:Key="SelBgBrush"      Color="#CCE4F7"/>  <!-- riga selezionata -->
     <SolidColorBrush x:Key="AccentBrush"     Color="#0078D4"/>  <!-- spinner, progress -->
     <SolidColorBrush x:Key="OkBrush"         Color="#107C10"/>  <!-- esito ok -->
-    <SolidColorBrush x:Key="WarnBrush"       Color="#B89500"/>  <!-- esito avviso -->
+    <!-- #B89500 su bianco faceva 2.86:1, sotto il 3:1 richiesto a un elemento grafico. -->
+    <SolidColorBrush x:Key="WarnBrush"       Color="#8A6F00"/>  <!-- esito avviso: 4.82:1 -->
     <SolidColorBrush x:Key="ErrBrush"        Color="#C42B1C"/>  <!-- esito errore -->
+    <SolidColorBrush x:Key="AccentFgBrush"   Color="#FFFFFF"/>  <!-- testo sopra AccentBrush: 4.53:1 -->
 
 </ResourceDictionary>

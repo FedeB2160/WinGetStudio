@@ -104,6 +104,49 @@ $missing = @($used | Where-Object { $kl -notcontains $_ })
 if ($missing) { throw "chiavi referenziate ma assenti dai temi: $($missing -join ', ')" }
 "OK ref    $($used.Count) chiavi referenziate, tutte definite"
 
+# 4b) Contrasto: le coppie che il tema promette leggibili lo sono davvero, in ENTRAMBI i
+# temi. Il pulsante di aggiornamento aveva Foreground="White" cablato: bianco su
+# AccentBrush fa 4.53:1 in Light ma 2.01:1 in Dark, cioe' illeggibile proprio sul pulsante
+# piu' importante della schermata. Soglie WCAG: 4.5:1 per il testo, 3:1 per gli elementi
+# grafici (i glifi di esito, il riempimento della barra).
+$uiTextEarly = Get-Content (Join-Path $root 'ui\UI.xaml') -Raw
+function Get-Luminance([System.Windows.Media.Color]$c) {
+    $ch = @($c.R, $c.G, $c.B) | ForEach-Object {
+        $s = $_ / 255
+        if ($s -le 0.03928) { $s / 12.92 } else { [Math]::Pow(($s + 0.055) / 1.055, 2.4) }
+    }
+    return 0.2126 * $ch[0] + 0.7152 * $ch[1] + 0.0722 * $ch[2]
+}
+function Get-Contrast($dict, [string]$fg, [string]$bg) {
+    $lf = Get-Luminance $dict[$fg].Color
+    $lb = Get-Luminance $dict[$bg].Color
+    $hi = [Math]::Max($lf, $lb); $lo = [Math]::Min($lf, $lb)
+    return [Math]::Round(($hi + 0.05) / ($lo + 0.05), 2)
+}
+# fg, bg, soglia. I glifi di esito stanno sia sulle righe normali sia su quelle alterne.
+$pairs = @(
+    @('FgBrush',        'BgBrush',       4.5), @('FgBrush',       'CtrlBgBrush',   4.5),
+    @('SubtleFgBrush',  'BgBrush',       4.5), @('SubtleFgBrush', 'CtrlBgBrush',   4.5),
+    @('AccentFgBrush',  'AccentBrush',   4.5),
+    @('OkBrush',        'BgBrush',       3.0), @('OkBrush',       'RowAltBgBrush', 3.0),
+    @('WarnBrush',      'BgBrush',       3.0), @('WarnBrush',     'RowAltBgBrush', 3.0),
+    @('ErrBrush',       'BgBrush',       3.0), @('ErrBrush',      'RowAltBgBrush', 3.0),
+    @('AccentBrush',    'BgBrush',       3.0)
+)
+foreach ($t in @{ Light = $light; Dark = $dark }.GetEnumerator()) {
+    foreach ($p in $pairs) {
+        $r = Get-Contrast $t.Value $p[0] $p[1]
+        if ($r -lt $p[2]) { throw "$($t.Key): $($p[0]) su $($p[1]) fa ${r}:1, minimo $($p[2]):1" }
+    }
+}
+"OK contr  $($pairs.Count) coppie sopra soglia nei due temi"
+
+# Il pulsante di aggiornamento non deve tornare a un colore cablato: su AccentBrush ci va
+# AccentFgBrush, che i due temi definiscono in modo diverso.
+if ($uiTextEarly -match '(?s)x:Name="BtnUpdateApp".*?Foreground="White"') {
+    throw "BtnUpdateApp ha ancora Foreground=White: 2.01:1 in Dark"
+}
+
 # 5) Lo swap del dizionario ridipinge davvero (e' il meccanismo del cambio tema)?
 $window.Resources.MergedDictionaries.Add($dark)
 $bg = $window.Background.Color.ToString()
