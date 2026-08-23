@@ -73,6 +73,7 @@ function Load-Installed {
     $TxtInstalledEmpty.Visibility = [System.Windows.Visibility]::Collapsed
     $GridInstalled.Visibility     = [System.Windows.Visibility]::Collapsed
     $InstalledSpinner.Visibility  = [System.Windows.Visibility]::Visible
+    $Progress.IsIndeterminate     = $true
     Refresh-InstalledState
 
     # I pin si leggono nello STESSO job dell'inventario: due winget in parallelo si
@@ -87,6 +88,7 @@ function Load-Installed {
         -OnDone {
             param($result)
             $InstalledSpinner.Visibility = [System.Windows.Visibility]::Collapsed
+            $Progress.IsIndeterminate    = $false
             $r = @($result)[0]
             if ($r) { foreach ($p in $r.Rows) { if ($p) { $installedItems.Add($p) } } }
 

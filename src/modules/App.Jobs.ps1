@@ -172,6 +172,9 @@ function Start-WinGetQueue {
     # Azzera eventuali esiti precedenti sulle righe in coda
     foreach ($item in $Rows) { $item.Status = ''; $item.StatusDetail = '' }
 
+    # Determinata, e in modo esplicito: la coda sa quanti pacchetti ha, e una scansione
+    # appena finita puo' aver lasciato la barra indeterminata.
+    $Progress.IsIndeterminate = $false
     $Progress.Value   = 0
     $Progress.Maximum = $Rows.Count
     Write-Log "Starting $($Verb.ToLower()) of $($Rows.Count) packages..."

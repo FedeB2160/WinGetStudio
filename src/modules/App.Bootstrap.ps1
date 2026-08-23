@@ -158,7 +158,7 @@ function Start-App([switch]$NoShow) {
         'TxtInstalledCount', 'GridInstalled', 'TxtInstalledEmpty',
         'TxtInstalledInfo', 'BtnUninstall',
         'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
-        'BtnExport', 'BtnImport',
+        'BtnExport', 'BtnImport', 'LogSplitter',
         'CmbTheme', 'TxtThemeHint', 'TxtVersion', 'BtnCheckUpdate', 'BtnUpdateApp',
         'UpdateSpinner', 'TxtUpdateStatus', 'ChkAutoCheck', 'CmbTabStyle',
         'TabAbout',

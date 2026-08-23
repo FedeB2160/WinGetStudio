@@ -106,7 +106,9 @@ function Load-Upgrades {
     $TxtEmpty.Visibility     = [System.Windows.Visibility]::Collapsed
     $Grid.Visibility         = [System.Windows.Visibility]::Collapsed
     $TopSpinner.Visibility   = [System.Windows.Visibility]::Visible
-    # Azzera la barra: appartiene alla coda di aggiornamento precedente, non al nuovo elenco
+    # Barra indeterminata: una scansione non ha un avanzamento da mostrare, e una barra ferma
+    # a zero sembra un'operazione bloccata. I valori li rimette la coda di aggiornamento.
+    $Progress.IsIndeterminate = $true
     $Progress.Value   = 0
     $Progress.Maximum = 100
     Refresh-SelectionState
@@ -126,6 +128,7 @@ function Load-Upgrades {
         } `
         -OnDone {
             param($result)
+            $Progress.IsIndeterminate = $false
             $TopSpinner.Visibility = [System.Windows.Visibility]::Collapsed
             $r = @($result)[0]
             if ($r) {

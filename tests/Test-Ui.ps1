@@ -504,6 +504,18 @@ if ($TxtLog.Text -notmatch 'test') { throw "Write-Log non scrive nel TextBox del
 # LogicalTreeHelper e non VisualTreeHelper: il visual tree non esiste senza rendering.
 $tabMain = $window.FindName('TabMain')
 if (-not $tabMain) { throw "TabControl 'TabMain' assente da UI.xaml" }
+# Il log era alto 140px fissi e non si poteva restringere. Ora c'e' una maniglia, e le due
+# righe che tocca hanno un minimo: senza, il trascinamento le schiaccia a zero e il log (o
+# l'elenco) sparisce senza che si capisca come farlo tornare.
+if ($null -eq $LogSplitter) { throw "manca la maniglia di ridimensionamento del log" }
+$mainRows = $window.Content.RowDefinitions
+$logRow = $mainRows[[System.Windows.Controls.Grid]::GetRow($TxtLog)]
+if ($logRow.MinHeight -le 0) { throw "la riga del log non ha un'altezza minima" }
+if ($mainRows[0].MinHeight -le 0) { throw "la riga delle schede non ha un'altezza minima" }
+if ([System.Windows.Controls.Grid]::GetRow($LogSplitter) -ge [System.Windows.Controls.Grid]::GetRow($TxtLog)) {
+    throw "la maniglia non sta sopra il log"
+}
+
 foreach ($shared in @{ TxtLog = $TxtLog; Progress = $Progress }.GetEnumerator()) {
     $p = $shared.Value
     while ($p) {
@@ -513,6 +525,18 @@ foreach ($shared in @{ TxtLog = $TxtLog; Progress = $Progress }.GetEnumerator())
 }
 Refresh-SelectionState
 if ($BtnUpdate.IsEnabled) { throw "con la lista vuota il pulsante Update deve restare spento" }
+
+# La barra va in indeterminato durante una SCANSIONE, che non ha un avanzamento da mostrare:
+# ferma a zero sembrava un'operazione bloccata. La coda invece sa quanti pacchetti ha, quindi
+# la rimette determinata — anche subito dopo una scansione.
+foreach ($fn in 'Load-Upgrades', 'Load-Installed', 'Invoke-PackageExport', 'Invoke-PackageImport') {
+    if ((Get-FunctionSource $fn) -notmatch 'IsIndeterminate\s*=\s*\$true') {
+        throw "$fn non mette la barra in indeterminato: durante la scansione resta ferma a zero"
+    }
+}
+if ((Get-FunctionSource 'Start-WinGetQueue') -notmatch 'IsIndeterminate\s*=\s*\$false') {
+    throw "Start-WinGetQueue non riporta la barra a determinata"
+}
 foreach ($t in @($script:themeTimer)) { if ($t) { $t.Stop() } }
 "OK start  finestra montata, controlli visibili ai moduli, log e selezione funzionanti"
 
@@ -931,6 +955,9 @@ else {
         throw "aprendo la scheda Installed l'elenco non si e' caricato"
     }
     $total = $installedItems.Count
+    # A scansione finita la barra torna determinata: se restasse indeterminata continuerebbe a
+    # scorrere per sempre, dicendo che qualcosa sta girando quando niente gira.
+    if ($Progress.IsIndeterminate) { throw "a caricamento finito la barra e' ancora indeterminata" }
 
     # ...e non deve ripartire ogni volta che si tocca la griglia: l'evento del DataGrid
     # bubbla fino al TabControl, e senza il controllo sull'originatore rilancerebbe una

@@ -30,6 +30,10 @@ The window has three tabs, plus **Settings** and **About** pinned to the right o
 
 The list stays scrollable while updating — the ticks and the pin entries are greyed, not the list — and columns can be resized by dragging their edge in the header.
 
+While a scan is running the progress bar is **indeterminate**: a scan has no progress to report, and a bar sitting at zero looks like something stuck. It shows real progress only for a queue, which knows how many packages it has.
+
+The **log can be resized**: drag the separator above it. It stops before either the log or the list disappears.
+
 ### Install
 
 Type a name and results appear **as you type** — there is no autocomplete popup, the results list itself is the suggestion, so you see version and ID before choosing.

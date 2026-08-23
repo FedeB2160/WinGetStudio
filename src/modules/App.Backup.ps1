@@ -42,6 +42,7 @@ function Invoke-PackageExport([string]$file) {
     if (Test-WinGetBusy) { return }
     Set-AppBusy $true
     $InstalledSpinner.Visibility = [System.Windows.Visibility]::Visible
+    $Progress.IsIndeterminate    = $true
     Write-Log "Exporting the package list to $file ..."
 
     # Una sola invocazione, non una coda: e' un comando unico su tutta la macchina.
@@ -58,6 +59,7 @@ function Invoke-PackageExport([string]$file) {
         -OnDone {
             param($result)
             $InstalledSpinner.Visibility = [System.Windows.Visibility]::Collapsed
+            $Progress.IsIndeterminate    = $false
             $r = @($result)[0]
             if ($r -and $r.Status -eq 'ok') {
                 $n = Get-ImportPackageCount $file
@@ -117,6 +119,7 @@ function Invoke-PackageImport([string]$file, [int]$count) {
     if (Test-WinGetBusy) { return }
     Set-AppBusy $true
     $InstalledSpinner.Visibility = [System.Windows.Visibility]::Visible
+    $Progress.IsIndeterminate    = $true
     Write-Log "Importing $count packages from $file ..."
 
     # Una sola invocazione lunga, non una coda per pacchetto: e' winget a scorrere la
@@ -135,6 +138,7 @@ function Invoke-PackageImport([string]$file, [int]$count) {
         -OnDone {
             param($result)
             $InstalledSpinner.Visibility = [System.Windows.Visibility]::Collapsed
+            $Progress.IsIndeterminate    = $false
             $r = @($result)[0]
             switch ($r.Status) {
                 'ok'      { Write-Log "Import done ($($r.Seconds)s)." }
