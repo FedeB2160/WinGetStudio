@@ -94,6 +94,38 @@ function Read-Xaml([string]$name) {
 }
 
 # ------------------------------------------------------------------
+# STRISCIA DEI TAB
+# ------------------------------------------------------------------
+# Cosa mostrano le linguette: icona, parola, o entrambe. Due Visibility nelle Resources
+# della finestra invece di otto controlli nominati — il template dell'header le legge con
+# DynamicResource, quindi riscriverle ridisegna la striscia senza ricostruire nulla.
+# Set-Theme non le tocca: quel metodo svuota i MergedDictionaries, non le Resources proprie.
+$script:tabStyles = @('Icon', 'Text', 'Icon + Text')
+
+function Set-TabHeaderStyle([string]$mode) {
+    $window.Resources['TabIconVis'] =
+        if ($mode -eq 'Text') { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible }
+    $window.Resources['TabTextVis'] =
+        if ($mode -eq 'Icon') { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible }
+}
+
+function Initialize-TabHeaders {
+    $saved = [string](Get-Pref 'TabHeaderStyle' 'Icon + Text')
+    if ($saved -notin $script:tabStyles) { $saved = 'Icon + Text' }
+    foreach ($m in $script:tabStyles) { [void]$CmbTabStyle.Items.Add($m) }
+    # SelectedItem PRIMA di agganciare l'handler, altrimenti la scelta ripristinata verrebbe
+    # risalvata a ogni avvio.
+    $CmbTabStyle.SelectedItem = $saved
+    Set-TabHeaderStyle $saved
+    $CmbTabStyle.Add_SelectionChanged({
+        $chosen = [string]$CmbTabStyle.SelectedItem
+        if (-not $chosen) { return }
+        Set-TabHeaderStyle $chosen
+        Set-Pref 'TabHeaderStyle' $chosen
+    })
+}
+
+# ------------------------------------------------------------------
 # AVVIO
 # ------------------------------------------------------------------
 # -NoShow monta tutto senza aprire la finestra: e' la cucitura che permette a
@@ -128,7 +160,7 @@ function Start-App([switch]$NoShow) {
         'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
         'BtnExport', 'BtnImport',
         'CmbTheme', 'TxtThemeHint', 'TxtVersion', 'BtnCheckUpdate', 'BtnUpdateApp',
-        'UpdateSpinner', 'TxtUpdateStatus', 'ChkAutoCheck',
+        'UpdateSpinner', 'TxtUpdateStatus', 'ChkAutoCheck', 'CmbTabStyle',
         'TabInstall', 'TabInstalled', 'TabUpdates', 'TabSettings'
     )) {
         $c = $script:window.FindName($n)
@@ -158,6 +190,7 @@ function Start-App([switch]$NoShow) {
 
     # 5) Aggancio dei controlli: da qui in poi i moduli possono lavorare.
     Initialize-Theme
+    Initialize-TabHeaders
     Initialize-UpdatesTab
     Initialize-InstallTab
     Initialize-InstalledTab

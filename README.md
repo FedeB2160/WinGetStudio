@@ -65,6 +65,7 @@ The **Settings** tab, at the right end of the tab strip, is a tab like the other
 
 - **Theme** — `Light`, `Dark`, or `Auto` to follow Windows (which it keeps following while the window is open).
 - **Installed version** and **Check for updates** — see below.
+- **Tab strip** — whether the tabs show their icon, their name, or both. Every tab also has a tooltip saying what it is for.
 - **Check for updates at startup** — on by default, and it can be turned off: it is one anonymous call to the GitHub API every time the app starts. The **Check for updates** button always works regardless.
 - **About** says what the app does, and links to the source, the release notes, the licence and where to report a bug.
 

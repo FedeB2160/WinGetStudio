@@ -97,9 +97,16 @@ if ($diff) { throw "chiavi diverse fra i due temi:`n$($diff | Out-String)" }
 "OK temi   $($kl.Count) chiavi identiche nei due file"
 
 # 4) Ogni DynamicResource di UI.xaml e' definito nei temi?
+# Solo le chiavi di COLORE: i temi definiscono pennelli, non tutto cio' che UI.xaml risolve
+# dinamicamente. La visibilita' delle due parti dell'header dei tab, per esempio, vive nelle
+# Resources della finestra e la scrive il codice.
+# NB: si cattura la chiave INTERA e si filtra dopo. Con 'DynamicResource\s+(\w+Brush)' la
+# chiave BorderBrush2 veniva troncata in "BorderBrush" — \w+ fa backtracking sulla cifra
+# finale per far combaciare "Brush" — e il controllo denunciava una chiave inesistente.
 $used = [regex]::Matches((Get-Content (Join-Path $root 'ui\UI.xaml') -Raw),
                          'DynamicResource\s+(\w+)') |
-        ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+        ForEach-Object { $_.Groups[1].Value } |
+        Where-Object { $_ -like '*Brush*' } | Sort-Object -Unique
 $missing = @($used | Where-Object { $kl -notcontains $_ })
 if ($missing) { throw "chiavi referenziate ma assenti dai temi: $($missing -join ', ')" }
 "OK ref    $($used.Count) chiavi referenziate, tutte definite"
@@ -409,6 +416,29 @@ $p = $CmbTheme
 while ($p -and $p -ne $TabSettings) { $p = [System.Windows.LogicalTreeHelper]::GetParent($p) }
 if ($p -ne $TabSettings) { throw "la tendina del tema non e' dentro il tab Settings" }
 "OK settab $($TabMain.Items.Count) tab, Settings ultimo, Updates selezionato all'avvio"
+
+# Ogni tab ha la sua icona e un tooltip, e cosa la striscia mostra e' una scelta:
+# Icon | Text | Icon + Text. Il glifo sta in Tag, la parola resta Header — cosi' Header
+# continua a fare da nome accessibile e i controlli sull'ordine dei tab restano validi.
+foreach ($t in $TabMain.Items) {
+    if (-not $t.Tag)     { throw "il tab '$($t.Header)' non ha un glifo in Tag" }
+    if (-not $t.ToolTip) { throw "il tab '$($t.Header)' non ha un tooltip" }
+    $n = [System.Windows.Automation.AutomationProperties]::GetName($t)
+    if (-not $n) { throw "il tab '$($t.Header)' non ha un nome accessibile: in modalita' Icon non annuncerebbe niente" }
+}
+# Le tre modalita' cambiano davvero cosa e' visibile.
+foreach ($case in @(@('Icon', 'Visible', 'Collapsed'), @('Text', 'Collapsed', 'Visible'),
+                    @('Icon + Text', 'Visible', 'Visible'))) {
+    Set-TabHeaderStyle $case[0]
+    if ("$($window.Resources['TabIconVis'])" -ne $case[1]) { throw "modalita' '$($case[0])': icona $($window.Resources['TabIconVis']), attesa $($case[1])" }
+    if ("$($window.Resources['TabTextVis'])" -ne $case[2]) { throw "modalita' '$($case[0])': testo $($window.Resources['TabTextVis']), atteso $($case[2])" }
+}
+Set-TabHeaderStyle 'Icon + Text'
+if ($CmbTabStyle.Items.Count -ne 3) { throw "la tendina della striscia non ha tre voci: $($CmbTabStyle.Items.Count)" }
+$initSrc = Get-FunctionSource 'Initialize-TabHeaders'
+if ($initSrc -notmatch "Get-Pref\s+'TabHeaderStyle'") { throw "la modalita' non si rilegge dalle preferenze" }
+if ($initSrc -notmatch "Set-Pref\s+'TabHeaderStyle'") { throw "la modalita' non si salva" }
+"OK tabicon 4 tab con icona, tooltip e nome accessibile; tre modalita' di visualizzazione"
 
 # Mentre una coda gira, spunte e pin non devono essere DISPONIBILI, ma la UI resta viva: la
 # griglia si scorre, il log si legge. Prima le spunte erano bloccate (IsReadOnly) ma

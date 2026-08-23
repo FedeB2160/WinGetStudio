@@ -21,6 +21,14 @@
         Foreground="{DynamicResource FgBrush}">
 
     <Window.Resources>
+        <!-- Cosa mostra la striscia dei tab: le riscrive Set-TabHeaderStyle, qui ci sono i
+             valori di partenza (Icon + Text). Sono Visibility e non colori, quindi NON stanno
+             nei file di tema — il controllo sulle chiavi guarda solo quelle che finiscono in
+             "Brush". Vivono nelle Resources della finestra, che Set-Theme non tocca: quel
+             metodo svuota solo i MergedDictionaries. -->
+        <Visibility x:Key="TabIconVis">Visible</Visibility>
+        <Visibility x:Key="TabTextVis">Visible</Visibility>
+
         <!-- Spinner riutilizzabile: 8 punti con opacita' decrescente, rotazione a
              8 step in 1s (equivalente WPF dell'esempio CSS). -->
         <Style x:Key="Spinner" TargetType="Control">
@@ -277,6 +285,31 @@
 
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{DynamicResource SubtleFgBrush}"/>
+            <!-- Header: icona + parola, e cosa si vede lo decide l'utente da Settings.
+                 Il glifo viene da Tag della linguetta, quindi c'e' UN solo template per tutti
+                 i tab e aggiungerne uno costa due attributi invece di un header a mano.
+                 Header resta la stringa: e' il nome accessibile, ed e' su quello che i
+                 controlli sull'ordine dei tab si appoggiano.
+                 I 7px di stacco stanno sull'ICONA e non sulla parola: un elemento Collapsed
+                 non occupa spazio, margine compreso, quindi in modalita' Text lo stacco
+                 sparisce da solo. Un trigger non servirebbe — e non funzionerebbe: il Binding
+                 di un DataTrigger non accetta un DynamicResource.
+                 AutomationProperties.Name vuoto sul glifo: il nome lo porta la linguetta. -->
+            <Setter Property="HeaderTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       FontSize="14" Margin="0,0,7,0" VerticalAlignment="Center"
+                                       AutomationProperties.Name=""
+                                       Visibility="{DynamicResource TabIconVis}"/>
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center"
+                                       Visibility="{DynamicResource TabTextVis}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
@@ -656,7 +689,9 @@
 
         <Grid Grid.Row="0">
             <TabControl x:Name="TabMain">
-                <TabItem x:Name="TabInstall" Header="Install">
+                <TabItem x:Name="TabInstall" Header="Install" Tag="&#xE896;"
+                         AutomationProperties.Name="Install"
+                         ToolTip="Search the winget catalogue as you type and install what you pick">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>   <!-- ricerca -->
@@ -754,7 +789,9 @@
                     </Grid>
                 </TabItem>
 
-                <TabItem x:Name="TabInstalled" Header="Installed">
+                <TabItem x:Name="TabInstalled" Header="Installed" Tag="&#xE71D;"
+                         AutomationProperties.Name="Installed"
+                         ToolTip="Everything installed on this machine: filter it, pin it, uninstall it">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>   <!-- comandi e filtro -->
@@ -852,7 +889,9 @@
                 <!-- IsSelected: l'ordine dei tab e' alfabetico, ma la vista di apertura resta
                      Updates — la scansione lanciata da Add_ContentRendered popola proprio
                      questa, e aprire su un tab che nessuno guarda nasconderebbe il conteggio. -->
-                <TabItem x:Name="TabUpdates" Header="Updates" IsSelected="True">
+                <TabItem x:Name="TabUpdates" Header="Updates" Tag="&#xE777;" IsSelected="True"
+                         AutomationProperties.Name="Updates"
+                         ToolTip="Packages with a newer version available, and the queue that updates them">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>   <!-- top bar -->
@@ -955,22 +994,10 @@
                      disallineata rispetto a lui. Il -2 sposta la slot di layout 2px oltre il
                      bordo del pannello, cosi' lo stacco interno cade fuori e il bordo visibile
                      della linguetta finisce esattamente sul bordo del riquadro. -->
-                <TabItem x:Name="TabSettings" DockPanel.Dock="Right" Margin="0,0,-2,0">
-                    <TabItem.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <!-- Decorativo: la parola accanto e' gia' il nome accessibile del
-                                 tab, e senza questo uno screen reader leggerebbe il codepoint del
-                                 glifo prima di essa. Name vuoto e non AccessibilityView="Raw":
-                                 quella proprieta' e' di UWP, in WPF non esiste e il caricamento
-                                 dello XAML muore con "membro sconosciuto". Un Name vuoto lascia
-                                 il peer nell'albero ma non gli fa annunciare niente. -->
-                            <TextBlock Text="&#xE713;" FontSize="13" Margin="0,0,7,0"
-                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                       AutomationProperties.Name=""
-                                       VerticalAlignment="Center"/>
-                            <TextBlock Text="Settings" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </TabItem.Header>
+                <TabItem x:Name="TabSettings" Header="Settings" Tag="&#xE713;"
+                         DockPanel.Dock="Right" Margin="0,0,-2,0"
+                         AutomationProperties.Name="Settings"
+                         ToolTip="Theme, tab strip, version and updates">
                     <!-- Impostazioni in colonna: sono pochi controlli e crescono in verticale.
                          ScrollViewer per non tagliarli a finestra piccola. -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -986,12 +1013,13 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>   <!-- 0 APPEARANCE -->
                                 <RowDefinition Height="Auto"/>   <!-- 1 tema -->
-                                <RowDefinition Height="Auto"/>   <!-- 2 UPDATES -->
-                                <RowDefinition Height="Auto"/>   <!-- 3 versione -->
-                                <RowDefinition Height="Auto"/>   <!-- 4 spunta controllo all'avvio -->
-                                <RowDefinition Height="Auto"/>   <!-- 5 pulsanti -->
-                                <RowDefinition Height="Auto"/>   <!-- 6 ABOUT -->
-                                <RowDefinition Height="Auto"/>   <!-- 7 descrizione e link -->
+                                <RowDefinition Height="Auto"/>   <!-- 2 striscia dei tab -->
+                                <RowDefinition Height="Auto"/>   <!-- 3 UPDATES -->
+                                <RowDefinition Height="Auto"/>   <!-- 4 versione -->
+                                <RowDefinition Height="Auto"/>   <!-- 5 spunta controllo all'avvio -->
+                                <RowDefinition Height="Auto"/>   <!-- 6 pulsanti -->
+                                <RowDefinition Height="Auto"/>   <!-- 7 ABOUT -->
+                                <RowDefinition Height="Auto"/>   <!-- 8 descrizione e link -->
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="APPEARANCE"
@@ -1006,24 +1034,32 @@
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
 
-                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="UPDATES"
-                                       Style="{StaticResource SettingsHeader}"/>
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Installed version" Margin="0,0,12,8"
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Tab strip" Margin="0,0,12,18"
                                        VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
-                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="TxtVersion" Margin="0,0,0,8"
+                            <!-- Le voci le riempie Initialize-TabHeaders: sono gli stessi valori
+                                 che finiscono nel registro (Icon | Text | Icon + Text). -->
+                            <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CmbTabStyle" Width="180"
+                                      HorizontalAlignment="Left" Margin="0,0,0,18"
+                                      ToolTip="What the tabs show: the icon, the name, or both"/>
+
+                            <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="UPDATES"
+                                       Style="{StaticResource SettingsHeader}"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Installed version" Margin="0,0,12,8"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="TxtVersion" Margin="0,0,0,8"
                                        VerticalAlignment="Center" FontWeight="SemiBold"
                                        Foreground="{DynamicResource FgBrush}"/>
                             <!-- Il controllo all'avvio e' una chiamata anonima all'API di GitHub.
                                  Acceso di default (e' il comportamento di sempre), ma si spegne:
                                  un programma che va in rete da solo deve almeno dirlo e lasciare
                                  la scelta. Il pulsante qui sotto resta sempre attivo. -->
-                            <CheckBox Grid.Row="4" Grid.Column="1" x:Name="ChkAutoCheck" IsChecked="True"
+                            <CheckBox Grid.Row="5" Grid.Column="1" x:Name="ChkAutoCheck" IsChecked="True"
                                       Margin="0,0,0,10" HorizontalAlignment="Left"
                                       Content="Check for updates at startup"
                                       Style="{StaticResource ThemedCheckBox}"
                                       ToolTip="One anonymous call to the GitHub API when the app starts. Turn it off to go online only when you press Check for updates"
                                       Foreground="{DynamicResource FgBrush}"/>
-                            <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,18">
+                            <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,18">
                                 <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
                                 <!-- Compare solo quando una release e' piu' recente di questa.
                                      Foreground dal tema e NON "White": l'accento del tema scuro
@@ -1040,7 +1076,7 @@
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
 
-                            <TextBlock Grid.Row="6" Grid.ColumnSpan="2" Text="ABOUT"
+                            <TextBlock Grid.Row="7" Grid.ColumnSpan="2" Text="ABOUT"
                                        Style="{StaticResource SettingsHeader}"/>
                             <!-- Descrizione vera: le cinque funzioni per nome e dove segnalare un
                                  problema. Prima era una riga che non diceva quasi niente, e non
@@ -1049,7 +1085,7 @@
                                  dell'AI Act riguarda i sistemi AI e i contenuti generati, non gli
                                  strumenti con cui si scrive il codice, e questo programma non
                                  contiene nessun sistema AI. Sta qui perche' e' vero. -->
-                            <TextBlock Grid.Row="7" Grid.ColumnSpan="2" TextWrapping="Wrap"
+                            <TextBlock Grid.Row="8" Grid.ColumnSpan="2" TextWrapping="Wrap"
                                        Foreground="{DynamicResource SubtleFgBrush}">
                                 WinGet Studio is a desktop front end for <Bold>winget</Bold>, the Windows package manager.<LineBreak/>
                                 <LineBreak/>
