@@ -49,3 +49,31 @@ function Test-WinGetBusy {
     return ($script:isBusy -or ($script:searchInFlight -gt 0))
 }
 
+# ------------------------------------------------------------------
+# RICALCOLO DIFFERITO DEI CONTATORI DI UNA GRIGLIA
+# ------------------------------------------------------------------
+# Aggancia a una griglia il ricalcolo dei suoi contatori. Le tre schede avevano lo stesso
+# blocco copiato con dentro il solo nome della funzione diverso: il prossimo inciampo
+# sull'overload di BeginInvoke andrebbe corretto in tre punti.
+# PERCHE' DIFFERITO: il binding della spunta e' UpdateSourceTrigger=PropertyChanged, ma il
+# valore arriva sull'oggetto solo DOPO che il ToggleButton ha commutato, quindi il ricalcolo
+# va rimandato a priorita' Background.
+# PERCHE' PreviewMouseLeftButtonUp: evento tunneling, raggiunge la griglia prima che la
+# CheckBox marchi l'evento come gestito -> contatori ed etichette si aggiornano al clic e non
+# alla perdita di fuoco della cella.
+# NB: BeginInvoke([action]{...}, 'Background') NON esiste come overload -> PowerShell risolve
+# su BeginInvoke(Delegate, params Object[]) e passa 'Background' COME ARGOMENTO a un delegate
+# senza parametri => TargetParameterCountException, che risale da ShowDialog(). Va usata la
+# forma con la priorita' PER PRIMA e l'enum tipizzato.
+# Il nome della funzione si INTERPOLA nel testo e l'handler nasce da [scriptblock]::Create: i
+# parametri di questa funzione non esistono piu' quando l'evento scatta, e .GetNewClosure()
+# non e' la via d'uscita — la closure crea un module scope dove $script: non e' piu' lo scope
+# di questo script (vedi App.Jobs.ps1).
+# $Target e non $Grid: un parametro chiamato $Grid coprirebbe il controllo omonimo.
+function Register-GridRefresh($Target, [string]$RefreshFunction) {
+    $handler = [scriptblock]::Create(
+        "`$window.Dispatcher.BeginInvoke([System.Windows.Threading.DispatcherPriority]::Background, [action]{ $RefreshFunction }) | Out-Null")
+    $Target.Add_CellEditEnding($handler)
+    $Target.Add_PreviewMouseLeftButtonUp($handler)
+}
+

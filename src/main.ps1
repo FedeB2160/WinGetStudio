@@ -112,17 +112,3 @@ if (-not (Get-Command Get-WinGetPath -ErrorAction SilentlyContinue)) {
 }
 
 Start-App
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -174,13 +174,7 @@ function Initialize-InstalledTab {
     $MenuPinInstalled.Add_Click({   Set-PackagePin @($GridInstalled.SelectedItems) $true })
     $MenuUnpinInstalled.Add_Click({ Set-PackagePin @($GridInstalled.SelectedItems) $false })
 
-    $queueInstalledRefresh = {
-        $window.Dispatcher.BeginInvoke(
-            [System.Windows.Threading.DispatcherPriority]::Background,
-            [action]{ Refresh-InstalledState }) | Out-Null
-    }
-    $GridInstalled.Add_CellEditEnding($queueInstalledRefresh)
-    $GridInstalled.Add_PreviewMouseLeftButtonUp($queueInstalledRefresh)
+    Register-GridRefresh $GridInstalled 'Refresh-InstalledState'
 
     # Primo ingresso nella scheda: carica l'elenco da solo, cosi' non si paga l'attesa
     # all'avvio del programma chi non usa questa scheda.

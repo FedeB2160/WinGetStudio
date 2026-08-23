@@ -247,23 +247,7 @@ function Initialize-UpdatesTab {
     $MenuPinUpdates.Add_Click({   Set-PackagePin @($Grid.SelectedItems) $true })
     $MenuUnpinUpdates.Add_Click({ Set-PackagePin @($Grid.SelectedItems) $false })
 
-    # Aggiorna stato pulsanti/contatore quando l'utente spunta/despunta manualmente.
-    # Il binding e' UpdateSourceTrigger=PropertyChanged, ma il valore arriva sull'oggetto solo
-    # DOPO che il ToggleButton ha commutato: il ricalcolo va rimandato a priorita' Background.
-    # NB: BeginInvoke([action]{...}, 'Background') NON esiste come overload -> PowerShell
-    # risolve su BeginInvoke(Delegate, params Object[]) e passa 'Background' COME ARGOMENTO a
-    # un delegate senza parametri => TargetParameterCountException, che risale da ShowDialog().
-    # Va usata la forma con la priorita' PER PRIMA e l'enum tipizzato.
-    $queueSelectionRefresh = {
-        $window.Dispatcher.BeginInvoke(
-            [System.Windows.Threading.DispatcherPriority]::Background,
-            [action]{ Refresh-SelectionState }) | Out-Null
-    }
-    $Grid.Add_CellEditEnding($queueSelectionRefresh)
-    # PreviewMouseLeftButtonUp: evento tunneling, raggiunge la griglia prima che il CheckBox
-    # marchi l'evento come gestito -> contatore e label si aggiornano al click, non alla
-    # perdita di focus della cella.
-    $Grid.Add_PreviewMouseLeftButtonUp($queueSelectionRefresh)
+    # Contatore ed etichette si ricalcolano quando l'utente spunta o despunta: il come sta in
+    # Register-GridRefresh (App.Ui.ps1), uguale per tutte e tre le griglie.
+    Register-GridRefresh $Grid 'Refresh-SelectionState'
 }
-
-

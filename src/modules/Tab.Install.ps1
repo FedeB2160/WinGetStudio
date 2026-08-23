@@ -231,14 +231,6 @@ function Initialize-InstallTab {
         if ($row) { Install-Rows @($row) }
     })
 
-    # Stesso meccanismo della scheda Updates: il valore della spunta arriva sull'oggetto
-    # solo dopo che il ToggleButton ha commutato, quindi il ricalcolo va rimandato.
-    $queueInstallRefresh = {
-        $window.Dispatcher.BeginInvoke(
-            [System.Windows.Threading.DispatcherPriority]::Background,
-            [action]{ Refresh-InstallState }) | Out-Null
-    }
-    $GridSearch.Add_CellEditEnding($queueInstallRefresh)
-    $GridSearch.Add_PreviewMouseLeftButtonUp($queueInstallRefresh)
+    Register-GridRefresh $GridSearch 'Refresh-InstallState'
 }
 

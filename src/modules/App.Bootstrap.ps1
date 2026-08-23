@@ -234,7 +234,3 @@ function Start-App([switch]$NoShow) {
     if ($NoShow) { return }
     $script:window.ShowDialog() | Out-Null
 }
-
-
-
-

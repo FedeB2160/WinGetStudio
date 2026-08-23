@@ -580,6 +580,29 @@ if ((Get-FunctionSource 'Initialize-UpdatesTab') -notmatch '(?s)ChkUnknown\.Add_
 }
 "OK prefs  giro completo su registro, 4 preferenze lette e salvate, Unknown ricarica"
 
+# 12d) Il ricalcolo differito dei contatori era copiato in tutte e tre le schede col solo
+# nome della funzione diverso. Vive in un posto solo: se una scheda tornasse a scriverselo a
+# mano, il prossimo inciampo sull'overload di BeginInvoke andrebbe corretto in tre punti.
+foreach ($f in 'Tab.Updates.ps1', 'Tab.Install.ps1', 'Tab.Installed.ps1') {
+    $t = Get-Content (Join-Path $root "src\modules\$f") -Raw
+    if ($t -notmatch 'Register-GridRefresh') { throw "$f non usa Register-GridRefresh" }
+    if ($t -match 'Dispatcher\.BeginInvoke') { throw "$f richiama ancora il dispatcher a mano" }
+}
+# Il collante non deve essere una closure: GetNewClosure crea un module scope dove $script:
+# non e' piu' questo script (la trappola documentata in App.Jobs.ps1).
+$regSrc = Get-FunctionSource 'Register-GridRefresh'
+if ($regSrc -match 'GetNewClosure') { throw "Register-GridRefresh usa GetNewClosure: `$script: non funzionerebbe piu'" }
+if ($regSrc -notmatch '\[scriptblock\]::Create') { throw "Register-GridRefresh non costruisce l'handler da testo" }
+# E deve funzionare davvero: il contatore si aggiorna.
+$items.Clear()
+$items.Add([WgtRow]@{ Id = 'A.A'; Name = 'A'; Selected = $true })
+$TxtSelected.Text = 'stantio'
+Refresh-SelectionState
+if ($TxtSelected.Text -ne '1 selected') { throw "il ricalcolo non aggiorna il contatore: '$($TxtSelected.Text)'" }
+$items.Clear()
+Refresh-SelectionState
+"OK defer  ricalcolo differito condiviso dalle tre schede"
+
 # 12c) Il corpo delle impostazioni sta su una griglia a due colonne. I 120 magici erano un
 # allineamento a mano: se un'etichetta cresce, la riga sotto non la segue.
 # Sul markup SENZA COMMENTI: il commento che spiega la modifica cita il margine di prima, ed
