@@ -141,6 +141,31 @@ foreach ($t in @{ Light = $light; Dark = $dark }.GetEnumerator()) {
 }
 "OK contr  $($pairs.Count) coppie sopra soglia nei due temi"
 
+# 4c) Separazione delle SUPERFICI e confine dei componenti. Il tema chiaro aveva
+# CtrlBgBrush #FDFDFD su BgBrush #FFFFFF: uno scarto di luminanza dello 0,6%, cioe' nessuno,
+# e l'unica cosa che definiva un pulsante era un filo #CCCCCC a 1.61:1 — che a controllo
+# disabilitato, con Opacity 0.5, scendeva a ~1.31 e spariva del tutto.
+# Le due soglie: il passo di superficie dice che un controllo si stacca dalla pagina, il
+# bordo che il suo confine si vede. Sono le due strade per identificare un componente, e
+# servono entrambe perche' nessuna delle due da sola regge in tutti i temi.
+foreach ($t in @{ Light = $light; Dark = $dark }.GetEnumerator()) {
+    $step = Get-Contrast $t.Value 'CtrlBgBrush' 'BgBrush'
+    if ($step -lt 1.08) {
+        throw "$($t.Key): la superficie dei controlli non si stacca dalla pagina ($step, minimo 1.08)"
+    }
+    foreach ($bg in 'BgBrush', 'CtrlBgBrush') {
+        $b = Get-Contrast $t.Value 'CtrlBorderBrush' $bg
+        if ($b -lt 2.3) { throw "$($t.Key): il bordo dei componenti su $bg fa ${b}:1, minimo 2.3" }
+    }
+}
+# Il pulsante disabilitato non torni a sparire: niente Opacity nel suo trigger.
+$btnStyle = [regex]::Match($uiTextEarly, '(?s)<Style TargetType="Button">.*?\r?\n        </Style>').Value
+if (-not $btnStyle) { throw "stile del pulsante non trovato: regex da rivedere" }
+if ($btnStyle -match '(?s)IsEnabled" Value="False">.*?Opacity') {
+    throw "il pulsante disabilitato torna a essere sbiadito con Opacity: il bordo spariva"
+}
+"OK surf   superfici e confini distinguibili nei due temi, disabilitato ancora visibile"
+
 # Il pulsante di aggiornamento non deve tornare a un colore cablato: su AccentBrush ci va
 # AccentFgBrush, che i due temi definiscono in modo diverso.
 if ($uiTextEarly -match '(?s)x:Name="BtnUpdateApp".*?Foreground="White"') {

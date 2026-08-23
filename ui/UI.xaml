@@ -76,7 +76,7 @@
         <Style TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -92,9 +92,13 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource CtrlPressBrush}"/>
                             </Trigger>
+                            <!-- Disabilitato: testo in tono minore, bordo e sfondo INTATTI.
+                                 Prima era Opacity 0.5 su tutto il bordo, che su un filo gia'
+                                 debole lo faceva sparire: un pulsante spento diventava
+                                 indistinguibile da un pulsante assente. Il colore del testo
+                                 e' il segnale, la cornice resta a dire che il pulsante c'e'. -->
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Foreground" Value="{DynamicResource SubtleFgBrush}"/>
-                                <Setter TargetName="bd" Property="Opacity" Value="0.5"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -177,7 +181,7 @@
              nelle celle della griglia il contenuto e' vuoto e non occupa spazio. -->
         <Style x:Key="ThemedCheckBox" TargetType="CheckBox">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -222,7 +226,7 @@
              copre quello alto del contenuto, cosi' i due si fondono. -->
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="{DynamicResource BgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabControl">
@@ -264,7 +268,7 @@
                         <Border x:Name="bd" Margin="0,0,2,0" CornerRadius="4,4,0,0"
                                 BorderThickness="1,1,1,0"
                                 Background="{DynamicResource CtrlBgBrush}"
-                                BorderBrush="{DynamicResource BorderBrush2}">
+                                BorderBrush="{DynamicResource CtrlBorderBrush}">
                             <ContentPresenter ContentSource="Header" Margin="14,6"
                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
@@ -371,7 +375,7 @@
         <Style TargetType="ContextMenu">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -446,7 +450,7 @@
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Height" Value="26"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -477,7 +481,7 @@
                             <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
                                    IsOpen="{TemplateBinding IsDropDownOpen}" Focusable="False">
                                 <Border Background="{DynamicResource CtrlBgBrush}"
-                                        BorderBrush="{DynamicResource BorderBrush2}"
+                                        BorderBrush="{DynamicResource CtrlBorderBrush}"
                                         BorderThickness="1" CornerRadius="4" Padding="2"
                                         MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                                     <ItemsPresenter/>
@@ -505,7 +509,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
                         <Border x:Name="bd" CornerRadius="4" Margin="2"
-                                Background="{DynamicResource BorderBrush2}"/>
+                                Background="{DynamicResource CtrlBorderBrush}"/>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource SubtleFgBrush}"/>
@@ -589,7 +593,7 @@
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="CaretBrush" Value="{DynamicResource FgBrush}"/>
             <Setter Property="Padding" Value="4,3"/>
         </Style>
@@ -597,7 +601,7 @@
         <Style TargetType="ProgressBar">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ProgressBar">
@@ -687,7 +691,7 @@
                                   IsReadOnly="False" SelectionMode="Extended"
                                   Background="{DynamicResource BgBrush}"
                                   Foreground="{DynamicResource FgBrush}"
-                                  BorderBrush="{DynamicResource BorderBrush2}"
+                                  BorderBrush="{DynamicResource CtrlBorderBrush}"
                                   RowBackground="{DynamicResource BgBrush}"
                                   AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
@@ -771,7 +775,7 @@
                                   IsReadOnly="False" SelectionMode="Extended"
                                   Background="{DynamicResource BgBrush}"
                                   Foreground="{DynamicResource FgBrush}"
-                                  BorderBrush="{DynamicResource BorderBrush2}"
+                                  BorderBrush="{DynamicResource CtrlBorderBrush}"
                                   RowBackground="{DynamicResource BgBrush}"
                                   AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
@@ -860,7 +864,7 @@
                                   IsReadOnly="False" SelectionMode="Extended"
                                   Background="{DynamicResource BgBrush}"
                                   Foreground="{DynamicResource FgBrush}"
-                                  BorderBrush="{DynamicResource BorderBrush2}"
+                                  BorderBrush="{DynamicResource CtrlBorderBrush}"
                                   RowBackground="{DynamicResource BgBrush}"
                                   AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
@@ -1008,7 +1012,7 @@
                  FontFamily="Consolas" FontSize="12"
                  Background="{DynamicResource CtrlBgBrush}"
                  Foreground="{DynamicResource FgBrush}"
-                 BorderBrush="{DynamicResource BorderBrush2}"
+                 BorderBrush="{DynamicResource CtrlBorderBrush}"
                  CaretBrush="{DynamicResource FgBrush}"/>
 
     </Grid>

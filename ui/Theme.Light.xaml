@@ -1,26 +1,38 @@
 <!--
-    Theme.Light.xaml — palette chiara.
+    Theme.Light.xaml — palette chiara (tinte Windows 11 light).
     Stesse chiavi di Theme.Dark.xaml: cambiare solo i colori, mai i nomi.
     UI.xaml li referenzia con {DynamicResource ...}, quindi basta rilanciare l'app.
+
+    PAGINA GRIGIA, CONTROLLI BIANCHI. Prima era il contrario di niente: BgBrush #FFFFFF con
+    CtrlBgBrush #FDFDFD, uno scarto di luminanza dello 0,6% — cioe' nessuno. L'unica cosa che
+    definiva un pulsante, un campo, il log o una linguetta era un filo #CCCCCC a 1.61:1, e a
+    controllo disabilitato spariva. Ora la pagina e' grigia e i controlli bianchi ci stanno
+    sopra come superfici rialzate, che e' anche il modo in cui lo fa Windows 11.
+    Test-Ui.ps1 misura il passo di superficie e il contrasto del bordo in entrambi i temi.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <SolidColorBrush x:Key="BgBrush"         Color="#FFFFFF"/>  <!-- sfondo finestra -->
-    <SolidColorBrush x:Key="FgBrush"         Color="#000000"/>  <!-- testo principale -->
-    <SolidColorBrush x:Key="SubtleFgBrush"   Color="#6E6E6E"/>  <!-- testo secondario -->
-    <SolidColorBrush x:Key="CtrlBgBrush"     Color="#FDFDFD"/>  <!-- sfondo controlli -->
-    <SolidColorBrush x:Key="CtrlHoverBrush"  Color="#F0F0F0"/>  <!-- hover pulsanti -->
-    <SolidColorBrush x:Key="CtrlPressBrush"  Color="#E0E0E0"/>  <!-- pulsante premuto -->
-    <SolidColorBrush x:Key="BorderBrush2"    Color="#CCCCCC"/>  <!-- bordi e gridlines -->
-    <SolidColorBrush x:Key="HeaderBgBrush"   Color="#F3F3F3"/>  <!-- header DataGrid -->
-    <SolidColorBrush x:Key="RowAltBgBrush"   Color="#FAFAFA"/>  <!-- righe alterne -->
-    <SolidColorBrush x:Key="SelBgBrush"      Color="#CCE4F7"/>  <!-- riga selezionata -->
-    <SolidColorBrush x:Key="AccentBrush"     Color="#0078D4"/>  <!-- spinner, progress -->
-    <SolidColorBrush x:Key="OkBrush"         Color="#107C10"/>  <!-- esito ok -->
+    <SolidColorBrush x:Key="BgBrush"          Color="#F3F3F3"/>  <!-- sfondo finestra (pagina) -->
+    <SolidColorBrush x:Key="FgBrush"          Color="#000000"/>  <!-- testo principale -->
+    <SolidColorBrush x:Key="SubtleFgBrush"    Color="#5D5D5D"/>  <!-- testo secondario: 5.93:1 -->
+    <SolidColorBrush x:Key="CtrlBgBrush"      Color="#FFFFFF"/>  <!-- superficie dei controlli -->
+    <SolidColorBrush x:Key="CtrlHoverBrush"   Color="#F0F0F0"/>  <!-- hover: piu' grigio del controllo -->
+    <SolidColorBrush x:Key="CtrlPressBrush"   Color="#E1E1E1"/>  <!-- pulsante premuto -->
+    <SolidColorBrush x:Key="BorderBrush2"     Color="#DCDCDC"/>  <!-- gridline e cornici della griglia -->
+    <!-- Confine dei componenti interattivi (pulsanti, campi, linguette, tendine): 3.11:1
+         sulla pagina e 3.45:1 sul controllo, quindi sopra il 3:1 che WCAG 1.4.11 chiede a
+         cio' che identifica un componente. Separato dalle gridline di proposito: alla stessa
+         intensita' la griglia diventerebbe un foglio di calcolo. -->
+    <SolidColorBrush x:Key="CtrlBorderBrush"  Color="#8A8A8A"/>
+    <SolidColorBrush x:Key="HeaderBgBrush"    Color="#EAEAEA"/>  <!-- header DataGrid -->
+    <SolidColorBrush x:Key="RowAltBgBrush"    Color="#F9F9F9"/>  <!-- righe alterne -->
+    <SolidColorBrush x:Key="SelBgBrush"       Color="#CCE4F7"/>  <!-- riga selezionata -->
+    <SolidColorBrush x:Key="AccentBrush"      Color="#0078D4"/>  <!-- spinner, progress -->
+    <SolidColorBrush x:Key="AccentFgBrush"    Color="#FFFFFF"/>  <!-- testo sopra AccentBrush: 4.53:1 -->
+    <SolidColorBrush x:Key="OkBrush"          Color="#107C10"/>  <!-- esito ok -->
     <!-- #B89500 su bianco faceva 2.86:1, sotto il 3:1 richiesto a un elemento grafico. -->
-    <SolidColorBrush x:Key="WarnBrush"       Color="#8A6F00"/>  <!-- esito avviso: 4.82:1 -->
-    <SolidColorBrush x:Key="ErrBrush"        Color="#C42B1C"/>  <!-- esito errore -->
-    <SolidColorBrush x:Key="AccentFgBrush"   Color="#FFFFFF"/>  <!-- testo sopra AccentBrush: 4.53:1 -->
+    <SolidColorBrush x:Key="WarnBrush"        Color="#8A6F00"/>  <!-- esito avviso: 4.35:1 -->
+    <SolidColorBrush x:Key="ErrBrush"         Color="#C42B1C"/>  <!-- esito errore -->
 
 </ResourceDictionary>
