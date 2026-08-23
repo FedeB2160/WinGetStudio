@@ -199,6 +199,17 @@ function Initialize-UpdatesTab {
 
     $BtnRefresh.Add_Click({ Load-Upgrades })
 
+    # La spunta comanda --include-unknown. Si rilegge dalle preferenze e si risalva a ogni
+    # cambio; e ricarica subito, perche' una spunta che cambia COSA c'e' nell'elenco senza
+    # cambiare l'elenco costringe a premere Check per capire cosa ha fatto.
+    # IsChecked si imposta PRIMA di agganciare l'handler, altrimenti il ripristino farebbe
+    # partire una scansione a ogni avvio.
+    $ChkUnknown.IsChecked = [bool][int](Get-Pref 'IncludeUnknown' 0)
+    $ChkUnknown.Add_Click({
+        Set-Pref 'IncludeUnknown' ([int][bool]$ChkUnknown.IsChecked)
+        Load-Upgrades
+    })
+
     $BtnToggleAll.Add_Click({
         # Riallinea $script:allSelected allo stato REALE: il refresh differito di una spunta
         # manuale gira a priorita' Background, quindi dopo questo Click. Senza il ricalcolo

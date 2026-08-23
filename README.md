@@ -17,7 +17,7 @@ Download `WinGetStudio.exe` from the [latest release](https://github.com/FedeB21
 
 ## Using it
 
-The window has three tabs plus **Settings**, pinned to the right of the strip. The **progress bar and the log at the bottom stay visible from every tab**, so you can start a long update, switch tab, and still see how it is going.
+The window has three tabs plus **Settings**, pinned to the right of the strip. **Unknown**, **MS Store** and **Scope** are remembered between launches, next to the theme. The **progress bar and the log at the bottom stay visible from every tab**, so you can start a long update, switch tab, and still see how it is going.
 
 ### Updates
 

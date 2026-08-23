@@ -172,6 +172,13 @@ function Initialize-InstallTab {
     $GridSearch.ItemsSource = $searchItems
     $GridSearch.Visibility  = [System.Windows.Visibility]::Collapsed
     Register-BusyHandler { param($busy) Set-InstallBusy $busy }
+
+    # Le due scelte della scheda si rileggono dalle preferenze: prima si perdevano a ogni
+    # avvio. Lo Scope resta accanto al pulsante Install che lo usa, non in Settings.
+    $ChkStore.IsChecked = [bool][int](Get-Pref 'IncludeStore' 0)
+    $ChkStore.Add_Click({ Set-Pref 'IncludeStore' ([int][bool]$ChkStore.IsChecked) })
+    $saved = [string](Get-Pref 'InstallScope' 'Auto')
+    if ($saved -in @('Auto', 'User', 'Machine')) { $script:installScope = $saved }
     Update-ScopeButton
 
     # Suggerimenti mentre si digita: il timer riparte a ogni tasto e la ricerca scatta
@@ -212,6 +219,7 @@ function Initialize-InstallTab {
             default   { 'Auto' }
         }
         Update-ScopeButton
+        Set-Pref 'InstallScope' $script:installScope
     })
 
     $BtnInstall.Add_Click({ Start-InstallSelected })

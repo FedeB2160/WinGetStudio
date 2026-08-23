@@ -82,6 +82,7 @@ $moduleNames = @(
     'WinGet.Exec.ps1'
     'WinGet.Parse.ps1'
     'App.Ui.ps1'
+    'App.Prefs.ps1'
     'App.Jobs.ps1'
     'App.Theme.ps1'
     'App.Pins.ps1'

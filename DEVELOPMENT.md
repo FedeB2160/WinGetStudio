@@ -17,6 +17,7 @@ src\   main.ps1                 entry point: version, elevation, module loading,
        WinGet.Exec.ps1          running winget: Invoke-WinGet, exit code mapping
        WinGet.Parse.ps1         reading winget's fixed-width tables
        App.Ui.ps1               shared helpers: Write-Log, global busy state
+       App.Prefs.ps1            user preferences under HKCU: Get-Pref / Set-Pref
        App.Jobs.ps1             background runspaces: Start-BackgroundJob, Start-WinGetQueue
        App.Theme.ps1            Light / Dark / Auto theme
        App.Pins.ps1             pins: read, add, remove, flag the rows

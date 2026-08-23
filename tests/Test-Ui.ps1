@@ -460,6 +460,36 @@ if ($BtnUpdate.IsEnabled) { throw "con la lista vuota il pulsante Update deve re
 foreach ($t in @($script:themeTimer)) { if ($t) { $t.Stop() } }
 "OK start  finestra montata, controlli visibili ai moduli, log e selezione funzionanti"
 
+# 12b) Le preferenze: scritte e rilette dal registro, e un valore assente torna il default
+# invece di far esplodere l'avvio. Si scrive un nome di prova e si cancella subito: la chiave
+# e' la stessa dell'app, quindi non si toccano i valori veri dell'utente.
+$probe = "TestProbe$PID"
+try {
+    if ($null -ne (Get-Pref $probe $null)) { throw "il nome di prova esisteva gia': $probe" }
+    if ((Get-Pref $probe 'fallback') -ne 'fallback') { throw "un valore assente non torna il default" }
+    Set-Pref $probe 42
+    if ((Get-Pref $probe 0) -ne 42) { throw "Set-Pref/Get-Pref non fanno il giro: $(Get-Pref $probe 0)" }
+}
+finally {
+    Remove-ItemProperty -Path $PrefsKey -Name $probe -ErrorAction SilentlyContinue
+}
+# I tre toggle che si perdevano a ogni avvio ora si rileggono e si risalvano. Controllo
+# statico: farli girare davvero vorrebbe dire sporcare le preferenze di chi esegue i test.
+foreach ($pair in @(@('Initialize-UpdatesTab', 'IncludeUnknown'),
+                    @('Initialize-InstallTab', 'IncludeStore'),
+                    @('Initialize-InstallTab', 'InstallScope'),
+                    @('Initialize-Theme',      'Theme'))) {
+    $src = Get-FunctionSource $pair[0]
+    if ($src -notmatch "Get-Pref\s+'$($pair[1])'") { throw "$($pair[0]) non rilegge la preferenza $($pair[1])" }
+    if ($src -notmatch "Set-Pref\s+'$($pair[1])'") { throw "$($pair[0]) non salva la preferenza $($pair[1])" }
+}
+# La spunta Unknown cambia COSA c'e' nell'elenco: deve anche ricaricarlo, altrimenti bisogna
+# premere Check per capire cosa ha fatto.
+if ((Get-FunctionSource 'Initialize-UpdatesTab') -notmatch '(?s)ChkUnknown\.Add_Click[\s\S]{0,300}Load-Upgrades') {
+    throw "la spunta Unknown non ricarica l'elenco"
+}
+"OK prefs  giro completo su registro, 4 preferenze lette e salvate, Unknown ricarica"
+
 # 13) Start-BackgroundJob regge? Ci passeranno tutte le operazioni winget. Si verifica
 # in un colpo: le -Vars arrivano nel runspace, le -Functions vengono ricreate la'
 # dentro (senza, muoiono con "termine non riconosciuto"), OnDone gira sul thread UI col

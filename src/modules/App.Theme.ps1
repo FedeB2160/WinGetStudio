@@ -12,8 +12,6 @@
     concatenato nell'exe al posto del marcatore ###MODULES###.
 #>
 
-$themeKey = 'HKCU:\Software\WinGetStudio'
-
 # Tema di sistema: AppsUseLightTheme = 0 -> scuro. Assente su Win10 vecchi -> chiaro.
 function Test-SystemDark {
     try {
@@ -62,11 +60,9 @@ function Set-Theme {
 }
 
 function Initialize-Theme {
-    $script:themeMode = 'Auto'   # Auto | Light | Dark
-    try {
-        $saved = (Get-ItemProperty -Path $themeKey -Name Theme -ErrorAction Stop).Theme
-        if ($saved -in @('Auto', 'Light', 'Dark')) { $script:themeMode = $saved }
-    } catch { }
+    # Auto | Light | Dark. Un valore fuori dai tre (registro modificato a mano) torna ad Auto.
+    $saved = [string](Get-Pref 'Theme' 'Auto')
+    $script:themeMode = if ($saved -in @('Auto', 'Light', 'Dark')) { $saved } else { 'Auto' }
 
     # Le voci sono ANCHE i valori salvati nel registro: nessuna tabella di conversione
     # fra etichetta a schermo e valore memorizzato.
@@ -79,10 +75,7 @@ function Initialize-Theme {
         $chosen = [string]$CmbTheme.SelectedItem
         if (-not $chosen -or $chosen -eq $script:themeMode) { return }
         $script:themeMode = $chosen
-        try {
-            if (-not (Test-Path $themeKey)) { New-Item -Path $themeKey -Force | Out-Null }
-            Set-ItemProperty -Path $themeKey -Name Theme -Value $script:themeMode
-        } catch { }   # scelta non persistita: non e' un motivo per non applicare il tema
+        Set-Pref 'Theme' $script:themeMode
         Set-Theme
     })
 
