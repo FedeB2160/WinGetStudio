@@ -65,7 +65,7 @@ A pin tells winget to leave a package alone until you remove the pin — for the
 
 ### Settings
 
-The **Settings** tab, at the right end of the tab strip, is a tab like the others — so the progress bar and the log stay visible while you are in it.
+The **Settings** tab, on the right of the strip next to About, is a tab like the others — so the progress bar and the log stay visible while you are in it.
 
 - **Theme** — `Light`, `Dark`, or `System` to follow Windows (which it keeps following while the window is open).
 - **Installed version** and **Check for updates** — see below.
@@ -74,7 +74,7 @@ The **Settings** tab, at the right end of the tab strip, is a tab like the other
 
 ### About
 
-Its own tab, at the right end of the strip: what the app does function by function, and links to the source, the release notes, the licence and where to report a bug.
+Its own tab, at the very right end of the strip: what the app does function by function, and links to the source, the release notes, the licence and where to report a bug.
 
 ### Keyboard
 
