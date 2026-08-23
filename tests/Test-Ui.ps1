@@ -401,8 +401,13 @@ if ($CmbTheme.SelectedItem -notin @('Light', 'Dark', 'Auto')) { throw "tema sele
 # La schermata delle impostazioni e' un TAB come gli altri, l'ultimo, fissato a destra:
 # cosi' barra di avanzamento e log restano visibili anche mentre e' aperta, e non servono
 # ne' un overlay con RowSpan/ZIndex, ne' un tasto per chiuderla, ne' Esc.
-if ($TabMain.Items.Count -ne 4) { throw "attesi 4 tab, trovati $($TabMain.Items.Count)" }
-if ($TabMain.Items[3] -ne $TabSettings) { throw "il tab Settings non e' l'ultimo" }
+if ($TabMain.Items.Count -ne 5) { throw "attesi 5 tab, trovati $($TabMain.Items.Count)" }
+# ORDINE DI DICHIARAZIONE E POSIZIONE NON COINCIDONO: in un DockPanel il primo figlio con
+# Dock="Right" prende il bordo destro e il successivo si mette alla sua sinistra. About e'
+# dichiarato prima di Settings proprio perche' e' lui a stare piu' a destra — la verifica
+# della posizione vera e' nella sezione 15b, che ha il layout calcolato.
+if ($TabMain.Items[3] -ne $TabAbout)    { throw "il quarto tab dichiarato non e' About" }
+if ($TabMain.Items[4] -ne $TabSettings) { throw "il quinto tab dichiarato non e' Settings" }
 # Ordine alfabetico dei tre tab funzionali.
 foreach ($pair in @(@(0, $TabInstall, 'Install'), @(1, $TabInstalled, 'Installed'), @(2, $TabUpdates, 'Updates'))) {
     if ($TabMain.Items[$pair[0]] -ne $pair[1]) { throw "il tab in posizione $($pair[0]) non e' $($pair[2])" }
@@ -415,6 +420,11 @@ if (-not $TabUpdates.IsSelected) { throw "all'avvio deve essere selezionato Upda
 $p = $CmbTheme
 while ($p -and $p -ne $TabSettings) { $p = [System.Windows.LogicalTreeHelper]::GetParent($p) }
 if ($p -ne $TabSettings) { throw "la tendina del tema non e' dentro il tab Settings" }
+# E la descrizione dell'app vive nel tab About, non piu' in fondo alle impostazioni.
+if ($TabAbout.Content -isnot [System.Windows.Controls.ScrollViewer]) { throw "il tab About e' vuoto" }
+$aboutText = $TabAbout.Content.Content
+if ($aboutText -isnot [System.Windows.Controls.TextBlock]) { throw "il tab About non contiene il testo" }
+if ($aboutText.Text -notmatch 'front end for') { throw "il tab About non contiene la descrizione" }
 "OK settab $($TabMain.Items.Count) tab, Settings ultimo, Updates selezionato all'avvio"
 
 # Ogni tab ha la sua icona e un tooltip, e cosa la striscia mostra e' una scelta:
@@ -435,6 +445,18 @@ foreach ($case in @(@('Icon', 'Visible', 'Collapsed'), @('Text', 'Collapsed', 'V
 }
 Set-TabHeaderStyle 'Icon + Text'
 if ($CmbTabStyle.Items.Count -ne 3) { throw "la tendina della striscia non ha tre voci: $($CmbTabStyle.Items.Count)" }
+# La modalita' ripristinata all'avvio e la striscia devono raccontare la stessa cosa: la
+# tendina dice una modalita' valida e le due visibilita' sono quelle di QUELLA modalita'.
+# Senza questo, una preferenza scritta di sorpresa aprirebbe l'app in una modalita' che la
+# tendina non mostra, e nessuno se ne accorgerebbe.
+$restored = [string]$CmbTabStyle.SelectedItem
+if ($restored -notin @('Icon', 'Text', 'Icon + Text')) { throw "modalita' ripristinata inattesa: '$restored'" }
+Set-TabHeaderStyle $restored
+$attesaIcona = if ($restored -eq 'Text') { 'Collapsed' } else { 'Visible' }
+$attesaTesto = if ($restored -eq 'Icon') { 'Collapsed' } else { 'Visible' }
+if ("$($window.Resources['TabIconVis'])" -ne $attesaIcona -or "$($window.Resources['TabTextVis'])" -ne $attesaTesto) {
+    throw "la striscia non corrisponde alla modalita' '$restored'"
+}
 $initSrc = Get-FunctionSource 'Initialize-TabHeaders'
 if ($initSrc -notmatch "Get-Pref\s+'TabHeaderStyle'") { throw "la modalita' non si rilegge dalle preferenze" }
 if ($initSrc -notmatch "Set-Pref\s+'TabHeaderStyle'") { throw "la modalita' non si salva" }
@@ -800,19 +822,64 @@ if ($TabSettings.ActualWidth -le 0) { throw "layout della striscia non calcolato
 if ($xSettings -lt $rightOfUpdates + 100) {
     throw "il tab Settings non e' fissato a destra (x=$([int]$xSettings), fine di Updates=$([int]$rightOfUpdates))"
 }
-"OK tabdock Settings fissato a destra (x=$([int]$xSettings) contro $([int]$rightOfUpdates) di Updates)"
+$xAbout = $TabAbout.TranslatePoint([System.Windows.Point]::new(0, 0), $window.Content).X
+if ($xAbout -lt $xSettings) { throw "About non e' a destra di Settings (About $([int]$xAbout), Settings $([int]$xSettings))" }
+"OK tabdock Settings e About a destra (x=$([int]$xSettings) e $([int]$xAbout) contro $([int]$rightOfUpdates) di Updates)"
 
 # 15c) E il suo bordo VISIBILE combacia col bordo del riquadro sotto. Non e' pignoleria: il
 # template della linguetta tiene 2px di stacco a destra per separarla dalla successiva, e
 # sull'ultima a destra quei 2px la lasciavano disallineata di 2px dal riquadro. Il margine
 # destro negativo li recupera; se qualcuno lo toglie, questo controllo se ne accorge.
-$sbd = [System.Windows.Media.VisualTreeHelper]::GetChild($TabSettings, 0)
+$sbd = [System.Windows.Media.VisualTreeHelper]::GetChild($TabAbout, 0)
 $rightBorder = $sbd.TranslatePoint([System.Windows.Point]::new(0, 0), $window.Content).X + $sbd.ActualWidth
 $rightFrame  = $TabMain.TranslatePoint([System.Windows.Point]::new(0, 0), $window.Content).X + $TabMain.ActualWidth
 if ([Math]::Abs($rightBorder - $rightFrame) -gt 0.5) {
-    throw "il bordo del tab Settings non combacia col riquadro: $([int]$rightBorder) contro $([int]$rightFrame)"
+    throw "il bordo dell'ultimo tab non combacia col riquadro: $([int]$rightBorder) contro $([int]$rightFrame)"
 }
-"OK tabedge bordo del tab Settings allineato al riquadro ($([int]$rightFrame)px)"
+"OK tabedge bordo dell'ultimo tab (About) allineato al riquadro ($([int]$rightFrame)px)"
+
+# 15e) Le tre modalita' della striscia non devono cambiarne l'ALTEZZA, e in sola icona il
+# glifo deve stare al centro della linguetta.
+# Erano due difetti distinti dello stesso pezzo: senza MinHeight la linguetta si accorciava
+# di 2px passando a sola icona (il riquadro di riga del glifo e' piu' basso di quello del
+# testo, e con la parola collassata restava solo lui), e il margine di stacco lasciato fisso
+# sull'icona sopravviveva alla parola e spostava il glifo 3,5px a sinistra.
+# Si misura contro il centro del BORDO VISIBILE, non del TabItem: il template tiene 2px di
+# stacco a destra di ogni linguetta, quindi il centro dei due non coincide di 1px — e vale
+# per il testo esattamente come per l'icona.
+$heights = @{}
+foreach ($mode in 'Icon + Text', 'Text', 'Icon') {
+    Set-TabHeaderStyle $mode
+    $window.Content.UpdateLayout()
+    $heights[$mode] = [Math]::Round($TabInstall.ActualHeight, 1)
+}
+if (@($heights.Values | Sort-Object -Unique).Count -ne 1) {
+    throw "la striscia cambia altezza fra le modalita': $(($heights.GetEnumerator() | ForEach-Object { "$($_.Key)=$($_.Value)" }) -join ', ')"
+}
+
+Set-TabHeaderStyle 'Icon'
+$window.Content.UpdateLayout()
+$bd = [System.Windows.Media.VisualTreeHelper]::GetChild($TabInstall, 0)
+$glyph = $null
+$queue = New-Object System.Collections.Queue
+$queue.Enqueue($TabInstall)
+while ($queue.Count -gt 0) {
+    $n = $queue.Dequeue()
+    for ($i = 0; $i -lt [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($n); $i++) {
+        $c = [System.Windows.Media.VisualTreeHelper]::GetChild($n, $i)
+        if ($c -is [System.Windows.Controls.TextBlock] -and $c.Visibility -eq 'Visible') { $glyph = $c }
+        $queue.Enqueue($c)
+    }
+}
+if (-not $glyph) { throw "in modalita' solo icona non si trova il glifo nella linguetta" }
+$cGlyph  = $glyph.TranslatePoint([System.Windows.Point]::new(0, 0), $bd).X + $glyph.ActualWidth / 2
+$cBorder = $bd.ActualWidth / 2
+if ([Math]::Abs($cGlyph - $cBorder) -gt 0.6) {
+    throw "in sola icona il glifo non e' centrato: centro glifo $([Math]::Round($cGlyph,1)), centro linguetta $([Math]::Round($cBorder,1))"
+}
+Set-TabHeaderStyle 'Icon + Text'
+$window.Content.UpdateLayout()
+"OK tabsize altezza uguale nelle tre modalita' ($($heights['Icon'])px), glifo centrato in sola icona"
 
 # 15d) ...e sotto di lui il riquadro non deve avere un angolo arrotondato. Con un tab fissato
 # a destra, la curva in alto a destra del riquadro affiorava sotto la linguetta come uno

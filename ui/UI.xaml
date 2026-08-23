@@ -298,10 +298,16 @@
             <Setter Property="HeaderTemplate">
                 <Setter.Value>
                     <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
+                        <!-- MinHeight: senza, in modalita' solo icona la linguetta si
+                             ACCORCIAVA di 2px, perche' il riquadro di riga del glifo e' piu'
+                             basso di quello del testo e con la parola collassata restava solo
+                             lui. 16 e' l'altezza che il testo occupa da solo, quindi la
+                             striscia resta identica nelle tre modalita'. -->
+                        <StackPanel Orientation="Horizontal" MinHeight="16">
                             <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabItem}}"
                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                       FontSize="14" Margin="0,0,7,0" VerticalAlignment="Center"
+                                       FontSize="13" VerticalAlignment="Center"
+                                       Margin="4,0,4,0"
                                        AutomationProperties.Name=""
                                        Visibility="{DynamicResource TabIconVis}"/>
                             <TextBlock Text="{Binding}" VerticalAlignment="Center"
@@ -994,8 +1000,55 @@
                      disallineata rispetto a lui. Il -2 sposta la slot di layout 2px oltre il
                      bordo del pannello, cosi' lo stacco interno cade fuori e il bordo visibile
                      della linguetta finisce esattamente sul bordo del riquadro. -->
-                <TabItem x:Name="TabSettings" Header="Settings" Tag="&#xE713;"
+                <!-- ORDINE DI DICHIARAZIONE E POSIZIONE NON COINCIDONO: in un DockPanel il
+                     PRIMO figlio con Dock="Right" prende il bordo destro e il successivo si
+                     mette alla sua sinistra. About e' dichiarato prima di Settings perche' e'
+                     lui a stare piu' a destra.
+                     Il margine destro negativo sta quindi su About: recupera i 2px di stacco
+                     che il template tiene a destra di ogni linguetta e che sull'ultima la
+                     lasciavano disallineata dal riquadro. -->
+                <TabItem x:Name="TabAbout" Header="About" Tag="&#xE946;"
                          DockPanel.Dock="Right" Margin="0,0,-2,0"
+                         AutomationProperties.Name="About"
+                         ToolTip="What this app does, where to report a bug, and the licence">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <!-- Descrizione vera: le cinque funzioni per nome e dove segnalare un
+                             problema. Prima era una riga che non diceva quasi niente, e non
+                             c'era modo di capire dove finiscono le segnalazioni.
+                             La nota finale su Claude Code e' volontaria: l'articolo 50
+                             dell'AI Act riguarda i sistemi AI e i contenuti generati, non gli
+                             strumenti con cui si scrive il codice, e questo programma non
+                             contiene nessun sistema AI. Sta qui perche' e' vero. -->
+                        <TextBlock TextWrapping="Wrap"
+                                   Foreground="{DynamicResource SubtleFgBrush}">
+                            WinGet Studio is a desktop front end for <Bold>winget</Bold>, the Windows package manager.<LineBreak/>
+                            <LineBreak/>
+                            <Bold>Updates</Bold> &#8212; list what has a newer version and upgrade the packages you tick, one at a time, with a per-row result. A running queue can be cancelled: the package in progress finishes, the rest are left alone.<LineBreak/>
+                            <Bold>Install</Bold> &#8212; search the winget catalogue as you type, optionally the Microsoft Store, and pick the install scope.<LineBreak/>
+                            <Bold>Installed</Bold> &#8212; the inventory of the machine, with a local filter, and uninstall behind a confirmation.<LineBreak/>
+                            <Bold>Pin</Bold> &#8212; block a package from being upgraded, from either list, until you remove the pin.<LineBreak/>
+                            <Bold>Export / Import</Bold> &#8212; save the package list to a .json file and rebuild a machine from it.<LineBreak/>
+                            <LineBreak/>
+                            It runs elevated, because installing and removing software requires it. No telemetry.<LineBreak/>
+                            <LineBreak/>
+                            Found a bug, or have an idea?
+                            <!-- I link li apre l'handler in Start-App. -->
+                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues"
+                                       Foreground="{DynamicResource AccentBrush}">Open an issue on GitHub</Hyperlink>.<LineBreak/>
+                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio"
+                                       Foreground="{DynamicResource AccentBrush}">Source code</Hyperlink> &#183;
+                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases"
+                                       Foreground="{DynamicResource AccentBrush}">Release notes</Hyperlink> &#183;
+                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE"
+                                       Foreground="{DynamicResource AccentBrush}">MIT licence</Hyperlink><LineBreak/>
+                            <LineBreak/>
+                            <Italic>Built with the help of Claude Code (Anthropic).</Italic>
+                        </TextBlock>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem x:Name="TabSettings" Header="Settings" Tag="&#xE713;"
+                         DockPanel.Dock="Right"
                          AutomationProperties.Name="Settings"
                          ToolTip="Theme, tab strip, version and updates">
                     <!-- Impostazioni in colonna: sono pochi controlli e crescono in verticale.
@@ -1018,8 +1071,6 @@
                                 <RowDefinition Height="Auto"/>   <!-- 4 versione -->
                                 <RowDefinition Height="Auto"/>   <!-- 5 spunta controllo all'avvio -->
                                 <RowDefinition Height="Auto"/>   <!-- 6 pulsanti -->
-                                <RowDefinition Height="Auto"/>   <!-- 7 ABOUT -->
-                                <RowDefinition Height="Auto"/>   <!-- 8 descrizione e link -->
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="APPEARANCE"
@@ -1076,40 +1127,6 @@
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
 
-                            <TextBlock Grid.Row="7" Grid.ColumnSpan="2" Text="ABOUT"
-                                       Style="{StaticResource SettingsHeader}"/>
-                            <!-- Descrizione vera: le cinque funzioni per nome e dove segnalare un
-                                 problema. Prima era una riga che non diceva quasi niente, e non
-                                 c'era modo di capire dove finiscono le segnalazioni.
-                                 La nota finale su Claude Code e' volontaria: l'articolo 50
-                                 dell'AI Act riguarda i sistemi AI e i contenuti generati, non gli
-                                 strumenti con cui si scrive il codice, e questo programma non
-                                 contiene nessun sistema AI. Sta qui perche' e' vero. -->
-                            <TextBlock Grid.Row="8" Grid.ColumnSpan="2" TextWrapping="Wrap"
-                                       Foreground="{DynamicResource SubtleFgBrush}">
-                                WinGet Studio is a desktop front end for <Bold>winget</Bold>, the Windows package manager.<LineBreak/>
-                                <LineBreak/>
-                                <Bold>Updates</Bold> &#8212; list what has a newer version and upgrade the packages you tick, one at a time, with a per-row result. A running queue can be cancelled: the package in progress finishes, the rest are left alone.<LineBreak/>
-                                <Bold>Install</Bold> &#8212; search the winget catalogue as you type, optionally the Microsoft Store, and pick the install scope.<LineBreak/>
-                                <Bold>Installed</Bold> &#8212; the inventory of the machine, with a local filter, and uninstall behind a confirmation.<LineBreak/>
-                                <Bold>Pin</Bold> &#8212; block a package from being upgraded, from either list, until you remove the pin.<LineBreak/>
-                                <Bold>Export / Import</Bold> &#8212; save the package list to a .json file and rebuild a machine from it.<LineBreak/>
-                                <LineBreak/>
-                                It runs elevated, because installing and removing software requires it. No telemetry.<LineBreak/>
-                                <LineBreak/>
-                                Found a bug, or have an idea?
-                                <!-- I link li apre l'handler in Start-App. -->
-                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues"
-                                           Foreground="{DynamicResource AccentBrush}">Open an issue on GitHub</Hyperlink>.<LineBreak/>
-                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio"
-                                           Foreground="{DynamicResource AccentBrush}">Source code</Hyperlink> &#183;
-                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases"
-                                           Foreground="{DynamicResource AccentBrush}">Release notes</Hyperlink> &#183;
-                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE"
-                                           Foreground="{DynamicResource AccentBrush}">MIT licence</Hyperlink><LineBreak/>
-                                <LineBreak/>
-                                <Italic>Built with the help of Claude Code (Anthropic).</Italic>
-                            </TextBlock>
                         </Grid>
                     </ScrollViewer>
                 </TabItem>

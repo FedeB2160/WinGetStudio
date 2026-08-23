@@ -17,7 +17,7 @@ Download `WinGetStudio.exe` from the [latest release](https://github.com/FedeB21
 
 ## Using it
 
-The window has three tabs plus **Settings**, pinned to the right of the strip. **Unknown**, **MS Store** and **Scope** are remembered between launches, next to the theme. The **progress bar and the log at the bottom stay visible from every tab**, so you can start a long update, switch tab, and still see how it is going.
+The window has three tabs, plus **Settings** and **About** pinned to the right of the strip. **Unknown**, **MS Store** and **Scope** are remembered between launches, next to the theme. The **progress bar and the log at the bottom stay visible from every tab**, so you can start a long update, switch tab, and still see how it is going.
 
 ### Updates
 
@@ -67,7 +67,10 @@ The **Settings** tab, at the right end of the tab strip, is a tab like the other
 - **Installed version** and **Check for updates** — see below.
 - **Tab strip** — whether the tabs show their icon, their name, or both. Every tab also has a tooltip saying what it is for.
 - **Check for updates at startup** — on by default, and it can be turned off: it is one anonymous call to the GitHub API every time the app starts. The **Check for updates** button always works regardless.
-- **About** says what the app does, and links to the source, the release notes, the licence and where to report a bug.
+
+### About
+
+Its own tab, at the right end of the strip: what the app does function by function, and links to the source, the release notes, the licence and where to report a bug.
 
 ### What the Result column means
 
