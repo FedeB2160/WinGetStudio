@@ -306,6 +306,21 @@ if ($sbText -match '"#[0-9A-Fa-f]{6}"') { throw "colori cablati nello stile dell
 if ($sbText -notmatch 'PART_Track') { throw "manca PART_Track: ScrollBar non saprebbe dove mettere il cursore" }
 "OK scrbar ScrollBar ri-templata, nessun colore cablato"
 
+# 10e) Ogni elemento che usa un font di icone dichiara un AutomationProperties.Name: il
+# contenuto di quei TextBlock e' un codepoint dell'area a uso privato, e senza un nome uno
+# screen reader legge quello. Vuoto se il glifo e' decorativo e accanto c'e' gia' il testo
+# che lo dice; il valore giusto se il glifo PORTA l'informazione, come nella colonna RESULT
+# (li' lo scrivono i DataTrigger insieme al glifo).
+# NB: NON esiste AutomationProperties.AccessibilityView in WPF — e' una proprieta' di UWP, e
+# usarla fa morire il caricamento dello XAML con "membro sconosciuto".
+$iconTags = @([regex]::Matches($uiText, '<[^>]*FontFamily="Segoe Fluent Icons[^>]*>'))
+if ($iconTags.Count -eq 0) { throw "nessun elemento con font di icone trovato: regex da rivedere" }
+$unnamed = @($iconTags | Where-Object { $_.Value -notmatch 'AutomationProperties\.Name=' })
+if ($unnamed.Count -gt 0) {
+    throw "$($unnamed.Count) glifi senza AutomationProperties.Name:`n$(($unnamed | ForEach-Object { $_.Value }) -join "`n")"
+}
+"OK a11y   $($iconTags.Count) elementi con font di icone, tutti con un nome accessibile"
+
 # 11) La versione e' una sola e arriva sia al titolo sia all'exe? build.ps1 la pesca
 # dalla costante con una regex: se qualcuno la rinomina o la sposta, la build morirebbe
 # (o l'exe uscirebbe senza versione) e il titolo mostrerebbe "[]" in silenzio.

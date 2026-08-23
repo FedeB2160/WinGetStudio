@@ -299,9 +299,12 @@
                 <!-- Icone di stato dal set di sistema di Windows 11 (fallback a
                      Segoe MDL2 Assets su Win10): forme PIENE e distinte fra loro,
                      leggibili anche senza distinguere i colori. Niente FontWeight:
-                     un icon font in Bold viene ingrassato per sintesi e sbava. -->
+                     un icon font in Bold viene ingrassato per sintesi e sbava.
+                     AutomationProperties.Name lo scrivono i DataTrigger insieme al glifo:
+                     senza, uno screen reader leggerebbe il codepoint del carattere. -->
                 <TextBlock x:Name="cellIcon" FontSize="16"
                            FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                           AutomationProperties.Name="No result yet"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            Visibility="Collapsed"/>
             </Grid>
@@ -313,18 +316,21 @@
                 <DataTrigger Binding="{Binding Status}" Value="ok">
                     <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="cellIcon" Property="Text" Value="&#xEC61;"/>
+                    <Setter TargetName="cellIcon" Property="AutomationProperties.Name" Value="Succeeded"/>
                     <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource OkBrush}"/>
                 </DataTrigger>
                 <!-- EB90 StatusErrorFull: cerchio pieno con X bianca -->
                 <DataTrigger Binding="{Binding Status}" Value="error">
                     <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="cellIcon" Property="Text" Value="&#xEB90;"/>
+                    <Setter TargetName="cellIcon" Property="AutomationProperties.Name" Value="Failed"/>
                     <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource ErrBrush}"/>
                 </DataTrigger>
                 <!-- E814 IncidentTriangle: triangolo pieno con ! bianco -->
                 <DataTrigger Binding="{Binding Status}" Value="warning">
                     <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="cellIcon" Property="Text" Value="&#xE814;"/>
+                    <Setter TargetName="cellIcon" Property="AutomationProperties.Name" Value="Finished with a warning"/>
                     <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource WarnBrush}"/>
                 </DataTrigger>
             </DataTemplate.Triggers>
@@ -339,6 +345,7 @@
                        Foreground="{DynamicResource AccentBrush}"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        Visibility="Collapsed"
+                       AutomationProperties.Name="Pinned"
                        ToolTip="Pinned: winget will not upgrade it until the pin is removed"/>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding Pinned}" Value="True">
@@ -919,8 +926,15 @@
                 <TabItem x:Name="TabSettings" DockPanel.Dock="Right" Margin="2,0,0,0">
                     <TabItem.Header>
                         <StackPanel Orientation="Horizontal">
+                            <!-- Decorativo: la parola accanto e' gia' il nome accessibile del
+                                 tab, e senza questo uno screen reader leggerebbe il codepoint del
+                                 glifo prima di essa. Name vuoto e non AccessibilityView="Raw":
+                                 quella proprieta' e' di UWP, in WPF non esiste e il caricamento
+                                 dello XAML muore con "membro sconosciuto". Un Name vuoto lascia
+                                 il peer nell'albero ma non gli fa annunciare niente. -->
                             <TextBlock Text="&#xE713;" FontSize="13" Margin="0,0,7,0"
                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       AutomationProperties.Name=""
                                        VerticalAlignment="Center"/>
                             <TextBlock Text="Settings" VerticalAlignment="Center"/>
                         </StackPanel>

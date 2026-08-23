@@ -512,13 +512,13 @@ In `tests\Test-Ui.ps1`, add after the `OK glyph` block:
 ```powershell
 # 10d) Ogni elemento che usa un font di icone dichiara la propria intenzione: un
 # AutomationProperties.Name se il glifo PORTA informazione (uno screen reader leggerebbe
-# altrimenti il codepoint), oppure AccessibilityView="Raw" se e' decorativo e accanto c'e'
-# gia' un testo che lo dice.
+# altrimenti il codepoint), vuoto se e' decorativo e accanto c'e' gia' un testo che lo dice.
+# NB: NON esiste AutomationProperties.AccessibilityView in WPF — e' di UWP, e usarla fa
+# morire il caricamento dello XAML con "membro sconosciuto".
 $iconTags = @([regex]::Matches($uiText, '<[^>]*FontFamily="Segoe Fluent Icons[^>]*>'))
 if ($iconTags.Count -eq 0) { throw "nessun elemento con font di icone trovato: regex da rivedere" }
 $unnamed = @($iconTags | Where-Object {
-    $_.Value -notmatch 'AutomationProperties\.Name=' -and
-    $_.Value -notmatch 'AutomationProperties\.AccessibilityView="Raw"'
+    $_.Value -notmatch 'AutomationProperties\.Name='
 })
 if ($unnamed.Count -gt 0) {
     throw "$($unnamed.Count) glifi senza nome accessibile ne' marca decorativa:`n$(($unnamed | ForEach-Object { $_.Value }) -join "`n")"
@@ -584,7 +584,7 @@ The gear in the Settings tab header sits next to the word "Settings", so naming 
                                  essere nominato una seconda volta. -->
                             <TextBlock Text="&#xE713;" FontSize="13" Margin="0,0,7,0"
                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
-                                       AutomationProperties.AccessibilityView="Raw"
+                                       AutomationProperties.Name=""
                                        VerticalAlignment="Center"/>
 ```
 
