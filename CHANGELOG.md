@@ -11,7 +11,6 @@
 - The theme dropdown offers **System** where it used to say `Auto`, which says what it follows instead of leaving you to guess. A theme saved as `Auto` by an earlier version falls back to the default, which is System — the same behaviour under the other name.
 - **F5** rescans the active tab and **Ctrl+F** jumps to the search box.
 - The context menu entries say they act on the **highlighted** rows rather than the ticked ones. That was always true and always documented only in the code, which nobody reads with the right mouse button held down.
-- The **log pane can be resized** by dragging the separator above it, instead of being stuck at 140px — nearly a quarter of the window — with no way to get them back.
 - The progress bar goes **indeterminate while scanning** rather than sitting at zero, which looked like something stuck. It shows real progress only for a queue, which knows how many packages it has.
 - The tabs are less padded and the gap between an icon and its name is wider: it used to be 18px of air at the sides against 4px in the middle.
 - The Settings rows have even spacing, the dropdowns are as wide as their longest value instead of a fixed 180px, and **About** names who made the project.

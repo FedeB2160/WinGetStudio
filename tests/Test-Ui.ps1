@@ -514,17 +514,13 @@ if ($TxtLog.Text -notmatch 'test') { throw "Write-Log non scrive nel TextBox del
 # LogicalTreeHelper e non VisualTreeHelper: il visual tree non esiste senza rendering.
 $tabMain = $window.FindName('TabMain')
 if (-not $tabMain) { throw "TabControl 'TabMain' assente da UI.xaml" }
-# Il log era alto 140px fissi e non si poteva restringere. Ora c'e' una maniglia, e le due
-# righe che tocca hanno un minimo: senza, il trascinamento le schiaccia a zero e il log (o
-# l'elenco) sparisce senza che si capisca come farlo tornare.
-if ($null -eq $LogSplitter) { throw "manca la maniglia di ridimensionamento del log" }
+# Il log ha un'altezza FISSA, e la riga delle schede e' la sola elastica. Con entrambe
+# elastiche (il GridSplitter provato e ritirato) restava una fascia vuota fra il riquadro
+# delle schede e la barra di avanzamento.
 $mainRows = $window.Content.RowDefinitions
 $logRow = $mainRows[[System.Windows.Controls.Grid]::GetRow($TxtLog)]
-if ($logRow.MinHeight -le 0) { throw "la riga del log non ha un'altezza minima" }
-if ($mainRows[0].MinHeight -le 0) { throw "la riga delle schede non ha un'altezza minima" }
-if ([System.Windows.Controls.Grid]::GetRow($LogSplitter) -ge [System.Windows.Controls.Grid]::GetRow($TxtLog)) {
-    throw "la maniglia non sta sopra il log"
-}
+if ($logRow.Height.IsStar -or $logRow.Height.IsAuto) { throw "la riga del log non ha un'altezza fissa" }
+if (-not $mainRows[0].Height.IsStar) { throw "la riga delle schede non e' quella elastica" }
 
 foreach ($shared in @{ TxtLog = $TxtLog; Progress = $Progress }.GetEnumerator()) {
     $p = $shared.Value

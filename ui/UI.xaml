@@ -698,11 +698,10 @@
          stanno FUORI dal TabControl, in fondo, e sono condivisi da ogni scheda. -->
     <Grid Margin="10">
         <Grid.RowDefinitions>
-            <RowDefinition Height="*" MinHeight="200"/>   <!-- 0 schede -->
-            <RowDefinition Height="Auto"/>                <!-- 1 progress -->
-            <RowDefinition Height="Auto"/>                <!-- 2 maniglia -->
-            <RowDefinition Height="Auto"/>                <!-- 3 log label -->
-            <RowDefinition Height="140" MinHeight="60"/>  <!-- 4 log -->
+            <RowDefinition Height="*"/>      <!-- 0 schede -->
+            <RowDefinition Height="Auto"/>   <!-- 1 progress -->
+            <RowDefinition Height="Auto"/>   <!-- 2 log label -->
+            <RowDefinition Height="140"/>    <!-- 3 log -->
         </Grid.RowDefinitions>
 
         <Grid Grid.Row="0">
@@ -1154,24 +1153,15 @@
         <ProgressBar x:Name="Progress" Grid.Row="1" Height="18" Margin="0,8,0,4"
                      Minimum="0" Maximum="100" Value="0"/>
 
-        <!-- Maniglia fra le schede e il log: il log era alto 140px fissi, cioe' quasi un quarto
-             della finestra, e chi guarda l'elenco non poteva recuperarli. Un GridSplitter e'
-             nativo e non richiede una riga di codice.
-             ResizeBehavior PreviousAndNext: trascina la riga sopra e quella sotto, non le altre.
-             Lo sfondo e' il colore dei bordi: a schermo e' un separatore, e si scopre
-             trascinabile passandoci sopra, dove il cursore diventa SizeNS. I minimi sulle due
-             righe evitano che il trascinamento schiacci a zero il log o le schede. -->
-        <GridSplitter x:Name="LogSplitter" Grid.Row="2" Height="4"
-                      HorizontalAlignment="Stretch" VerticalAlignment="Center"
-                      ResizeDirection="Rows" ResizeBehavior="PreviousAndNext"
-                      Background="{DynamicResource BorderBrush2}"
-                      ShowsPreview="True"/>
-
-        <TextBlock Grid.Row="3" Text="Log:" Margin="0,4,0,2" FontWeight="Bold"
+        <!-- Il log resta alto 140px FISSI. Un GridSplitter era stato provato e ritirato: le
+             righe che rendeva elastiche lasciavano una fascia vuota fra il riquadro delle
+             schede e la barra di avanzamento, e il log e' un pannello di servizio che sta
+             bene dove sta. -->
+        <TextBlock Grid.Row="2" Text="Log:" Margin="0,4,0,2" FontWeight="Bold"
                    Foreground="{DynamicResource FgBrush}"/>
 
         <!-- Log (condiviso da tutte le schede) -->
-        <TextBox x:Name="TxtLog" Grid.Row="4"
+        <TextBox x:Name="TxtLog" Grid.Row="3"
                  IsReadOnly="True" VerticalScrollBarVisibility="Auto"
                  TextWrapping="NoWrap" HorizontalScrollBarVisibility="Auto"
                  FontFamily="Consolas" FontSize="12"
