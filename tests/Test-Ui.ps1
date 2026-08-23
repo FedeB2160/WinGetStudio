@@ -547,26 +547,70 @@ if ($BtnUpdate.Content -ne 'Update') { throw "a coda finita il pulsante non torn
 if ($null -ne $script:queueVerb) { throw "Set-AppBusy `$false non azzera il verbo della coda" }
 "OK cancel  Update <-> Cancel legati alla coda in corso"
 
-# 13e) L'annullamento vero, su una coda finta di 5 righe che lanciano "--version": rapido e
-# innocuo. Si annulla subito dopo l'avvio, quindi il primo pacchetto e' in volo e gli altri
-# non partono. NB: e' una corsa vinta con ampio margine (una winget --version costa ~0.3s, la
-# richiesta arriva in millisecondi), ed e' per questo che l'asserzione e' "meno di 5" e non
-# un numero esatto.
+# 13e) CICLO COMPLETO di una coda, simulato su 5 righe finte che lanciano "winget --version":
+# rapido, innocuo, e nessun pacchetto della macchina viene toccato. Prova le quattro cose che
+# a mano si vedrebbero solo con aggiornamenti veri da installare:
+#   1. mentre la coda gira: Update e' Cancel e premibile, le spunte sono bloccate, le voci
+#      di pin spente, e le griglie ancora vive;
+#   2. il pulsante premuto DAVVERO (RaiseEvent sul Click, non la funzione chiamata a mano)
+#      passa a "Cancelling..." e si spegne;
+#   3. il pacchetto IN VOLO arriva al suo esito e gli altri non partono — si aspetta che il
+#      primo sia davvero partito prima di annullare, altrimenti la richiesta batte la coda e
+#      questo pezzo non verrebbe provato;
+#   4. a coda finita il pulsante torna Update ma resta bloccato, e il perche' e' a schermo.
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    "SKIP cancel2 winget non presente su questa macchina"
+    "SKIP queue  winget non presente su questa macchina"
 }
 else {
-    $probeRows = @(1..5 | ForEach-Object { [WgtRow]@{ Id = "Probe.$_"; Name = "Probe $_" } })
+    # Righe finte spuntate, e poi si chiama la funzione VERA del pulsante Update: cosi' passano
+    # per il percorso reale — ArgsBuilder, OnDone, marcatura della lista — invece di una coda
+    # costruita a mano dal test, che proverebbe solo il test.
+    # Gli ID non esistono in nessun catalogo, quindi winget esce con "nessun pacchetto trovato"
+    # senza toccare la macchina: e' l'esito che serve, il codice di uscita non conta.
+    $probeRows = @(1..5 | ForEach-Object { [WgtRow]@{ Id = "WinGetStudio.Probe.$_"; Name = "Probe $_"; Selected = $true } })
+    $items.Clear()
+    foreach ($r in $probeRows) { $items.Add($r) }
+    $script:listStale = $false
+    Refresh-SelectionState
     $TxtLog.Clear()
-    Start-WinGetQueue -Rows $probeRows -Verb 'Update' `
-        -ArgsBuilder { param($r) '--version' } -OnDone { Set-AppBusy $false }
-    Request-QueueCancel
-    if (-not (Wait-For { -not $script:isBusy } 90)) { throw "la coda annullata non e' terminata" }
+
+    Start-UpdateSelected
+
+    # 1) stato durante la coda
+    if ($BtnUpdate.Content -ne 'Cancel') { throw "coda in corso: il pulsante e' '$($BtnUpdate.Content)', atteso Cancel" }
+    if (-not $BtnUpdate.IsEnabled) { throw "coda in corso: il Cancel e' spento" }
+    if (-not $Grid.IsReadOnly) { throw "coda in corso: le spunte sono ancora modificabili" }
+    if ($MenuPinUpdates.IsEnabled) { throw "coda in corso: la voce Pin e' ancora attiva" }
+    if (-not $Grid.IsEnabled) { throw "coda in corso: la griglia e' stata disabilitata" }
+    if ($BtnToggleAll.IsEnabled) { throw "coda in corso: Select all e' ancora premibile" }
+
+    # 2-3) si annulla premendo il pulsante, dopo che il primo pacchetto e' partito
+    if (-not (Wait-For { $probeRows[0].Status } 60)) { throw "il primo pacchetto non e' mai partito" }
+    $BtnUpdate.RaiseEvent(
+        (New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.Primitives.ButtonBase]::ClickEvent)))
+    if ($BtnUpdate.Content -ne 'Cancelling...') { throw "premuto Cancel, il pulsante dice '$($BtnUpdate.Content)'" }
+    if ($BtnUpdate.IsEnabled) { throw "premuto Cancel, il pulsante e' ancora premibile" }
+
+    if (-not (Wait-For { -not $script:isBusy } 120)) { throw "la coda annullata non e' terminata" }
+    if ($probeRows[0].Status -eq 'updating') { throw "il pacchetto in volo e' rimasto 'updating': non ha finito" }
+    if (-not $probeRows[0].Status) { throw "il pacchetto in volo non e' arrivato a un esito" }
     $ran = @($probeRows | Where-Object { $_.Status }).Count
     if ($ran -ge 5) { throw "l'annullamento non ha fermato la coda: eseguiti $ran su 5" }
     if ($TxtLog.Text -notmatch 'cancelled') { throw "l'annullamento non e' finito nel log" }
+
+    # 4) a coda finita: pulsante di nuovo Update, ma bloccato fino al Check
+    if ($BtnUpdate.Content -ne 'Update') { throw "a coda finita il pulsante dice '$($BtnUpdate.Content)'" }
+    if ($BtnUpdate.IsEnabled) { throw "a coda finita Update non e' bloccato: la lista e' vecchia" }
+    if ($TxtSelected.Text -notmatch 'press Check') { throw "non viene detto perche' Update e' bloccato: '$($TxtSelected.Text)'" }
+    if (-not $BtnRefresh.IsEnabled) { throw "Check deve restare attivo: e' l'unico modo per sbloccare" }
+    if ($MenuPinUpdates.IsEnabled -ne $true) { throw "a coda finita la voce Pin resta spenta" }
+    if ($Grid.IsReadOnly) { throw "a coda finita le spunte restano bloccate" }
+
+    $items.Clear()
+    $script:listStale = $false
+    Refresh-SelectionState
     Stop-AllJobs
-    "OK cancel2 coda fermata dopo $ran pacchetti su 5"
+    "OK queue   ciclo coda: Cancel premuto, in volo finito a $ran/5, Update bloccato fino al Check"
 }
 
 # 13f) Dopo un'alterazione della macchina il pulsante Update si blocca fino al Check:

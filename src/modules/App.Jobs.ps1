@@ -159,13 +159,15 @@ function Start-WinGetQueue {
         Write-Log "Another winget operation is still running: try again in a moment."
         return
     }
-    Set-AppBusy $true
-
-    # Quale coda sta girando (lo leggono gli handler dello stato occupato) e con che flag di
-    # annullamento. Nuova hashtable a ogni coda: una richiesta arrivata fra due code non si
+    # PRIMA di Set-AppBusy, e l'ordine e' vincolante: Set-AppBusy chiama subito gli handler
+    # delle schede, e quelli leggono queueVerb per decidere se l'operazione e' la loro — con
+    # l'assegnazione dopo, il pulsante Update della scheda Updates non diventava mai Cancel.
+    # Nuova hashtable a ogni coda: una richiesta di annullamento arrivata fra due code non si
     # trascina sulla successiva.
     $script:queueVerb   = $Verb
     $script:queueCancel = [hashtable]::Synchronized(@{ Requested = $false })
+
+    Set-AppBusy $true
 
     # Azzera eventuali esiti precedenti sulle righe in coda
     foreach ($item in $Rows) { $item.Status = ''; $item.StatusDetail = '' }
