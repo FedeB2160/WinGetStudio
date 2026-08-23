@@ -134,7 +134,8 @@ function Install-Rows([object[]]$Rows) {
         Write-Log "         Per-user packages will install into that profile. Use Scope: Machine to install for all users."
     }
 
-    Set-AppBusy $true
+    # Lo stato occupato lo prende Start-WinGetQueue, che e' anche il punto in cui si controlla
+    # che non ci sia gia' un winget in corso.
     # Lo scope si calcola QUI e viaggia come variabile del runspace: -ArgsBuilder gira
     # dentro il runspace e non vedrebbe $script:installScope.
     $scopeArg = switch ($script:installScope) {

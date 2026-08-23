@@ -144,7 +144,11 @@ function Start-UpdateCheck([switch]$Manual) {
 # Scarica, verifica e sostituisce. Chiamata dal pulsante, dopo conferma.
 function Start-SelfUpdate {
     $rel = $script:pendingUpdate
-    if (-not $rel -or $script:isBusy) { return }
+    # Test-WinGetBusy e non isBusy: questa funzione finisce sostituendo l'eseguibile e
+    # chiudendo la finestra, e farlo mentre un runspace sta ancora dentro winget e' l'ultima
+    # cosa da fare. Il controllo automatico degli aggiornamenti (Start-UpdateCheck) resta su
+    # isBusy: quello parla solo con GitHub e non tocca niente.
+    if (-not $rel -or (Test-WinGetBusy)) { return }
     $exe = Get-RunningExePath
     if (-not $exe) { return }
 

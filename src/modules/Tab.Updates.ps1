@@ -58,6 +58,9 @@ function Set-UpdatesBusy([bool]$busy) {
 # Carica/ricarica l'elenco upgrade in modo ASINCRONO (req 1): la scansione winget
 # gira in un runspace separato cosi' l'overlay di caricamento resta animato.
 function Load-Upgrades {
+    # Non si scansiona sopra un altro winget: la scheda Install non alza lo stato occupato
+    # mentre cerca, quindi il solo isBusy non basterebbe.
+    if (Test-WinGetBusy) { return }
     Set-AppBusy $true
     Write-Log "Searching for updates..."
     $items.Clear()
@@ -133,7 +136,8 @@ function Start-UpdateSelected {
         return
     }
 
-    Set-AppBusy $true
+    # Lo stato occupato lo prende Start-WinGetQueue, che e' anche il punto in cui si controlla
+    # che non ci sia gia' un winget in corso.
     Start-WinGetQueue -Rows $selected -Verb 'Update' -ArgsBuilder {
         param($r)
         # Aggiornamento silenzioso, match esatto sull'ID.

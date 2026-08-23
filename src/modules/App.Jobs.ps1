@@ -141,6 +141,15 @@ function Start-WinGetQueue {
         [scriptblock]$OnDone
     )
 
+    # UNICO punto di passaggio di update, install, uninstall e pin: lo stato occupato lo
+    # prende lei, cosi' i chiamanti non possono dimenticarselo, e il controllo contro un
+    # winget gia' in corso (ricerche comprese) vive in un posto solo invece che in quattro.
+    if (Test-WinGetBusy) {
+        Write-Log "Another winget operation is still running: try again in a moment."
+        return
+    }
+    Set-AppBusy $true
+
     # Azzera eventuali esiti precedenti sulle righe in coda
     foreach ($item in $Rows) { $item.Status = ''; $item.StatusDetail = '' }
 

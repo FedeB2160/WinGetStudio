@@ -53,7 +53,8 @@ function Set-PackagePin([object[]]$Rows, [bool]$Pin) {
         return
     }
 
-    Set-AppBusy $true
+    # Lo stato occupato lo prende Start-WinGetQueue, che e' anche il punto in cui si controlla
+    # che non ci sia gia' un winget in corso.
     Start-WinGetQueue -Rows $todo -Verb $(if ($Pin) { 'Pin' } else { 'Unpin' }) `
         -Vars @{ pinVerb = $(if ($Pin) { 'add' } else { 'remove' }) } `
         -ArgsBuilder {

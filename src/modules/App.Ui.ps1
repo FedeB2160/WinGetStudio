@@ -32,3 +32,14 @@ function Set-AppBusy([bool]$busy) {
     foreach ($h in $script:busyHandlers) { & $h $busy }
 }
 
+# Sta girando un processo winget? Comprende le RICERCHE, che di proposito NON alzano lo stato
+# occupato — il typeahead deve restare fluido — ma sono comunque un processo winget. Chi sta
+# per lanciarne un altro deve chiedere a questa, non a $script:isBusy: con il solo isBusy,
+# digitare in Install e passare subito a Installed lanciava winget search e winget list
+# insieme, ed e' con due processi in parallelo che un comando esce con exit 1.
+# $script:searchInFlight vive in Tab.Install.ps1 e vale 0 finche' quel modulo non e' stato
+# caricato; il confronto regge anche su $null.
+function Test-WinGetBusy {
+    return ($script:isBusy -or ($script:searchInFlight -gt 0))
+}
+

@@ -26,7 +26,7 @@ function Get-ImportPackageCount([string]$Path) {
 # Scelta del file, poi l'azione. Sono separate perche' un dialog non si puo' pilotare da
 # un test headless, mentre Invoke-PackageExport si.
 function Start-Export {
-    if ($script:isBusy) { return }
+    if (Test-WinGetBusy) { return }
 
     $dlg = New-Object Microsoft.Win32.SaveFileDialog
     $dlg.Title    = 'Export installed packages'
@@ -38,6 +38,8 @@ function Start-Export {
 }
 
 function Invoke-PackageExport([string]$file) {
+    # Di nuovo: fra la scelta del file e qui puo' essere rientrata una ricerca.
+    if (Test-WinGetBusy) { return }
     Set-AppBusy $true
     $InstalledSpinner.Visibility = [System.Windows.Visibility]::Visible
     Write-Log "Exporting the package list to $file ..."
@@ -76,7 +78,7 @@ function Invoke-PackageExport([string]$file) {
 }
 
 function Start-Import {
-    if ($script:isBusy) { return }
+    if (Test-WinGetBusy) { return }
 
     $dlg = New-Object Microsoft.Win32.OpenFileDialog
     $dlg.Title  = 'Import packages from a list'
@@ -112,6 +114,7 @@ function Start-Import {
 }
 
 function Invoke-PackageImport([string]$file, [int]$count) {
+    if (Test-WinGetBusy) { return }
     Set-AppBusy $true
     $InstalledSpinner.Visibility = [System.Windows.Visibility]::Visible
     Write-Log "Importing $count packages from $file ..."

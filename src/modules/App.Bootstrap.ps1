@@ -151,11 +151,14 @@ function Start-App([switch]$NoShow) {
     Initialize-Backup
     Initialize-Update
 
-    # Alla chiusura: ferma timer e chiudi i job pendenti, cosi' il processo termina
-    # davvero (niente thread in background lasciati vivi).
+    # Alla chiusura: ferma i timer e chiudi i job pendenti, cosi' il processo termina
+    # davvero (niente thread in background lasciati vivi). ENTRAMBI i timer: se la ragione
+    # vale per quello del tema, vale anche per quello del typeahead.
     $script:window.Add_Closed({
         Stop-AllJobs
-        if ($script:themeTimer) { try { $script:themeTimer.Stop() } catch { } }
+        foreach ($t in $script:themeTimer, $script:searchTimer) {
+            if ($t) { try { $t.Stop() } catch { } }
+        }
     })
 
     # Carica gli upgrade all'apertura. Secondo Set-Theme: al primo giro la finestra non

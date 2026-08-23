@@ -461,6 +461,42 @@ if ($script:jobs.Count -ne 0) { throw "job non rimosso dalla lista: $($script:jo
 Stop-AllJobs
 "OK job    runspace, -Vars, -Functions, OnDone sul thread UI e cleanup"
 
+# 13b) Una ricerca in volo E' un processo winget, anche se di proposito non alza lo stato
+# occupato (la digitazione deve restare fluida). Senza questo controllo, digitare in Install
+# e passare subito a Installed lanciava due winget insieme — ed e' cosi' che un comando
+# esce con exit 1. Il flag si forza a mano: far partire una ricerca vera renderebbe il test
+# lento e dipendente dalla rete.
+$script:searchInFlight = 1
+try {
+    if (-not (Test-WinGetBusy)) { throw "Test-WinGetBusy ignora le ricerche in volo" }
+
+    $script:installedLoaded = $false
+    Load-Installed
+    if ($script:installedLoaded) { throw "Load-Installed e' partita con una ricerca in volo" }
+
+    # La coda e' il punto di passaggio di update, install, uninstall e pin: se non si difende
+    # lei, ognuno dei quattro deve ricordarselo, e prima o poi uno se lo dimentica.
+    $wasBusy = $script:isBusy
+    Start-WinGetQueue -Rows @([WgtRow]@{ Id = 'Test.Id'; Name = 'Test' }) -Verb 'Test' `
+        -ArgsBuilder { param($r) '--version' }
+    if ($script:isBusy -ne $wasBusy) { throw "Start-WinGetQueue ha preso lo stato occupato con una ricerca in volo" }
+    if ($script:jobs.Count -ne 0) { throw "Start-WinGetQueue ha avviato un job con una ricerca in volo" }
+}
+finally {
+    $script:searchInFlight = 0
+    Stop-AllJobs
+}
+"OK busy   ricerca in volo: scansioni e coda winget si fermano"
+
+# 13c) Entrambi i timer si fermano alla chiusura: uno che resta vivo tiene in piedi il
+# processo dopo che la finestra e' sparita, ed e' la ragione per cui il primo era stato
+# fermato — quindi vale anche per il secondo.
+$startSrc = Get-FunctionSource 'Start-App'
+foreach ($t in 'themeTimer', 'searchTimer') {
+    if ($startSrc -notmatch "Add_Closed[\s\S]*$t") { throw "Add_Closed non ferma `$script:$t" }
+}
+"OK timers themeTimer e searchTimer fermati in Add_Closed"
+
 # 14) La ricerca della scheda Install: debounce, soglia dei 3 caratteri e scarto dei
 # risultati superati. E' l'unica parte della suite che chiama winget davvero, ma solo in
 # lettura e sul solo indice LOCALE (--source winget), quindi non tocca la rete.

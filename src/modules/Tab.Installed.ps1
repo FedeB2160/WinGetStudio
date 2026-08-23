@@ -59,7 +59,10 @@ function Test-InstalledMatch($row) {
 }
 
 function Load-Installed {
-    if ($script:isBusy) { return }
+    # Non si scansiona sopra un altro winget. Test-WinGetBusy e non isBusy: una ricerca in
+    # volo nella scheda Install non alza lo stato occupato, ed e' proprio entrando qui dal
+    # typeahead che partivano due winget insieme.
+    if (Test-WinGetBusy) { return }
     Set-AppBusy $true
     $script:installedLoaded = $true
     Write-Log "Listing installed packages..."
@@ -125,7 +128,8 @@ function Start-UninstallSelected {
         return
     }
 
-    Set-AppBusy $true
+    # Lo stato occupato lo prende Start-WinGetQueue, che e' anche il punto in cui si controlla
+    # che non ci sia gia' un winget in corso.
     Start-WinGetQueue -Rows $sel -Verb 'Uninstall' -ArgsBuilder {
         param($r)
         # Match esatto sull'ID: vale anche per i pacchetti non installati con winget, il
