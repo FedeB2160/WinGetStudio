@@ -1418,7 +1418,7 @@ git commit -m "feat(ui): indeterminate progress while scanning, determinate for 
 
 ## Task 9: Make the log resizable — WITHDRAWN
 
-**Implemented and reverted on the user's call.** The GridSplitter worked, but making both rows elastic left an empty band between the tab frame and the progress bar, and the log is a service panel that is fine where it is.  now asserts the opposite: the log row has a fixed height and the tab row is the only elastic one, so this does not get re-attempted by accident.
+**Implemented and reverted on the user's call.** The GridSplitter worked, but making both rows elastic left an empty band between the tab frame and the progress bar, and the log is a service panel that is fine where it is. The suite now asserts the opposite: the log row has a fixed height and the tab row is the only elastic one, so this does not get re-attempted by accident.
 
 The original task, for the record:
 
