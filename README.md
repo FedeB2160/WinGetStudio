@@ -25,8 +25,9 @@ The window has three tabs plus **Settings**, pinned to the right of the strip. T
    - **Unknown** (off by default) also lists packages whose installed version winget cannot determine. It applies to the *next* check.
 2. Tick what you want, or **Select all**.
 3. **Update** upgrades them one at a time. Each row shows its own outcome, and slow installers are never cut off — the log writes a line every 30 seconds so you can see it is still working.
+   - While the queue runs, **Update** reads **Cancel**. Pressing it lets the package in progress finish and then stops, so nothing is interrupted halfway through an installer; the packages that never ran keep their tick and an empty result.
 
-The list stays scrollable while updating, and columns can be resized by dragging their edge in the header.
+The list stays scrollable while updating — the ticks and the pin entries are greyed, not the list — and columns can be resized by dragging their edge in the header.
 
 ### Install
 

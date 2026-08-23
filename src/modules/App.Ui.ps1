@@ -27,8 +27,14 @@ function Register-BusyHandler([scriptblock]$handler) {
     [void]$script:busyHandlers.Add($handler)
 }
 
+# $script:queueVerb dice QUALE coda sta girando ('Update', 'Install', 'Uninstall', 'Pin')
+# oppure $null. Lo stato occupato e' globale, quindi senza questo una scheda non puo'
+# distinguere la propria operazione da quella di un'altra — ed e' l'unico modo per offrire
+# "Cancel" solo a chi l'ha avviata. Lo scrive Start-WinGetQueue.
+# Si azzera PRIMA di chiamare gli handler, cosi' ognuno vede lo stato finale.
 function Set-AppBusy([bool]$busy) {
     $script:isBusy = $busy
+    if (-not $busy) { $script:queueVerb = $null }
     foreach ($h in $script:busyHandlers) { & $h $busy }
 }
 

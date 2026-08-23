@@ -21,8 +21,12 @@ function Refresh-SelectionState {
 
     # req3: "Seleziona tutto" attivo solo se c'e' almeno un elemento (e non occupato)
     $BtnToggleAll.IsEnabled = (-not $script:isBusy) -and ($total -gt 0)
-    # req4: "Aggiorna" attivo solo se almeno uno selezionato
-    $BtnUpdate.IsEnabled    = (-not $script:isBusy) -and ($sel -gt 0)
+    # req4: "Aggiorna" attivo solo se almeno uno selezionato. Ma mentre gira LA NOSTRA coda il
+    # pulsante e' Cancel e deve restare premibile: Set-PinFlags richiama questa funzione a
+    # stato ancora occupato, e senza la guardia spegneva il Cancel appena letti i pin.
+    if ($script:queueVerb -ne 'Update') {
+        $BtnUpdate.IsEnabled = (-not $script:isBusy) -and ($sel -gt 0)
+    }
 
     # Allinea l'etichetta del toggle allo stato reale della selezione
     $script:allSelected   = ($total -gt 0 -and $sel -eq $total)
@@ -48,13 +52,23 @@ function Set-UpdatesBusy([bool]$busy) {
     # risponde "riprova fra un attimo" e' un rifiuto, non un blocco.
     $MenuPinUpdates.IsEnabled   = -not $busy
     $MenuUnpinUpdates.IsEnabled = -not $busy
+    # Il pulsante Update diventa Cancel SOLO se la coda in corso e' la nostra: un export o
+    # un'installazione dall'altra scheda alzano lo stesso stato occupato, e offrire di
+    # annullarli da qui sarebbe una bugia.
+    # Etichetta e tooltip si assegnano SEMPRE, non solo in un ramo: cosi' l'aspetto del
+    # pulsante e' una funzione di (occupato, quale coda) e non dipende da come ci si e'
+    # arrivati. Assegnandolo solo nel ramo a riposo restava "Cancel" a coda altrui avviata.
+    $ourQueue = $busy -and ($script:queueVerb -eq 'Update')
+    $BtnUpdate.Content = if ($ourQueue) { 'Cancel' } else { 'Update' }
+    $BtnUpdate.ToolTip = if ($ourQueue) { 'Finish the package in progress, then stop without starting the others' } else { $null }
+
     if ($busy) {
-        # Durante un'operazione i pulsanti selezione/aggiorna sono sempre spenti
+        # Durante un'operazione la selezione non si tocca.
         $BtnToggleAll.IsEnabled = $false
-        $BtnUpdate.IsEnabled    = $false
+        $BtnUpdate.IsEnabled    = $ourQueue
     }
     else {
-        # A riposo lo stato dipende da elenco e selezione
+        # A riposo lo stato dipende da elenco e selezione.
         Refresh-SelectionState
     }
 }
@@ -174,7 +188,19 @@ function Initialize-UpdatesTab {
         Refresh-SelectionState
     })
 
-    $BtnUpdate.Add_Click({ Start-UpdateSelected })
+    # Lo stesso pulsante fa due cose: Update a riposo, Cancel mentre la nostra coda gira. Due
+    # pulsanti separati avrebbero significato uno sempre spento, a occupare spazio per dire
+    # niente.
+    $BtnUpdate.Add_Click({
+        if ($script:queueVerb -eq 'Update') {
+            Request-QueueCancel
+            $BtnUpdate.Content   = 'Cancelling...'
+            $BtnUpdate.IsEnabled = $false
+            Write-Log "Cancelling: the package in progress will finish, then the queue stops."
+            return
+        }
+        Start-UpdateSelected
+    })
 
     # Pin/Unpin dal menu contestuale, sulle righe EVIDENZIATE (non su quelle spuntate:
     # una riga pinnata ha la spunta disabilitata e non potrebbe piu' essere sbloccata).

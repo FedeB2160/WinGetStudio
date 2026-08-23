@@ -19,6 +19,17 @@
 # una coppia di variabili per operazione: le operazioni sono molte.
 $script:jobs = New-Object System.Collections.ArrayList
 
+# Annullamento COOPERATIVO della coda in corso. Una hashtable e non una variabile $script:
+# perche' il runspace ha il proprio scope: una hashtable e' un tipo per RIFERIMENTO, quindi i
+# due thread vedono lo stesso oggetto — lo stesso motivo per cui $rows funziona.
+# NON si uccide il processo in corso: un installer interrotto a meta' lascia la macchina in
+# uno stato che nessuno sa descrivere. Si finisce il pacchetto e non si parte col prossimo.
+$script:queueCancel = $null
+
+function Request-QueueCancel {
+    if ($script:queueCancel) { $script:queueCancel.Requested = $true }
+}
+
 # Esegue $Script in un runspace STA e richiama $OnDone sul thread UI a lavoro finito,
 # passandogli i risultati.
 #   -Vars      variabili da rendere visibili dentro il runspace
@@ -150,6 +161,12 @@ function Start-WinGetQueue {
     }
     Set-AppBusy $true
 
+    # Quale coda sta girando (lo leggono gli handler dello stato occupato) e con che flag di
+    # annullamento. Nuova hashtable a ogni coda: una richiesta arrivata fra due code non si
+    # trascina sulla successiva.
+    $script:queueVerb   = $Verb
+    $script:queueCancel = [hashtable]::Synchronized(@{ Requested = $false })
+
     # Azzera eventuali esiti precedenti sulle righe in coda
     foreach ($item in $Rows) { $item.Status = ''; $item.StatusDetail = '' }
 
@@ -160,6 +177,7 @@ function Start-WinGetQueue {
     # window e txtLog li passa Start-BackgroundJob a tutti i job: qui non si ripetono.
     $jobVars = @{
         rows       = $Rows
+        cancel     = $script:queueCancel
         progress   = $Progress
         wingetPath = $wingetPath
         verb       = $Verb
@@ -177,8 +195,11 @@ function Start-WinGetQueue {
     [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet' -Vars $jobVars -Script {
         Invoke-Expression "function Get-WinGetArgs { $argsFnBody }"
 
-        $done = 0
+        $done    = 0
+        $stopped = $false
         foreach ($item in $rows) {
+            # Annullamento: si controlla PRIMA di partire col pacchetto, mai a meta'.
+            if ($cancel.Requested) { $stopped = $true; break }
             $id   = $item.Id
             $name = $item.Name
             UI { $item.Status = 'updating'; $item.StatusDetail = 'In progress...' }
@@ -215,6 +236,7 @@ function Start-WinGetQueue {
                 UI { $progress.Value = $done }
             }
         }
-        LogUI "$verb complete ($done/$($rows.Count))."
+        if ($stopped) { LogUI "$verb cancelled after $done of $($rows.Count) packages; the rest were left untouched." }
+        else          { LogUI "$verb complete ($done/$($rows.Count))." }
     })
 }

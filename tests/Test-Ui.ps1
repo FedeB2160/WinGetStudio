@@ -528,6 +528,47 @@ foreach ($t in 'themeTimer', 'searchTimer') {
 }
 "OK timers themeTimer e searchTimer fermati in Add_Closed"
 
+# 13d) Il pulsante Update diventa Cancel mentre gira LA NOSTRA coda, e torna Update quando lo
+# stato occupato si libera. Con la coda di un'altra scheda resta spento: annullare
+# un'installazione dal pulsante degli aggiornamenti non vorrebbe dire niente.
+$script:queueVerb = 'Update'
+Set-AppBusy $true
+if ($BtnUpdate.Content -ne 'Cancel') { throw "durante l'update il pulsante non diventa Cancel: '$($BtnUpdate.Content)'" }
+if (-not $BtnUpdate.IsEnabled) { throw "il pulsante Cancel e' spento" }
+# Set-PinFlags richiama Refresh-SelectionState mentre lo stato e' ANCORA occupato: era il
+# primo modo in cui questo si rompeva, spegnendo il Cancel appena letti i pin.
+Refresh-SelectionState
+if (-not $BtnUpdate.IsEnabled) { throw "un ricalcolo della selezione ha spento il Cancel" }
+$script:queueVerb = 'Install'
+Set-AppBusy $true
+if ($BtnUpdate.Content -eq 'Cancel') { throw "il pulsante mostra Cancel per una coda che non e' la sua" }
+Set-AppBusy $false
+if ($BtnUpdate.Content -ne 'Update') { throw "a coda finita il pulsante non torna Update: '$($BtnUpdate.Content)'" }
+if ($null -ne $script:queueVerb) { throw "Set-AppBusy `$false non azzera il verbo della coda" }
+"OK cancel  Update <-> Cancel legati alla coda in corso"
+
+# 13e) L'annullamento vero, su una coda finta di 5 righe che lanciano "--version": rapido e
+# innocuo. Si annulla subito dopo l'avvio, quindi il primo pacchetto e' in volo e gli altri
+# non partono. NB: e' una corsa vinta con ampio margine (una winget --version costa ~0.3s, la
+# richiesta arriva in millisecondi), ed e' per questo che l'asserzione e' "meno di 5" e non
+# un numero esatto.
+if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+    "SKIP cancel2 winget non presente su questa macchina"
+}
+else {
+    $probeRows = @(1..5 | ForEach-Object { [WgtRow]@{ Id = "Probe.$_"; Name = "Probe $_" } })
+    $TxtLog.Clear()
+    Start-WinGetQueue -Rows $probeRows -Verb 'Update' `
+        -ArgsBuilder { param($r) '--version' } -OnDone { Set-AppBusy $false }
+    Request-QueueCancel
+    if (-not (Wait-For { -not $script:isBusy } 90)) { throw "la coda annullata non e' terminata" }
+    $ran = @($probeRows | Where-Object { $_.Status }).Count
+    if ($ran -ge 5) { throw "l'annullamento non ha fermato la coda: eseguiti $ran su 5" }
+    if ($TxtLog.Text -notmatch 'cancelled') { throw "l'annullamento non e' finito nel log" }
+    Stop-AllJobs
+    "OK cancel2 coda fermata dopo $ran pacchetti su 5"
+}
+
 # 14) La ricerca della scheda Install: debounce, soglia dei 3 caratteri e scarto dei
 # risultati superati. E' l'unica parte della suite che chiama winget davvero, ma solo in
 # lettura e sul solo indice LOCALE (--source winget), quindi non tocca la rete.
