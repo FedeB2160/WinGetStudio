@@ -396,7 +396,11 @@ if ($TxtVersion.Text -notmatch [regex]::Escape($AppVersion)) { throw "la scheda 
 if ($null -eq $Grid) { throw "i moduli non vedono `$Grid: controllo assegnato senza `$script:?" }
 if ($null -eq $Grid.ItemsSource) { throw "Initialize-UpdatesTab non ha agganciato la collezione al DataGrid" }
 if ($CmbTheme.Items.Count -ne 3) { throw "Initialize-Theme non ha riempito la tendina del tema: $($CmbTheme.Items.Count) voci" }
-if ($CmbTheme.SelectedItem -notin @('Light', 'Dark', 'Auto')) { throw "tema selezionato inatteso: '$($CmbTheme.SelectedItem)'" }
+# "System" e non "Auto": dice che segue il sistema invece di lasciarlo indovinare. Un vecchio
+# "Auto" nel registro non e' fra i tre e ripiega sul default, che e' System — stesso
+# comportamento, nessuna perdita per chi aggiorna.
+if ($CmbTheme.SelectedItem -notin @('Light', 'Dark', 'System')) { throw "tema selezionato inatteso: '$($CmbTheme.SelectedItem)'" }
+if ($CmbTheme.Items -contains 'Auto') { throw "la tendina del tema offre ancora 'Auto'" }
 
 # La schermata delle impostazioni e' un TAB come gli altri, l'ultimo, fissato a destra:
 # cosi' barra di avanzamento e log restano visibili anche mentre e' aperta, e non servono
@@ -555,6 +559,7 @@ foreach ($w in 'Updates', 'Install', 'Installed', 'Pin', 'Export / Import') {
     if ($uiTextEarly -notmatch "<Bold>$([regex]::Escape($w))</Bold>") { throw "ABOUT non elenca la funzione $w" }
 }
 if ($uiTextEarly -notmatch 'Claude Code') { throw "manca la nota sullo strumento con cui e' stato scritto" }
+if ($uiTextEarly -notmatch 'github\.com/FedeB2160"') { throw "ABOUT non dice chi ha fatto il progetto" }
 # I link aprono il browser: WPF non lo fa da solo, serve un handler.
 if ((Get-FunctionSource 'Start-App') -notmatch 'RequestNavigateEvent') {
     throw "nessun handler per i link: cliccarli non aprirebbe nulla"

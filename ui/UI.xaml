@@ -304,13 +304,21 @@
                              lui. 16 e' l'altezza che il testo occupa da solo, quindi la
                              striscia resta identica nelle tre modalita'. -->
                         <StackPanel Orientation="Horizontal" MinHeight="16">
+                            <!-- Lo stacco fra icona e parola sta sulla PAROLA, e il glifo non ha
+                                 margini: cosi' in sola icona e' esattamente al centro della
+                                 linguetta, ed e' la modalita' in cui uno scarto si vede (la
+                                 linguetta e' larga la meta').
+                                 In sola testo la parola resta 3,5px a destra del centro, perche'
+                                 il suo margine sinistro sopravvive all'icona collassata: su una
+                                 linguetta larga il triplo non si distingue, e le alternative
+                                 costano un DataTrigger che non puo' leggere un DynamicResource
+                                 oppure una Thickness nelle risorse, che fa fallire il layout. -->
                             <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabItem}}"
                                        FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
                                        FontSize="13" VerticalAlignment="Center"
-                                       Margin="4,0,4,0"
                                        AutomationProperties.Name=""
                                        Visibility="{DynamicResource TabIconVis}"/>
-                            <TextBlock Text="{Binding}" VerticalAlignment="Center"
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center" Margin="7,0,0,0"
                                        Visibility="{DynamicResource TabTextVis}"/>
                         </StackPanel>
                     </DataTemplate>
@@ -323,7 +331,10 @@
                                 BorderThickness="1,1,1,0"
                                 Background="{DynamicResource CtrlBgBrush}"
                                 BorderBrush="{DynamicResource CtrlBorderBrush}">
-                            <ContentPresenter ContentSource="Header" Margin="14,6"
+                            <!-- 9px per lato contro i 7 di stacco fra icona e parola: prima erano
+                                 14 per lato contro 4 in mezzo, e la linguetta sembrava due cose
+                                 lontane dentro una scatola larga. -->
+                            <ContentPresenter ContentSource="Header" Margin="9,6"
                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -1042,7 +1053,9 @@
                             <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE"
                                        Foreground="{DynamicResource AccentBrush}">MIT licence</Hyperlink><LineBreak/>
                             <LineBreak/>
-                            <Italic>Built with the help of Claude Code (Anthropic).</Italic>
+                            Made by <Hyperlink NavigateUri="https://github.com/FedeB2160"
+                                       Foreground="{DynamicResource AccentBrush}">FedeB2160</Hyperlink>,
+                            with the help of <Italic>Claude Code</Italic> (Anthropic).
                         </TextBlock>
                     </ScrollViewer>
                 </TabItem>
@@ -1056,11 +1069,15 @@
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <!-- Due colonne: etichette a larghezza automatica, controlli elastici.
                              Prima le etichette avevano Width="120" e la riga dei pulsanti un
-                             Margin="120,0,0,0" per fingere l'allineamento: un'etichetta piu'
-                             lunga rompeva tutto in silenzio. -->
+                             margine sinistro dello stesso valore per fingere l'allineamento: una
+                             etichetta piu' lunga rompeva tutto in silenzio.
+                             Spaziatura: 10px fra le righe di una sezione, 22 fra una sezione e la
+                             successiva. Le tendine sono larghe quanto serve al loro valore piu'
+                             lungo invece dei 180px fissi di prima, che su "Light" erano il triplo
+                             del necessario. -->
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" MinWidth="120"/>
+                                <ColumnDefinition Width="Auto" MinWidth="110"/>
                                 <ColumnDefinition Width="*"/>
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
@@ -1075,29 +1092,28 @@
 
                             <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="APPEARANCE"
                                        Style="{StaticResource SettingsHeader}"/>
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Theme" Margin="0,0,12,18"
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Theme" Margin="0,0,14,10"
                                        VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
-                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,18">
-                                <!-- Le voci le riempie App.Theme.ps1: sono gli stessi valori
-                                     che finiscono nel registro (Light | Dark | Auto). -->
-                                <ComboBox x:Name="CmbTheme" Width="180"/>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                                <!-- Le voci le riempie App.Theme.ps1: sono gli stessi valori che
+                                     finiscono nel registro (Light | Dark | System). -->
+                                <ComboBox x:Name="CmbTheme" Width="140"/>
                                 <TextBlock x:Name="TxtThemeHint" VerticalAlignment="Center" Margin="12,0,0,0"
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
-
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Tab strip" Margin="0,0,12,18"
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Tab strip" Margin="0,0,14,22"
                                        VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
                             <!-- Le voci le riempie Initialize-TabHeaders: sono gli stessi valori
                                  che finiscono nel registro (Icon | Text | Icon + Text). -->
-                            <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CmbTabStyle" Width="180"
-                                      HorizontalAlignment="Left" Margin="0,0,0,18"
+                            <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CmbTabStyle" Width="140"
+                                      HorizontalAlignment="Left" Margin="0,0,0,22"
                                       ToolTip="What the tabs show: the icon, the name, or both"/>
 
                             <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="UPDATES"
                                        Style="{StaticResource SettingsHeader}"/>
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Installed version" Margin="0,0,12,8"
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Installed version" Margin="0,0,14,10"
                                        VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="TxtVersion" Margin="0,0,0,8"
+                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="TxtVersion" Margin="0,0,0,10"
                                        VerticalAlignment="Center" FontWeight="SemiBold"
                                        Foreground="{DynamicResource FgBrush}"/>
                             <!-- Il controllo all'avvio e' una chiamata anonima all'API di GitHub.
@@ -1110,7 +1126,7 @@
                                       Style="{StaticResource ThemedCheckBox}"
                                       ToolTip="One anonymous call to the GitHub API when the app starts. Turn it off to go online only when you press Check for updates"
                                       Foreground="{DynamicResource FgBrush}"/>
-                            <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,18">
+                            <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal">
                                 <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
                                 <!-- Compare solo quando una release e' piu' recente di questa.
                                      Foreground dal tema e NON "White": l'accento del tema scuro
@@ -1126,7 +1142,6 @@
                                 <TextBlock x:Name="TxtUpdateStatus" VerticalAlignment="Center" Margin="12,0,0,0"
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
-
                         </Grid>
                     </ScrollViewer>
                 </TabItem>

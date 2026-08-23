@@ -63,7 +63,7 @@ A pin tells winget to leave a package alone until you remove the pin — for the
 
 The **Settings** tab, at the right end of the tab strip, is a tab like the others — so the progress bar and the log stay visible while you are in it.
 
-- **Theme** — `Light`, `Dark`, or `Auto` to follow Windows (which it keeps following while the window is open).
+- **Theme** — `Light`, `Dark`, or `System` to follow Windows (which it keeps following while the window is open).
 - **Installed version** and **Check for updates** — see below.
 - **Tab strip** — whether the tabs show their icon, their name, or both. Every tab also has a tooltip saying what it is for.
 - **Check for updates at startup** — on by default, and it can be turned off: it is one anonymous call to the GitHub API every time the app starts. The **Check for updates** button always works regardless.
