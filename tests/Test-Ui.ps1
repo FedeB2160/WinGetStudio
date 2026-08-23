@@ -409,6 +409,37 @@ $p = $CmbTheme
 while ($p -and $p -ne $TabSettings) { $p = [System.Windows.LogicalTreeHelper]::GetParent($p) }
 if ($p -ne $TabSettings) { throw "la tendina del tema non e' dentro il tab Settings" }
 "OK settab $($TabMain.Items.Count) tab, Settings ultimo, Updates selezionato all'avvio"
+
+# Mentre una coda gira, spunte e pin non devono essere DISPONIBILI, ma la UI resta viva: la
+# griglia si scorre, il log si legge. Prima le spunte erano bloccate (IsReadOnly) ma
+# sembravano ancora cliccabili, e le voci Pin restavano accese per poi rifiutare.
+Set-AppBusy $true
+foreach ($m in $MenuPinUpdates, $MenuUnpinUpdates, $MenuPinInstalled, $MenuUnpinInstalled) {
+    if ($m.IsEnabled) { throw "una voce di pin resta attiva durante un'operazione" }
+}
+if (-not $Grid.IsReadOnly) { throw "le spunte restano modificabili durante un'operazione" }
+# Le griglie NON si disabilitano: disabilitate non rispondono piu' a rotellina, scrollbar e
+# tastiera, ed e' la regressione che il controllo 9 esiste per impedire.
+foreach ($g in $Grid, $GridSearch, $GridInstalled) {
+    if (-not $g.IsEnabled) { throw "una griglia e' stata disabilitata: non si scorrerebbe piu'" }
+}
+Set-AppBusy $false
+foreach ($m in $MenuPinUpdates, $MenuUnpinUpdates, $MenuPinInstalled, $MenuUnpinInstalled) {
+    if (-not $m.IsEnabled) { throw "a operazione finita una voce di pin resta spenta" }
+}
+if ($Grid.IsReadOnly) { throw "a operazione finita le spunte restano bloccate" }
+
+# E la spunta deve anche VEDERSI spenta: il trigger sta negli stili, non nel codice, cosi'
+# vale per tutte e tre le griglie senza ripeterlo scheda per scheda. Fuori da una griglia
+# (Unknown, MS Store) l'antenato non esiste, il binding torna null e non succede niente.
+foreach ($st in 'ThemedCheckBox', 'PinnableCheckBox') {
+    $blk = [regex]::Match($uiTextEarly, "(?s)x:Key=`"$st`".*?\r?\n        </Style>").Value
+    if (-not $blk) { throw "stile $st non trovato in UI.xaml" }
+    if ($blk -notmatch 'IsReadOnly, RelativeSource=\{RelativeSource AncestorType=DataGrid\}') {
+        throw "lo stile $st non spegne la spunta quando la griglia e' in sola lettura"
+    }
+}
+"OK lockrow spunte e pin spenti durante la coda, griglie ancora vive"
 # Le funzioni delle schede girano senza esplodere sui controlli?
 Write-Log 'test'
 if ($TxtLog.Text -notmatch 'test') { throw "Write-Log non scrive nel TextBox del log" }

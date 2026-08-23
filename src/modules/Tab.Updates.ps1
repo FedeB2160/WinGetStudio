@@ -44,6 +44,10 @@ function Set-UpdatesBusy([bool]$busy) {
     # IsReadOnly blocca solo l'edit delle checkbox, che e' l'unica cosa da impedire.
     if ($busy) { [void]$Grid.CommitEdit() }
     $Grid.IsReadOnly = $busy
+    # Pin e Unpin spenti durante un'operazione: winget e' occupato, e una voce accesa che
+    # risponde "riprova fra un attimo" e' un rifiuto, non un blocco.
+    $MenuPinUpdates.IsEnabled   = -not $busy
+    $MenuUnpinUpdates.IsEnabled = -not $busy
     if ($busy) {
         # Durante un'operazione i pulsanti selezione/aggiorna sono sempre spenti
         $BtnToggleAll.IsEnabled = $false

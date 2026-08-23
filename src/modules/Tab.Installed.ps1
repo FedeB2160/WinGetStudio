@@ -48,6 +48,9 @@ function Set-InstalledBusy([bool]$busy) {
     $TxtFilter.IsEnabled           = -not $busy
     if ($busy) { [void]$GridInstalled.CommitEdit() }
     $GridInstalled.IsReadOnly = $busy
+    # Come nella scheda Updates: le voci di pin si spengono, la griglia resta scorrevole.
+    $MenuPinInstalled.IsEnabled   = -not $busy
+    $MenuUnpinInstalled.IsEnabled = -not $busy
     if ($busy) { $BtnUninstall.IsEnabled = $false } else { Refresh-InstalledState }
 }
 

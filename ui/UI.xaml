@@ -217,6 +217,16 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <!-- Griglia in sola lettura = coda in corso: la spunta e' gia' bloccata da
+                     IsReadOnly, ma senza questo continua a SEMBRARE cliccabile. Il trigger sta
+                     nello stile e non nel codice, cosi' vale per tutte e tre le griglie senza
+                     ripeterlo scheda per scheda. Fuori da una griglia (Unknown, MS Store) e
+                     l'antenato non esiste: il binding torna null e non succede niente. -->
+                <DataTrigger Binding="{Binding IsReadOnly, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <!-- Schede. Come per Button e DataGridColumnHeader il template di sistema (Aero2)
@@ -370,6 +380,12 @@
         <Style x:Key="PinnableCheckBox" TargetType="CheckBox" BasedOn="{StaticResource ThemedCheckBox}">
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Pinned}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
+                </DataTrigger>
+                <!-- Ripetuto e non ereditato: BasedOn porta con se' i Setter, e su una cosa
+                     che si nota solo guardando lo schermo preferisco non affidarmi
+                     all'ereditarieta' dei Trigger. Tre righe, zero dubbi. -->
+                <DataTrigger Binding="{Binding IsReadOnly, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="True">
                     <Setter Property="IsEnabled" Value="False"/>
                 </DataTrigger>
             </Style.Triggers>
