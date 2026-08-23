@@ -1510,12 +1510,13 @@ git commit -m "feat(ui): the log pane is resizable"
 
 ---
 
-## Task 10: Say the list is stale, and clarify what the context menu acts on
+## Task 10: Clarify what the context menu acts on
 
-Two text-only fixes. After an update the grid still shows the old installed versions, and unlike install and uninstall nothing says to rescan. And the checkbox column drives the action bar while row highlighting drives the context menu — true, documented in the comments, and invisible on screen.
+**The "say the list is stale" half of this task shipped with Task 18**, whose locked Update button needed exactly that sentence to explain itself — the log line and its assertion are already in place, so only the context menu part is left here.
+
+The checkbox column drives the action bar while row highlighting drives the context menu — true, documented in the comments, and invisible on screen.
 
 **Files:**
-- Modify: `src\modules\Tab.Updates.ps1` (`Start-UpdateSelected` OnDone)
 - Modify: `ui\UI.xaml` (four context menu headers)
 - Test: `tests\Test-Ui.ps1` — one static assertion
 
