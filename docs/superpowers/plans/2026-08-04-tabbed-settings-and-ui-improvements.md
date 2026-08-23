@@ -27,6 +27,14 @@ Every task's requirements implicitly include this section. Most of these are enf
 - **One source of truth for the module list:** `$moduleNames` in `src\main.ps1`. `build.ps1` and the test suite both parse it. A module file on disk that is missing from the list fails test 1, and a listed file that does not exist also fails.
 - **Never two winget processes at once.** Documented at `DEVELOPMENT.md:220`. Task 4 closes the one remaining hole in this invariant.
 
+**How the work is committed.** All of it lands on one branch, `feature/v1.10.0`, and `main` stays on what is published.
+
+- **One commit per task**, not per step. Each commit contains the code, the tests, the lines of `README.md` and `DEVELOPMENT.md` that the task invalidates, and one line under `## Unreleased` in `CHANGELOG.md`. Docs and code do not travel separately: a README describing yesterday's button is worse than no README.
+- **Both suites must be green before the commit.** There is no CI, so this gate is manual and it is the only one there is.
+- **Push after every commit** (`git push`, the first time with `-u origin feature/v1.10.0`). No batching: if the session dies, the work is already out.
+- Commit messages follow the conventional style the history already uses (`feat(ui):`, `fix(winget):`, `refactor:`, `chore(release):`). Each task below carries its own.
+- `git push` needs the credential helper that `gh auth setup-git` installs, with `gh` authenticated as **FedeB2160** — the account that owns the repo. Verify once with `gh api repos/FedeB2160/WinGetStudio --jq .permissions`: it must report `"push": true`.
+
 **Running the tests** — there is no test selector; each script runs top to bottom and stops at the first failure:
 
 ```bash
@@ -1887,6 +1895,16 @@ git commit -m "fix(winget): resolved path in the read commands, reject unbalance
 
 Do this only once every task you intend to ship has landed and both test scripts are green.
 
+Three hard dependencies make the release mandatory rather than optional, and worth stating before touching anything: the published winget manifest points at `releases/download/v1.9.0/WinGetStudio.exe` and pins its SHA-256, so the asset cannot move; the app's own update check reads `releases/latest` and verifies the download against the digest GitHub publishes with the asset; and the package is live in `microsoft/winget-pkgs`, so a version that never gets a release leaves those users behind. Task 19 closes that last one.
+
+**Pre-condition:** `gh` authenticated as **FedeB2160**.
+
+```bash
+gh api repos/FedeB2160/WinGetStudio --jq .permissions
+```
+
+Must report `"push": true`. The account that was active before this work (`FedeB-Egi`) has `push: false` on this repo, and every write through `gh` answers 403 with an error that blames the token's `workflow` scope and sends you the wrong way.
+
 **Files:**
 - Modify: `src\main.ps1:22` (`$AppVersion`)
 - Modify: `CHANGELOG.md`
@@ -1907,9 +1925,11 @@ Run: `powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.p
 
 Expected: PASS, including `OK ver versione 1.10.0`. Note that `Test-NewerVersion 'v1.10.0' '1.9.0'` is already asserted in section 20 — the version you just set is the one that comparison was written for.
 
-- [ ] **Step 3: Write the changelog entry**
+- [ ] **Step 3: Promote `## Unreleased` into the release entry**
 
-Add at the top of `CHANGELOG.md`, under the `# Changelog` heading, keeping the existing prose style (what changed and why, not a list of commits):
+Every task added one line under `## Unreleased` as it landed. Now those lines become prose, and `## Unreleased` disappears. Do not write this from memory: read the section first and check that every line has a home below, and that nothing below claims something no line accounts for.
+
+The result, at the top of `CHANGELOG.md` under the `# Changelog` heading, in the narrative style the file already uses (what changed and why, never a list of commits):
 
 ```markdown
 ## v1.10.0
@@ -1956,11 +1976,15 @@ After an update, an install, an uninstall or an import, **Update locks until the
 
 Trim this to the tasks you actually shipped.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 4: Commit and push**
 
 ```bash
 git add src/main.ps1 CHANGELOG.md
 git commit -m "chore(release): 1.10.0"
+```
+
+```bash
+git push
 ```
 
 - [ ] **Step 5: Build and check the exe**
@@ -1970,6 +1994,40 @@ git commit -m "chore(release): 1.10.0"
 ```
 
 Expected: `Moduli iniettati: ...` listing 13 modules (`App.Prefs.ps1` present, `App.Settings.ps1` absent), then `Fatto: ...\dist\WinGetStudio.exe (versione 1.10.0)`. Run the exe: it elevates, the tab strip is right, and the Settings tab shows `v1.10.0`. The exe follows a different loading path from the `.ps1` (concatenated modules instead of dot-sourcing), so this is not a formality.
+
+- [ ] **Step 6: Merge into `main` and tag**
+
+The tag must sit on what is published, so the branch merges first.
+
+```bash
+git switch main && git merge --no-ff feature/v1.10.0 && git push
+```
+
+```bash
+git tag v1.10.0 && git push origin v1.10.0
+```
+
+**The tag and `$AppVersion` must agree.** The app compares its own constant with the tag: a mismatch means it either keeps offering an update that is already installed, or never offers one at all.
+
+- [ ] **Step 7: Publish the release**
+
+Extract the `## v1.10.0` section into a temporary file for the notes, then:
+
+```bash
+gh release create v1.10.0 dist/WinGetStudio.exe --title "WinGet Studio v1.10.0" --notes-file <estratto>
+```
+
+```bash
+gh release view v1.10.0
+```
+
+Expected: the release exists, not a draft, with `WinGetStudio.exe` attached. GitHub computes the asset's SHA-256 itself, and that digest is what the app verifies a download against — **builds are not reproducible**, so recompiling and comparing hashes proves nothing. What is verifiable is that digest and the Authenticode signature.
+
+- [ ] **Step 8: Prove the update chain works**
+
+The one check that cannot be faked: take the **v1.9.0** exe, run it, and let it find v1.10.0.
+
+Expected: the Settings tab shows an **Update to v1.10.0** button, the confirmation names the file and its size, the download is reported as verified against the SHA-256, and the app restarts as v1.10.0. Nothing else in the suite exercises release → check → download → verify → replace end to end.
 
 ---
 
@@ -2466,6 +2524,8 @@ Tick three or four packages and press Update. The button reads **Cancel**; press
 
 - [ ] **Step 8: Document it**
 
+In `README.md`, in the Updates section, add after the sentence describing the update queue: "A running queue can be stopped: while it runs the **Update** button reads **Cancel**, and pressing it lets the package in progress finish before stopping, so nothing is interrupted halfway through an installer."
+
 In `DEVELOPMENT.md`, next to the note about the busy state:
 
 ```markdown
@@ -2645,17 +2705,157 @@ powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\src\main.ps1
 
 Update one package and let it finish. Expect: the row keeps its green tick, **Update** is greyed, the label reads `list out of date - press Check`, and **Check** is live. Press Check: the list is rebuilt, the updated package is gone from it, and Update works again. Then do the same from the Install tab — installing something must lock the Updates button too. Finally pin a package: that must **not** lock it.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 7: Document it**
+
+In `README.md`, in the Updates section: "After an update, an install, an uninstall or an import, **Update** is greyed until you press **Check** again. The versions on screen describe the machine as it was before, and running the queue on them would report failures for packages that had in fact succeeded."
+
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/modules/Tab.Updates.ps1 src/modules/Tab.Install.ps1 src/modules/Tab.Installed.ps1 src/modules/App.Backup.ps1 tests/Test-Ui.ps1
+git add src/modules/Tab.Updates.ps1 src/modules/Tab.Install.ps1 src/modules/Tab.Installed.ps1 src/modules/App.Backup.ps1 tests/Test-Ui.ps1 README.md
 git commit -m "fix(updates): lock Update after any alteration until the next check"
+```
+
+```bash
+git push
+```
+
+---
+
+## Task 19: the winget manifest for 1.10.0
+
+The package is live in `microsoft/winget-pkgs` at `manifests/f/FedeB2160/WinGetStudio/1.9.0`, so a version that gets a GitHub release but never reaches the community repository leaves every winget user on the old one. Three files, a validator run, a submission.
+
+No code and no unit tests here: `winget validate` is the test, and the winget-pkgs CI installs and uninstalls the package in a sandbox on the pull request.
+
+**Files:**
+- Create: `winget\1.10.0\FedeB2160.WinGetStudio.yaml`, `…installer.yaml`, `…locale.en-US.yaml`
+
+- [ ] **Step 1: Read the digest off the published release**
+
+```bash
+gh api repos/FedeB2160/WinGetStudio/releases/tags/v1.10.0 --jq '.assets[] | select(.name=="WinGetStudio.exe") | {name, size, digest}'
+```
+
+Take the hash from **the published asset**, never from a local `Get-FileHash` of your own build: builds are not reproducible, so the exe on your disk and the exe in the release are different bytes with the same size. Getting this wrong fails the winget-pkgs CI with a hash mismatch, after the PR is already open.
+
+The API returns `sha256:<hex minuscolo>`; the manifest wants the bare hex, and the 1.9.0 manifest writes it uppercase — keep that.
+
+- [ ] **Step 2: Create the three manifests**
+
+Copy `winget\1.9.0\*` to `winget\1.10.0\` and change, and only change:
+
+- all three files: `PackageVersion: 1.10.0`
+- `…installer.yaml`: `InstallerUrl` (`…/download/v1.10.0/WinGetStudio.exe`), `InstallerSha256`, `ReleaseDate`
+- `…locale.en-US.yaml`: `ReleaseNotes` (a short summary of the `## v1.10.0` changelog entry, not the whole thing) and `ReleaseNotesUrl` (`…/releases/tag/v1.10.0`)
+
+Leave `InstallerType: portable`, `Architecture: x86` and `ElevationRequirement: elevatesSelf` alone. The installer type is what a later version changes, deliberately and with its own plan — see the note at the end of this file.
+
+- [ ] **Step 3: Validate**
+
+```bash
+winget validate --manifest .\winget\1.10.0
+```
+
+Expected: `Manifest validation succeeded.` This is the same validator the moderators run. A `:` inside an unquoted YAML value is the usual way this fails — `ShortDescription` is quoted in 1.9.0 for exactly that reason.
+
+- [ ] **Step 4: Install from the manifests locally (optional but cheap)**
+
+```bash
+winget settings --enable LocalManifestFiles
+```
+
+```bash
+winget install --manifest .\winget\1.10.0
+```
+
+The first command needs an elevated prompt. This proves the URL resolves and the hash matches before a human moderator ever looks at it.
+
+- [ ] **Step 5: Submit**
+
+```bash
+wingetcreate update FedeB2160.WinGetStudio --version 1.10.0 --urls https://github.com/FedeB2160/WinGetStudio/releases/download/v1.10.0/WinGetStudio.exe --submit
+```
+
+`wingetcreate` carries its own GitHub authentication and works through a personal fork, so it does not care which account `gh` is authenticated as. It forks `microsoft/winget-pkgs`, writes `manifests\f\FedeB2160\WinGetStudio\1.10.0\`, and opens the pull request with the conventional title `New version: FedeB2160.WinGetStudio version 1.10.0`. Automated validation runs first; a moderator reviews after. Updates to an existing package go through faster than the first submission did.
+
+- [ ] **Step 6: Commit the manifests**
+
+They stay in this repo as the versioned, reviewable copy of what was submitted — the pull request is a copy of that folder, not the other way round.
+
+```bash
+git add winget/1.10.0
+git commit -m "chore(winget): manifests for 1.10.0"
+```
+
+```bash
+git push
+```
+
+---
+
+## Task 20: close the plan
+
+Everything below happens on `main`: Task 14 merged the branch before tagging.
+
+- [ ] **Step 1: Verify the whole thing, once, together**
+
+```bash
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
+```
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
+```
+
+Then the things no suite can see:
+
+- The app from source: `powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\src\main.ps1` — tab strip right, Settings on the right, both themes, scrollbars following the theme.
+- The compiled exe: it elevates, shows `v1.10.0`, and the Settings tab reports being up to date.
+- The release chain: already proved in Task 14 Step 8, from the v1.9.0 exe.
+- The winget submission: the pull request from Task 19 exists and its automated validation is green.
+
+Read the `## v1.10.0` changelog entry against the ten decisions in this plan's header. Anything the changelog claims that the app does not do, or the app does that nothing documents, is a finding — fix it before Step 3, not after.
+
+- [ ] **Step 2: Write the rule down where it survives**
+
+In `DEVELOPMENT.md`, after *Publishing a release*:
+
+```markdown
+## Working on a plan
+
+A multi-step change is planned in `docs\superpowers\plans\<date>-<topic>.md`, committed alongside the work so the reasoning travels with the diffs. One branch, one commit per task, both test suites green before each commit, the `README.md` and `DEVELOPMENT.md` lines the task invalidates in that same commit, a line under `## Unreleased` in the changelog, and a push after every commit.
+
+**The plan file is deleted when the plan is done** — once every task is executed, both suites are green, and the result matches what the plan established. It is a working document: git history keeps every version of it, and what deserves to outlive it has already been written into the changelog, this file and the README.
+```
+
+- [ ] **Step 3: Delete the plan**
+
+```bash
+git rm docs/superpowers/plans/2026-08-04-tabbed-settings-and-ui-improvements.md
+```
+
+```bash
+git add DEVELOPMENT.md && git commit -m "docs: record the plan workflow, remove the executed plan"
+```
+
+```bash
+git push
+```
+
+Nothing is lost: `git log -- docs/superpowers/plans/` still tells the whole story, and the durable part now lives in the changelog, `DEVELOPMENT.md` and the `README.md`.
+
+- [ ] **Step 4: Tidy the branch**
+
+```bash
+git branch -d feature/v1.10.0 && git push origin --delete feature/v1.10.0
 ```
 
 ---
 
 ## Execution order
 
+0. **Setup, once.** `git switch -c feature/v1.10.0`; commit `CLAUDE.md` and `docs/` so the plan travels with the work; `git push -u origin feature/v1.10.0`. Confirm `gh api repos/FedeB2160/WinGetStudio --jq .permissions` reports `"push": true` — without it neither the push nor the release will work, and finding out at Task 14 is the wrong time.
 1. **Task 1** — tab structure. First, always: it deletes a module, and Tasks 2, 6 and 7 all edit XAML that it moves.
 2. **Task 2, Task 15, Task 3** — the measured defects: contrast, white scrollbars, accessible names. Self-contained, no behaviour change.
 3. **Task 4** — the winget concurrency hole. Needs a real run, not just the suite, and everything in step 4 depends on its choke point.
@@ -2663,13 +2863,15 @@ git commit -m "fix(updates): lock Update after any alteration until the next che
 5. **Task 5, Task 6, Task 7** — in this order: `Get-Pref` first, then the checkbox that uses it, then the layout that absorbs the checkbox and rewrites About.
 6. **Task 8, 9, 10, 11, 12** — polish and cleanup, any order.
 7. **Task 13** — consistency and hardening. Optional.
-8. **Task 14** — release, once everything you intend to ship is in and both suites are green.
+8. **Task 14** — release: version, changelog promotion, merge into `main`, tag, GitHub release, and the end-to-end proof that a v1.9.0 install updates itself to it.
+9. **Task 19** — the winget manifest, so the community package follows the release rather than lagging a version behind it.
+10. **Task 20** — verification against the decisions, the workflow rule into `DEVELOPMENT.md`, the plan file deleted, the branch tidied.
 
-Stopping early is fine: **1 through 4** are the ones that fix something measured or broken. **16 through 18** are the behaviour the user asked for. Everything from 5 onward is improvement rather than repair.
+Stopping early is fine, and the cut lines are these: **1 through 4** fix something measured or broken. **16 through 18** are the behaviour that was asked for. **5 onward** is improvement rather than repair. **14, 19 and 20** are one unit — shipping a release without the manifest update leaves winget users behind, and deleting the plan before the verification of Task 20 throws away the only checklist that says whether the result matches what was decided.
 
 ## Self-review notes
 
-- **Coverage.** Every finding from the 2026-08-04 review maps to a task: T1→Task 1, T2→Task 1, A1/A2/A5→Task 2, A3→removed by Task 1, A4→Task 3, B1/B2/B3→Task 4, B4/B5→Task 13, C1→Task 5, C2→Task 6, C3→removed by Task 1, C4/C5→Task 7, D1→Task 8, D2→Task 9, D3/D5→Task 10, D4→Task 5 (folded into the `Unknown` handler, where the rescan belongs), D6→Task 11, E1/E2→Task 12. The additions requested on 2026-08-23 map to: About copy→Task 7, white scrollbars→Task 15, flags and pins during a queue→Task 16, Update/Cancel→Task 17, stale lock→Task 18.
+- **Coverage.** Every finding from the 2026-08-04 review maps to a task: T1→Task 1, T2→Task 1, A1/A2/A5→Task 2, A3→removed by Task 1, A4→Task 3, B1/B2/B3→Task 4, B4/B5→Task 13, C1→Task 5, C2→Task 6, C3→removed by Task 1, C4/C5→Task 7, D1→Task 8, D2→Task 9, D3/D5→Task 10, D4→Task 5 (folded into the `Unknown` handler, where the rescan belongs), D6→Task 11, E1/E2→Task 12. The additions requested on 2026-08-23 map to: About copy→Task 7, white scrollbars→Task 15, flags and pins during a queue→Task 16, Update/Cancel→Task 17, stale lock→Task 18. The tail of the cycle: Task 19 brings the winget manifest along behind the release, and Task 20 checks the result against the decisions, records the workflow rule in DEVELOPMENT.md, and deletes this file.
 - **Names used consistently across tasks.** `Test-WinGetBusy` (Task 4), `Get-Pref` / `Set-Pref` / `$PrefsKey` (Task 5), `Register-GridRefresh($Target, $RefreshFunction)` (Task 12), controls `$TabInstall` / `$TabInstalled` / `$TabUpdates` / `$TabSettings` (Task 1), `$ChkAutoCheck` (Task 6), `$LogSplitter` (Task 9), theme key `AccentFgBrush` (Task 2).
 - **Ordering constraints that are real.** Task 1 must come first: it deletes a module and removes the need for A3 and C3, and Tasks 2, 6 and 7 all edit XAML that Task 1 moves. Task 5 must precede Task 6 (`Get-Pref` / `Set-Pref`) and Task 7 (which absorbs the checkbox Task 6 adds — if you do Task 7 before Task 6, add the checkbox there instead). Task 4 should precede Task 11, whose F5 relies on `Load-*` refusing to stack. Tasks 8-13 are independent of each other.
 - **Deliberately not planned.** An opening animation for the settings view, a configurable accent colour, grid virtualisation (`DataGrid` does it already), access keys on buttons, and the 44px minimum touch target (a mobile guideline; this is a mouse-and-keyboard desktop app).
