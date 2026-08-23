@@ -128,7 +128,7 @@ function Start-App([switch]$NoShow) {
         'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
         'BtnExport', 'BtnImport',
         'CmbTheme', 'TxtThemeHint', 'TxtVersion', 'BtnCheckUpdate', 'BtnUpdateApp',
-        'UpdateSpinner', 'TxtUpdateStatus',
+        'UpdateSpinner', 'TxtUpdateStatus', 'ChkAutoCheck',
         'TabInstall', 'TabInstalled', 'TabUpdates', 'TabSettings'
     )) {
         $c = $script:window.FindName($n)
@@ -142,6 +142,19 @@ function Start-App([switch]$NoShow) {
     if ($iconPath) {
         try { $script:window.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri]$iconPath) } catch { }
     }
+
+    # I link della scheda Settings: WPF non apre il browser da solo. Un solo handler sulla
+    # finestra invece di uno per link, cosi' un link nuovo non richiede codice nuovo.
+    # NB: l'app gira elevata, quindi il browser eredita l'elevazione. Aprirlo come utente
+    # interattivo richiederebbe una ShellExecute impersonata: se diventa un problema, i link
+    # diventano testo selezionabile.
+    $script:window.AddHandler(
+        [System.Windows.Documents.Hyperlink]::RequestNavigateEvent,
+        [System.Windows.Navigation.RequestNavigateEventHandler]{
+            param($s, $e)
+            try { Start-Process $e.Uri.AbsoluteUri } catch { Write-Log "Could not open $($e.Uri): $($_.Exception.Message)" }
+            $e.Handled = $true
+        })
 
     # 5) Aggancio dei controlli: da qui in poi i moduli possono lavorare.
     Initialize-Theme

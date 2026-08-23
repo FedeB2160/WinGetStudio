@@ -601,12 +601,13 @@
             </Setter>
         </Style>
 
-        <!-- Titolo di sezione nella scheda Settings -->
+        <!-- Titolo di sezione nella scheda Settings: piu' piccolo e in tono minore delle
+             etichette che introduce. Con lo stesso peso del testo sotto non separava niente. -->
         <Style x:Key="SettingsHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtleFgBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
         </Style>
 
         <!-- Campo di testo: la TextBox di sistema ha sfondo bianco cablato e in Dark-Mode
@@ -973,11 +974,31 @@
                     <!-- Impostazioni in colonna: sono pochi controlli e crescono in verticale.
                          ScrollViewer per non tagliarli a finestra piccola. -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel>
-                            <TextBlock Text="APPEARANCE" Style="{StaticResource SettingsHeader}"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
-                                <TextBlock Text="Theme" VerticalAlignment="Center" Width="120"
-                                           Foreground="{DynamicResource FgBrush}"/>
+                        <!-- Due colonne: etichette a larghezza automatica, controlli elastici.
+                             Prima le etichette avevano Width="120" e la riga dei pulsanti un
+                             Margin="120,0,0,0" per fingere l'allineamento: un'etichetta piu'
+                             lunga rompeva tutto in silenzio. -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" MinWidth="120"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>   <!-- 0 APPEARANCE -->
+                                <RowDefinition Height="Auto"/>   <!-- 1 tema -->
+                                <RowDefinition Height="Auto"/>   <!-- 2 UPDATES -->
+                                <RowDefinition Height="Auto"/>   <!-- 3 versione -->
+                                <RowDefinition Height="Auto"/>   <!-- 4 spunta controllo all'avvio -->
+                                <RowDefinition Height="Auto"/>   <!-- 5 pulsanti -->
+                                <RowDefinition Height="Auto"/>   <!-- 6 ABOUT -->
+                                <RowDefinition Height="Auto"/>   <!-- 7 descrizione e link -->
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="APPEARANCE"
+                                       Style="{StaticResource SettingsHeader}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Theme" Margin="0,0,12,18"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,18">
                                 <!-- Le voci le riempie App.Theme.ps1: sono gli stessi valori
                                      che finiscono nel registro (Light | Dark | Auto). -->
                                 <ComboBox x:Name="CmbTheme" Width="180"/>
@@ -985,14 +1006,24 @@
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
 
-                            <TextBlock Text="UPDATES" Style="{StaticResource SettingsHeader}"/>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <TextBlock Text="Installed version" VerticalAlignment="Center" Width="120"
-                                           Foreground="{DynamicResource FgBrush}"/>
-                                <TextBlock x:Name="TxtVersion" VerticalAlignment="Center"
-                                           FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
-                            </StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="120,0,0,18">
+                            <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Text="UPDATES"
+                                       Style="{StaticResource SettingsHeader}"/>
+                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Installed version" Margin="0,0,12,8"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" x:Name="TxtVersion" Margin="0,0,0,8"
+                                       VerticalAlignment="Center" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource FgBrush}"/>
+                            <!-- Il controllo all'avvio e' una chiamata anonima all'API di GitHub.
+                                 Acceso di default (e' il comportamento di sempre), ma si spegne:
+                                 un programma che va in rete da solo deve almeno dirlo e lasciare
+                                 la scelta. Il pulsante qui sotto resta sempre attivo. -->
+                            <CheckBox Grid.Row="4" Grid.Column="1" x:Name="ChkAutoCheck" IsChecked="True"
+                                      Margin="0,0,0,10" HorizontalAlignment="Left"
+                                      Content="Check for updates at startup"
+                                      Style="{StaticResource ThemedCheckBox}"
+                                      ToolTip="One anonymous call to the GitHub API when the app starts. Turn it off to go online only when you press Check for updates"
+                                      Foreground="{DynamicResource FgBrush}"/>
+                            <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,18">
                                 <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
                                 <!-- Compare solo quando una release e' piu' recente di questa.
                                      Foreground dal tema e NON "White": l'accento del tema scuro
@@ -1009,10 +1040,41 @@
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
 
-                            <TextBlock Text="ABOUT" Style="{StaticResource SettingsHeader}"/>
-                            <TextBlock Foreground="{DynamicResource SubtleFgBrush}" TextWrapping="Wrap"
-                                       Text="A graphical front end for winget: update, install, uninstall, pin and export packages. Requires administrator rights, which it asks for at startup."/>
-                        </StackPanel>
+                            <TextBlock Grid.Row="6" Grid.ColumnSpan="2" Text="ABOUT"
+                                       Style="{StaticResource SettingsHeader}"/>
+                            <!-- Descrizione vera: le cinque funzioni per nome e dove segnalare un
+                                 problema. Prima era una riga che non diceva quasi niente, e non
+                                 c'era modo di capire dove finiscono le segnalazioni.
+                                 La nota finale su Claude Code e' volontaria: l'articolo 50
+                                 dell'AI Act riguarda i sistemi AI e i contenuti generati, non gli
+                                 strumenti con cui si scrive il codice, e questo programma non
+                                 contiene nessun sistema AI. Sta qui perche' e' vero. -->
+                            <TextBlock Grid.Row="7" Grid.ColumnSpan="2" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource SubtleFgBrush}">
+                                WinGet Studio is a desktop front end for <Bold>winget</Bold>, the Windows package manager.<LineBreak/>
+                                <LineBreak/>
+                                <Bold>Updates</Bold> &#8212; list what has a newer version and upgrade the packages you tick, one at a time, with a per-row result. A running queue can be cancelled: the package in progress finishes, the rest are left alone.<LineBreak/>
+                                <Bold>Install</Bold> &#8212; search the winget catalogue as you type, optionally the Microsoft Store, and pick the install scope.<LineBreak/>
+                                <Bold>Installed</Bold> &#8212; the inventory of the machine, with a local filter, and uninstall behind a confirmation.<LineBreak/>
+                                <Bold>Pin</Bold> &#8212; block a package from being upgraded, from either list, until you remove the pin.<LineBreak/>
+                                <Bold>Export / Import</Bold> &#8212; save the package list to a .json file and rebuild a machine from it.<LineBreak/>
+                                <LineBreak/>
+                                It runs elevated, because installing and removing software requires it. No telemetry.<LineBreak/>
+                                <LineBreak/>
+                                Found a bug, or have an idea?
+                                <!-- I link li apre l'handler in Start-App. -->
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues"
+                                           Foreground="{DynamicResource AccentBrush}">Open an issue on GitHub</Hyperlink>.<LineBreak/>
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio"
+                                           Foreground="{DynamicResource AccentBrush}">Source code</Hyperlink> &#183;
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases"
+                                           Foreground="{DynamicResource AccentBrush}">Release notes</Hyperlink> &#183;
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE"
+                                           Foreground="{DynamicResource AccentBrush}">MIT licence</Hyperlink><LineBreak/>
+                                <LineBreak/>
+                                <Italic>Built with the help of Claude Code (Anthropic).</Italic>
+                            </TextBlock>
+                        </Grid>
                     </ScrollViewer>
                 </TabItem>
 

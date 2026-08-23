@@ -490,6 +490,32 @@ if ((Get-FunctionSource 'Initialize-UpdatesTab') -notmatch '(?s)ChkUnknown\.Add_
 }
 "OK prefs  giro completo su registro, 4 preferenze lette e salvate, Unknown ricarica"
 
+# 12c) Il corpo delle impostazioni sta su una griglia a due colonne. I 120 magici erano un
+# allineamento a mano: se un'etichetta cresce, la riga sotto non la segue.
+# Sul markup SENZA COMMENTI: il commento che spiega la modifica cita il margine di prima, ed
+# e' giusto che lo faccia — non deve far fallire il controllo.
+$uiMarkup = [regex]::Replace($uiTextEarly, '(?s)<!--.*?-->', '')
+if ($uiMarkup -match 'Margin="120,') { throw "il corpo delle impostazioni usa ancora i margini magici da 120" }
+# ABOUT deve dire COSA fa il programma e DOVE si segnala un problema, non una riga generica.
+if ($uiTextEarly -notmatch 'NavigateUri="https://github\.com/') { throw "ABOUT non ha link a github.com" }
+if ($uiTextEarly -notmatch 'WinGetStudio/issues') { throw "ABOUT non dice dove segnalare un bug" }
+foreach ($w in 'Updates', 'Install', 'Installed', 'Pin', 'Export / Import') {
+    if ($uiTextEarly -notmatch "<Bold>$([regex]::Escape($w))</Bold>") { throw "ABOUT non elenca la funzione $w" }
+}
+if ($uiTextEarly -notmatch 'Claude Code') { throw "manca la nota sullo strumento con cui e' stato scritto" }
+# I link aprono il browser: WPF non lo fa da solo, serve un handler.
+if ((Get-FunctionSource 'Start-App') -notmatch 'RequestNavigateEvent') {
+    throw "nessun handler per i link: cliccarli non aprirebbe nulla"
+}
+# Il controllo all'avvio si puo' spegnere: con la spunta giu' non deve partire NESSUN job,
+# cioe' nessuna chiamata a GitHub. Il pulsante Check resta sempre disponibile.
+Stop-AllJobs
+$ChkAutoCheck.IsChecked = $false
+Start-UpdateCheck
+if ($script:jobs.Count -ne 0) { throw "con la spunta giu' il controllo automatico e' partito comunque" }
+$ChkAutoCheck.IsChecked = $true
+"OK settgs griglia a due colonne, ABOUT completo con link, controllo all'avvio spegnibile"
+
 # 13) Start-BackgroundJob regge? Ci passeranno tutte le operazioni winget. Si verifica
 # in un colpo: le -Vars arrivano nel runspace, le -Functions vengono ricreate la'
 # dentro (senza, muoiono con "termine non riconosciuto"), OnDone gira sul thread UI col

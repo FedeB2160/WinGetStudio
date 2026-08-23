@@ -101,6 +101,9 @@ function Start-UpdateCheck([switch]$Manual) {
         if ($Manual) { $TxtUpdateStatus.Text = 'Updates apply to the compiled exe only; from source use git.' }
         return
     }
+    # Il controllo AUTOMATICO si puo' spegnere; quello chiesto dal pulsante no — chi lo premette
+    # lo sta chiedendo adesso.
+    if (-not $Manual -and -not $ChkAutoCheck.IsChecked) { return }
     if ($script:isBusy) { return }
 
     if ($Manual) {
@@ -231,6 +234,8 @@ function Initialize-Update {
     Clear-OldExe                     # pulisce il residuo dell'aggiornamento precedente
     # La versione sta qui, non nel titolo della finestra.
     $TxtVersion.Text = "v$AppVersion"
+    $ChkAutoCheck.IsChecked = [bool][int](Get-Pref 'CheckAtStartup' 1)
+    $ChkAutoCheck.Add_Click({ Set-Pref 'CheckAtStartup' ([int][bool]$ChkAutoCheck.IsChecked) })
     $BtnUpdateApp.Add_Click({ Start-SelfUpdate })
     $BtnCheckUpdate.Add_Click({ Start-UpdateCheck -Manual })
     Register-BusyHandler {
