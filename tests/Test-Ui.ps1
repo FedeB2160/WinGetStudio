@@ -510,6 +510,18 @@ if ($xSettings -lt $rightOfUpdates + 100) {
 }
 "OK tabdock Settings fissato a destra (x=$([int]$xSettings) contro $([int]$rightOfUpdates) di Updates)"
 
+# 15c) E il suo bordo VISIBILE combacia col bordo del riquadro sotto. Non e' pignoleria: il
+# template della linguetta tiene 2px di stacco a destra per separarla dalla successiva, e
+# sull'ultima a destra quei 2px la lasciavano disallineata di 2px dal riquadro. Il margine
+# destro negativo li recupera; se qualcuno lo toglie, questo controllo se ne accorge.
+$sbd = [System.Windows.Media.VisualTreeHelper]::GetChild($TabSettings, 0)
+$rightBorder = $sbd.TranslatePoint([System.Windows.Point]::new(0, 0), $window.Content).X + $sbd.ActualWidth
+$rightFrame  = $TabMain.TranslatePoint([System.Windows.Point]::new(0, 0), $window.Content).X + $TabMain.ActualWidth
+if ([Math]::Abs($rightBorder - $rightFrame) -gt 0.5) {
+    throw "il bordo del tab Settings non combacia col riquadro: $([int]$rightBorder) contro $([int]$rightFrame)"
+}
+"OK tabedge bordo del tab Settings allineato al riquadro ($([int]$rightFrame)px)"
+
 # 16) La disinstallazione DEVE restare dietro una conferma, e la conferma deve venire
 # prima di mettere qualcosa in coda. E' l'unica operazione irreversibile del programma:
 # il controllo e' statico perche' una MessageBox headless bloccherebbe la suite.

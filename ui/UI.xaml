@@ -923,7 +923,13 @@
                      Test-Ui.ps1 lo verifica.
                      Nessun Foreground esplicito sui due TextBlock: cosi' ereditano quello della
                      linguetta e seguono i trigger di selezione e hover. -->
-                <TabItem x:Name="TabSettings" DockPanel.Dock="Right" Margin="2,0,0,0">
+                <!-- Margine destro NEGATIVO: il template della linguetta tiene 2px di stacco a
+                     destra per separarla dalla successiva, ma qui a destra non c'e' nessuna
+                     successiva — c'e' il bordo del riquadro, e quei 2px lasciavano la linguetta
+                     disallineata rispetto a lui. Il -2 sposta la slot di layout 2px oltre il
+                     bordo del pannello, cosi' lo stacco interno cade fuori e il bordo visibile
+                     della linguetta finisce esattamente sul bordo del riquadro. -->
+                <TabItem x:Name="TabSettings" DockPanel.Dock="Right" Margin="0,0,-2,0">
                     <TabItem.Header>
                         <StackPanel Orientation="Horizontal">
                             <!-- Decorativo: la parola accanto e' gia' il nome accessibile del
