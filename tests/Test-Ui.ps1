@@ -290,6 +290,22 @@ else {
     "OK glyph   $($glyphCodes.Count) glifi presenti in $($iconFonts.Count) font di icone"
 }
 
+# 10d) Barre di scorrimento: il template di sistema (Aero2) cabla colori chiari e ignora
+# Background, quindi in Dark restavano BIANCHE — l'ultimo pezzo di finestra dipinto da
+# Windows invece che dal tema. Si controlla che lo stile esista, che sostituisca il template
+# (senza, i Setter di colore non arrivano da nessuna parte) e che non contenga colori
+# cablati, che e' esattamente il difetto che si sta togliendo.
+$sbStyle = $window.Resources[[System.Windows.Controls.Primitives.ScrollBar]]
+if (-not $sbStyle) { throw "nessuno stile per ScrollBar: in Dark le barre restano bianche" }
+if (@($sbStyle.Setters | Where-Object { $_.Property.Name -eq 'Template' }).Count -eq 0) {
+    throw "lo stile della ScrollBar non ne sostituisce il template"
+}
+$sbText = [regex]::Match($uiText, '(?s)<Style TargetType="ScrollBar">.*?\r?\n        </Style>').Value
+if (-not $sbText) { throw "stile ScrollBar non trovato nel testo di UI.xaml: regex da rivedere" }
+if ($sbText -match '"#[0-9A-Fa-f]{6}"') { throw "colori cablati nello stile della ScrollBar: non seguirebbero il tema" }
+if ($sbText -notmatch 'PART_Track') { throw "manca PART_Track: ScrollBar non saprebbe dove mettere il cursore" }
+"OK scrbar ScrollBar ri-templata, nessun colore cablato"
+
 # 11) La versione e' una sola e arriva sia al titolo sia all'exe? build.ps1 la pesca
 # dalla costante con una regex: se qualcuno la rinomina o la sposta, la build morirebbe
 # (o l'exe uscirebbe senza versione) e il titolo mostrerebbe "[]" in silenzio.

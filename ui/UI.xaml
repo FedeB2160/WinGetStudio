@@ -490,6 +490,85 @@
             </Setter>
         </Style>
 
+        <!-- Cursore della barra di scorrimento: un rettangolo arrotondato che schiarisce
+             sotto il mouse e mentre si trascina. Margin 2: lascia un filo di traccia
+             visibile ai lati, come fa Windows 11. -->
+        <Style x:Key="ScrollThumb" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="bd" CornerRadius="4" Margin="2"
+                                Background="{DynamicResource BorderBrush2}"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource SubtleFgBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource SubtleFgBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Barra di scorrimento. Come CheckBox, header e ComboBox: il template di sistema
+             (Aero2) cabla colori chiari e ignora Background, quindi in Dark-Mode le barre
+             restavano BIANCHE, ed erano l'ultimo pezzo della finestra a non seguire il tema.
+             Template minimo: traccia + cursore, senza i pulsanti freccia (Windows 11 non li
+             disegna piu'). I due RepeatButton dentro il Track restano, trasparenti: sono loro
+             che fanno avanzare di una pagina quando si clicca nel vuoto della traccia, e senza
+             di loro quel clic non farebbe nulla.
+             PART_Track e' il nome che ScrollBar cerca per calcolare la posizione del cursore:
+             rinominarlo blocca la barra senza alcun errore.
+             IsDirectionReversed="True" e' la forma VERTICALE (il valore cresce verso il basso);
+             il trigger su Orientation lo toglie e scambia gli assi. -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="MinWidth" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Border Background="{TemplateBinding Background}">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource ScrollThumb}"/>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Horizontal">
+                                <Setter Property="Width"     Value="Auto"/>
+                                <Setter Property="MinWidth"  Value="0"/>
+                                <Setter Property="Height"    Value="12"/>
+                                <Setter Property="MinHeight" Value="12"/>
+                                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Titolo di sezione nella scheda Settings -->
         <Style x:Key="SettingsHeader" TargetType="TextBlock">
             <Setter Property="FontSize" Value="13"/>
