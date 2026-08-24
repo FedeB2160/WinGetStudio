@@ -9,13 +9,19 @@ dist/
 *.p12
 *.snk
 
-# graphify: si tengono solo il report leggibile e il grafo, che sono il valore
-# durevole. Tutto il resto e' rigenerabile con un comando (graph.html, vault
-# obsidian) oppure e' stato locale della macchina: manifest.json contiene mtime e
-# hash dei file, cost.json e' un contatore, cache\ e' la cache di estrazione,
-# .graphify_python e .graphify_root sono percorsi di questo PC, 2026-08-03\ e' lo
-# snapshot di un'esecuzione precedente.
+# graphify: si tengono il report leggibile, il grafo e il manifest, che sono il
+# valore durevole. Il resto e' rigenerabile con un comando (graph.html, vault
+# obsidian) oppure e' stato locale della macchina: cost.json e' un contatore,
+# cache\ e' la cache di estrazione, .graphify_python e .graphify_root sono
+# percorsi di questo PC, 2026-08-03\ e' lo snapshot di un'esecuzione precedente.
+#
+# manifest.json ha percorsi relativi e hash MD5 del contenuto: e' portabile. Gli
+# mtime dentro sono di questa macchina e su un clone non combaciano, ma non e' un
+# problema — a mtime diverso graphify ricade sul confronto degli hash e riconosce
+# lo stesso i file invariati. Senza questo file un clone rifarebbe da zero
+# l'estrazione di TUTTO il corpus invece del solo --update.
 graphify-out/*
 !graphify-out/GRAPH_REPORT.md
 !graphify-out/graph.json
 !graphify-out/graph.html
+!graphify-out/manifest.json

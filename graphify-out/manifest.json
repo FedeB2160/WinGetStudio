@@ -1,0 +1,152 @@
+{
+  "src/build.ps1": {
+    "mtime": 1787563343.6622212,
+    "ast_hash": "e61e9b0492fcaff0002344ead1305b74",
+    "semantic_hash": "e61e9b0492fcaff0002344ead1305b74"
+  },
+  "src/main.ps1": {
+    "mtime": 1787563343.6632192,
+    "ast_hash": "02ea6bb421fa57fceec1376ebc3eae89",
+    "semantic_hash": "02ea6bb421fa57fceec1376ebc3eae89"
+  },
+  "src/modules/App.Bootstrap.ps1": {
+    "mtime": 1787563343.6651978,
+    "ast_hash": "cdf73769ebdc004cdaadb593b6f6f6da",
+    "semantic_hash": "cdf73769ebdc004cdaadb593b6f6f6da"
+  },
+  "src/modules/App.Jobs.ps1": {
+    "mtime": 1787563343.6651978,
+    "ast_hash": "7545b4274c5e7148627ebab883d00499",
+    "semantic_hash": "7545b4274c5e7148627ebab883d00499"
+  },
+  "src/modules/App.Pins.ps1": {
+    "mtime": 1787563343.6662097,
+    "ast_hash": "9bf25242b730d59fe912bd10d0cc8fcc",
+    "semantic_hash": "9bf25242b730d59fe912bd10d0cc8fcc"
+  },
+  "src/modules/App.Theme.ps1": {
+    "mtime": 1787563343.6672034,
+    "ast_hash": "5db7968b380bcba72ec9e66bdfb7342a",
+    "semantic_hash": "5db7968b380bcba72ec9e66bdfb7342a"
+  },
+  "src/modules/App.Ui.ps1": {
+    "mtime": 1787563343.668617,
+    "ast_hash": "3d17d399d1917611a1cdffe07ee5abff",
+    "semantic_hash": "3d17d399d1917611a1cdffe07ee5abff"
+  },
+  "src/modules/Tab.Install.ps1": {
+    "mtime": 1787563343.6709626,
+    "ast_hash": "2682e4b12481ce8576b967c72567497d",
+    "semantic_hash": "2682e4b12481ce8576b967c72567497d"
+  },
+  "src/modules/Tab.Installed.ps1": {
+    "mtime": 1787563343.6719615,
+    "ast_hash": "96e3864b2800509555d411e1ed66c883",
+    "semantic_hash": "96e3864b2800509555d411e1ed66c883"
+  },
+  "src/modules/Tab.Updates.ps1": {
+    "mtime": 1787563343.6729612,
+    "ast_hash": "ff74ad1de529cc8c7b82c704c02a0cc4",
+    "semantic_hash": "ff74ad1de529cc8c7b82c704c02a0cc4"
+  },
+  "src/modules/WinGet.Exec.ps1": {
+    "mtime": 1787563343.6739614,
+    "ast_hash": "a56080e70361acec921de919a8d347df",
+    "semantic_hash": "a56080e70361acec921de919a8d347df"
+  },
+  "src/modules/WinGet.Parse.ps1": {
+    "mtime": 1787563343.6749616,
+    "ast_hash": "7b335a726f4bffaa2fda894da80baad9",
+    "semantic_hash": "7b335a726f4bffaa2fda894da80baad9"
+  },
+  "tests/Test-InvokeWinGet.ps1": {
+    "mtime": 1787563343.6749616,
+    "ast_hash": "67e5995b734b4079cf650630cf2a9cd5",
+    "semantic_hash": "67e5995b734b4079cf650630cf2a9cd5"
+  },
+  "tests/Test-Ui.ps1": {
+    "mtime": 1787563343.6769617,
+    "ast_hash": "49567a1c5293b33c3c5103f3542e0a40",
+    "semantic_hash": "49567a1c5293b33c3c5103f3542e0a40"
+  },
+  "ui/Theme.Dark.xaml": {
+    "mtime": 1787563343.6769617,
+    "ast_hash": "b6ff297781ac79e84abadb7d071947be",
+    "semantic_hash": "b6ff297781ac79e84abadb7d071947be"
+  },
+  "ui/Theme.Light.xaml": {
+    "mtime": 1787563343.6779613,
+    "ast_hash": "ee37016fd0dc622810dd5af16d6515e8",
+    "semantic_hash": "ee37016fd0dc622810dd5af16d6515e8"
+  },
+  "ui/UI.xaml": {
+    "mtime": 1787563343.6789665,
+    "ast_hash": "1b1188e5863fcfe8431e0f7e9f811433",
+    "semantic_hash": "1b1188e5863fcfe8431e0f7e9f811433"
+  },
+  "README.md": {
+    "mtime": 1787563343.6592183,
+    "ast_hash": "283b9a94041f06dd5ae76e5daddbe040",
+    "semantic_hash": "283b9a94041f06dd5ae76e5daddbe040"
+  },
+  "src/modules/App.Backup.ps1": {
+    "mtime": 1787563343.6632192,
+    "ast_hash": "03ab89568e98e0130b4ee53f76b36dc3",
+    "semantic_hash": "03ab89568e98e0130b4ee53f76b36dc3"
+  },
+  "src/modules/App.Update.ps1": {
+    "mtime": 1787563343.6699538,
+    "ast_hash": "af881fe79348429f1ccfa6d47274dab0",
+    "semantic_hash": "af881fe79348429f1ccfa6d47274dab0"
+  },
+  "CHANGELOG.md": {
+    "mtime": 1787563343.6562204,
+    "ast_hash": "1beb4aac147e44fc8e40106b29aaeb89",
+    "semantic_hash": "1beb4aac147e44fc8e40106b29aaeb89"
+  },
+  "DEVELOPMENT.md": {
+    "mtime": 1787566889.7489064,
+    "ast_hash": "ea8ad6484f8efaec5ab62016762615c9",
+    "semantic_hash": "ea8ad6484f8efaec5ab62016762615c9"
+  },
+  "winget/1.9.0/FedeB2160.WinGetStudio.installer.yaml": {
+    "mtime": 1785846107.1844254,
+    "ast_hash": "d13b44c186505ab68ebd2aec4df4e42b",
+    "semantic_hash": "d13b44c186505ab68ebd2aec4df4e42b"
+  },
+  "winget/1.9.0/FedeB2160.WinGetStudio.locale.en-US.yaml": {
+    "mtime": 1785846065.804294,
+    "ast_hash": "3cafc172023303461f99d7fbf96006cd",
+    "semantic_hash": "3cafc172023303461f99d7fbf96006cd"
+  },
+  "winget/1.9.0/FedeB2160.WinGetStudio.yaml": {
+    "mtime": 1785846065.8052804,
+    "ast_hash": "a00b9459da7c540da1f8df6f14073cac",
+    "semantic_hash": "a00b9459da7c540da1f8df6f14073cac"
+  },
+  "src/modules/App.Prefs.ps1": {
+    "mtime": 1787563343.6662097,
+    "ast_hash": "64f2bf0afdf50f30139ff27248cd2077",
+    "semantic_hash": "64f2bf0afdf50f30139ff27248cd2077"
+  },
+  "CLAUDE.md": {
+    "mtime": 1787563343.6572194,
+    "ast_hash": "49c5b4b24fec0fe65a862008627e1be2",
+    "semantic_hash": "49c5b4b24fec0fe65a862008627e1be2"
+  },
+  "winget/1.10.0/FedeB2160.WinGetStudio.installer.yaml": {
+    "mtime": 1787565138.3533306,
+    "ast_hash": "e3c304782bdde07460777d597b4f9e23",
+    "semantic_hash": "e3c304782bdde07460777d597b4f9e23"
+  },
+  "winget/1.10.0/FedeB2160.WinGetStudio.locale.en-US.yaml": {
+    "mtime": 1787565138.4300125,
+    "ast_hash": "e408d6a2f5a9fe3053973a98d5c649b3",
+    "semantic_hash": "e408d6a2f5a9fe3053973a98d5c649b3"
+  },
+  "winget/1.10.0/FedeB2160.WinGetStudio.yaml": {
+    "mtime": 1787565138.2851326,
+    "ast_hash": "475e2e5530f719c13a5358b379ed835d",
+    "semantic_hash": "475e2e5530f719c13a5358b379ed835d"
+  }
+}

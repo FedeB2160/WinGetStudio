@@ -52,4 +52,4 @@ Glyphs must be written `[char]0xE706`, never `` "`u{E706}" `` — that escape ne
 
 - **UI text and documentation in English; in-code comments in Italian.** User-facing strings live in `ui\UI.xaml` and in the `Write-Log` / `LogUI` / `MessageBox` calls under `src\modules\`.
 - Signing: `build.ps1` picks `$env:WINGETSTUDIO_CERT_THUMBPRINT` if set, else the first code-signing certificate in `Cert:\CurrentUser\My`; it still succeeds unsigned. Private keys (`*.pfx`, `*.p12`, `*.snk`) are gitignored — only the public `.cer` is committed.
-- `graphify-out\` holds a knowledge graph of this repo; `graphify query "..."` answers *why* questions that span code, DEVELOPMENT.md and the changelog. Only `GRAPH_REPORT.md`, `graph.json` and `graph.html` are committed.
+- `graphify-out\` holds a knowledge graph of this repo; `graphify query "..."` answers *why* questions that span code, DEVELOPMENT.md and the changelog. Only `GRAPH_REPORT.md`, `graph.json`, `graph.html` and `manifest.json` are committed. The manifest is what lets a clone run `graphify --update` and re-extract just the files that changed, instead of paying for the whole corpus again.
