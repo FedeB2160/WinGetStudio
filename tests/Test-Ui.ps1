@@ -627,6 +627,13 @@ foreach ($w in 'Updates', 'Install', 'Installed', 'Pin', 'Export / Import') {
 }
 if ($uiTextEarly -notmatch 'Claude Code') { throw "manca la nota sullo strumento con cui e' stato scritto" }
 if ($uiTextEarly -notmatch 'github\.com/FedeB2160"') { throw "ABOUT non dice chi ha fatto il progetto" }
+# Niente trattini lunghi nel testo a schermo: separano peggio dei due punti e lasciano un
+# segno lungo in mezzo alla riga. Sul markup SENZA COMMENTI, perche' nei commenti italiani
+# ci stanno e devono restarci.
+foreach ($dash in '&#8212;', [char]0x2014, [char]0x2013) {
+    if ($uiMarkup.Contains([string]$dash)) { throw "trattino lungo nel testo dell'interfaccia: '$dash'" }
+}
+"OK dash    nessun trattino lungo nel testo a schermo"
 # I link aprono il browser: WPF non lo fa da solo, serve un handler.
 if ((Get-FunctionSource 'Start-App') -notmatch 'RequestNavigateEvent') {
     throw "nessun handler per i link: cliccarli non aprirebbe nulla"
@@ -961,6 +968,31 @@ if ([Math]::Abs($cGlyph - $cBorder) -gt 0.6) {
 Set-TabHeaderStyle 'Icon + Text'
 $window.Content.UpdateLayout()
 "OK tabsize altezza uguale nelle tre modalita' ($($heights['Icon'])px), glifo centrato in sola icona"
+
+# 15f) Il testo di About non deve andare a capo da solo: una frase per riga, e ogni frase
+# corta abbastanza da starci anche alla larghezza MINIMA della finestra. Il ritorno a capo
+# automatico spezza a meta' e lascia un mozzicone sulla riga dopo, che e' proprio cio' che
+# le interruzioni esplicite servono a evitare.
+# Si misura l'altezza a due larghezze: se e' la stessa mentre la larghezza cresce, allora a
+# mandare a capo sono solo i LineBreak.
+$prevTab = $TabMain.SelectedItem
+$TabAbout.IsSelected = $true
+$aboutBlock = $TabAbout.Content.Content
+$aboutH = @{}
+foreach ($w in $window.MinWidth, 1400) {
+    $window.Content.Measure([System.Windows.Size]::new($w, 620))
+    $window.Content.Arrange([System.Windows.Rect]::new(0, 0, $w, 620))
+    $window.Content.UpdateLayout()
+    $aboutH[$w] = [Math]::Round($aboutBlock.ActualHeight, 1)
+}
+if ($aboutH[$window.MinWidth] -ne $aboutH[1400]) {
+    throw "il testo di About va a capo da solo alla larghezza minima: $($aboutH[$window.MinWidth])px contro $($aboutH[1400])px"
+}
+$prevTab.IsSelected = $true
+$window.Content.Measure([System.Windows.Size]::new(900, 620))
+$window.Content.Arrange([System.Windows.Rect]::new(0, 0, 900, 620))
+$window.Content.UpdateLayout()
+"OK aboutw About non va a capo da solo a $([int]$window.MinWidth)px ($($aboutH[1400])px di altezza)"
 
 # 15d) ...e sotto di lui il riquadro non deve avere un angolo arrotondato. Con un tab fissato
 # a destra, la curva in alto a destra del riquadro affiorava sotto la linguetta come uno

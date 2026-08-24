@@ -1026,6 +1026,13 @@
                         <!-- Descrizione vera: le cinque funzioni per nome e dove segnalare un
                              problema. Prima era una riga che non diceva quasi niente, e non
                              c'era modo di capire dove finiscono le segnalazioni.
+                             UNA FRASE PER RIGA, e ogni frase corta abbastanza da starci: e'
+                             il testo a capo automatico a spezzarle a meta' lasciando un
+                             mozzicone sulla riga dopo. A finestra molto stretta il ritorno a
+                             capo torna inevitabile, ma alla larghezza minima (760px) le righe
+                             qui sotto ci stanno.
+                             Niente trattini lunghi: i due punti separano meglio e non
+                             lasciano un segno lungo in mezzo alla riga.
                              La nota finale su Claude Code e' volontaria: l'articolo 50
                              dell'AI Act riguarda i sistemi AI e i contenuti generati, non gli
                              strumenti con cui si scrive il codice, e questo programma non
@@ -1034,13 +1041,15 @@
                                    Foreground="{DynamicResource SubtleFgBrush}">
                             WinGet Studio is a desktop front end for <Bold>winget</Bold>, the Windows package manager.<LineBreak/>
                             <LineBreak/>
-                            <Bold>Updates</Bold> &#8212; list what has a newer version and upgrade the packages you tick, one at a time, with a per-row result. A running queue can be cancelled: the package in progress finishes, the rest are left alone.<LineBreak/>
-                            <Bold>Install</Bold> &#8212; search the winget catalogue as you type, optionally the Microsoft Store, and pick the install scope.<LineBreak/>
-                            <Bold>Installed</Bold> &#8212; the inventory of the machine, with a local filter, and uninstall behind a confirmation.<LineBreak/>
-                            <Bold>Pin</Bold> &#8212; block a package from being upgraded, from either list, until you remove the pin.<LineBreak/>
-                            <Bold>Export / Import</Bold> &#8212; save the package list to a .json file and rebuild a machine from it.<LineBreak/>
+                            <Bold>Updates</Bold>: list what has a newer version and upgrade the packages you tick, one at a time.<LineBreak/>
+                            A running queue can be stopped; the package in progress finishes and the rest are left alone.<LineBreak/>
+                            <Bold>Install</Bold>: search the winget catalogue as you type, optionally the Microsoft Store.<LineBreak/>
+                            <Bold>Installed</Bold>: the inventory of the machine, with a local filter and a guarded uninstall.<LineBreak/>
+                            <Bold>Pin</Bold>: block a package from being upgraded, from either list, until you remove the pin.<LineBreak/>
+                            <Bold>Export / Import</Bold>: save the package list to a .json file and rebuild a machine from it.<LineBreak/>
                             <LineBreak/>
-                            It runs elevated, because installing and removing software requires it. No telemetry.<LineBreak/>
+                            It runs elevated, because installing and removing software requires it.<LineBreak/>
+                            No telemetry.<LineBreak/>
                             <LineBreak/>
                             Found a bug, or have an idea?
                             <!-- I link li apre l'handler in Start-App. -->

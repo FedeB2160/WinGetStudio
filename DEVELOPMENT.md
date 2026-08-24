@@ -4,6 +4,11 @@ Everything a change to this codebase needs: layout, build, tests, and the decisi
 
 The **UI and the documentation are in English**; the in-code comments are in Italian. User-facing strings live in `ui\UI.xaml` (labels, column headers) and in the `Write-Log` / `LogUI` / `MessageBox` calls under `src\modules\`.
 
+Two rules for on-screen prose, which the About tab is the only place long enough to break:
+
+- **One sentence per line, each short enough to fit.** Where a block wraps, it is automatic wrapping that splits a sentence and leaves a stub on the next line; an explicit `<LineBreak/>` between sentences reads as a list instead. At a very narrow window wrapping comes back regardless, but the lines must fit at the minimum width (760px).
+- **No em dashes in UI text.** A colon separates a term from its description without leaving a long stroke in the middle of the line. `Test-Ui.ps1` fails on one outside a comment — Italian comments use them freely, and should.
+
 ## Layout
 
 ```
