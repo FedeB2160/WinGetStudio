@@ -6,7 +6,8 @@ The **UI and the documentation are in English**; the in-code comments are in Ita
 
 Two rules for on-screen prose, which the About tab is the only place long enough to break:
 
-- **One sentence per line, each short enough to fit.** Where a block wraps, it is automatic wrapping that splits a sentence and leaves a stub on the next line; an explicit `<LineBreak/>` between sentences reads as a list instead. At a very narrow window wrapping comes back regardless, but the lines must fit at the minimum width (760px).
+- **One sentence per line, each short enough to fit.** Where free prose wraps, it is automatic wrapping that splits a sentence and leaves a stub on the next line; an explicit `<LineBreak/>` between sentences reads as a list instead. At a very narrow window wrapping comes back regardless.
+- **A list of term-and-description belongs in a borderless grid, not in prose.** The About tab holds its five features in a two-column `Grid` named `AboutTable`: names in an `Auto` column, so it is exactly as wide as the longest one and every description starts at the same offset, and descriptions in a `*` column that takes the rest. Inside a cell wrapping is *fine* — the text re-indents under its own description rather than under the name, which is precisely what the prose version could not do. `Test-Ui.ps1` measures the two alignments and that the description column really does grow with the window.
 - **No em dashes in UI text.** A colon separates a term from its description without leaving a long stroke in the middle of the line. `Test-Ui.ps1` fails on one outside a comment — Italian comments use them freely, and should.
 
 ## Layout

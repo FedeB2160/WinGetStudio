@@ -450,9 +450,10 @@ while ($p -and $p -ne $TabSettings) { $p = [System.Windows.LogicalTreeHelper]::G
 if ($p -ne $TabSettings) { throw "la tendina del tema non e' dentro il tab Settings" }
 # E la descrizione dell'app vive nel tab About, non piu' in fondo alle impostazioni.
 if ($TabAbout.Content -isnot [System.Windows.Controls.ScrollViewer]) { throw "il tab About e' vuoto" }
-$aboutText = $TabAbout.Content.Content
-if ($aboutText -isnot [System.Windows.Controls.TextBlock]) { throw "il tab About non contiene il testo" }
-if ($aboutText.Text -notmatch 'front end for') { throw "il tab About non contiene la descrizione" }
+$aboutPanel = $TabAbout.Content.Content
+if ($aboutPanel -isnot [System.Windows.Controls.StackPanel]) { throw "il tab About non contiene il pannello" }
+$aboutIntro = @($aboutPanel.Children | Where-Object { $_ -is [System.Windows.Controls.TextBlock] })[0]
+if ($aboutIntro.Text -notmatch 'front end for') { throw "il tab About non contiene la descrizione" }
 "OK settab $($TabMain.Items.Count) tab, Settings ultimo, Updates selezionato all'avvio"
 
 # Ogni tab ha la sua icona e un tooltip, e cosa la striscia mostra e' una scelta:
@@ -622,8 +623,17 @@ if ($uiMarkup -match 'Margin="120,') { throw "il corpo delle impostazioni usa an
 # ABOUT deve dire COSA fa il programma e DOVE si segnala un problema, non una riga generica.
 if ($uiTextEarly -notmatch 'NavigateUri="https://github\.com/') { throw "ABOUT non ha link a github.com" }
 if ($uiTextEarly -notmatch 'WinGetStudio/issues') { throw "ABOUT non dice dove segnalare un bug" }
+# Le cinque funzioni stanno nella PRIMA COLONNA della tabella, non piu' in grassetto in mezzo
+# a un blocco di prosa: e' li' che l'occhio le cerca.
+$nomiFunzioni = @($AboutTable.Children |
+    Where-Object { [System.Windows.Controls.Grid]::GetColumn($_) -eq 0 } |
+    ForEach-Object { $_.Text })
 foreach ($w in 'Updates', 'Install', 'Installed', 'Pin', 'Export / Import') {
-    if ($uiTextEarly -notmatch "<Bold>$([regex]::Escape($w))</Bold>") { throw "ABOUT non elenca la funzione $w" }
+    if ($nomiFunzioni -notcontains $w) { throw "ABOUT non elenca la funzione $w (trovate: $($nomiFunzioni -join ', '))" }
+}
+$descrizioni = @($AboutTable.Children | Where-Object { [System.Windows.Controls.Grid]::GetColumn($_) -eq 1 })
+if ($descrizioni.Count -ne $nomiFunzioni.Count) {
+    throw "la tabella di About ha $($nomiFunzioni.Count) nomi e $($descrizioni.Count) descrizioni"
 }
 if ($uiTextEarly -notmatch 'Claude Code') { throw "manca la nota sullo strumento con cui e' stato scritto" }
 if ($uiTextEarly -notmatch 'github\.com/FedeB2160"') { throw "ABOUT non dice chi ha fatto il progetto" }
@@ -969,30 +979,37 @@ Set-TabHeaderStyle 'Icon + Text'
 $window.Content.UpdateLayout()
 "OK tabsize altezza uguale nelle tre modalita' ($($heights['Icon'])px), glifo centrato in sola icona"
 
-# 15f) Il testo di About non deve andare a capo da solo: una frase per riga, e ogni frase
-# corta abbastanza da starci anche alla larghezza MINIMA della finestra. Il ritorno a capo
-# automatico spezza a meta' e lascia un mozzicone sulla riga dopo, che e' proprio cio' che
-# le interruzioni esplicite servono a evitare.
-# Si misura l'altezza a due larghezze: se e' la stessa mentre la larghezza cresce, allora a
-# mandare a capo sono solo i LineBreak.
+# 15f) La tabella di About allinea davvero: tutti i nomi partono dalla stessa ascissa e
+# tutte le descrizioni dalla stessa, a qualunque larghezza di finestra. E' cio' che un blocco
+# di prosa non poteva dare, con i nomi in mezzo alle frasi.
+# La colonna dei nomi e' Auto — larga quanto il nome piu' lungo e non un pixel di piu' — e
+# quella delle descrizioni elastica: se la seconda non crescesse con la finestra, la tabella
+# starebbe tutta a sinistra con meta' riga vuota a destra.
 $prevTab = $TabMain.SelectedItem
 $TabAbout.IsSelected = $true
-$aboutBlock = $TabAbout.Content.Content
-$aboutH = @{}
+$larghezzeCelle = @{}
 foreach ($w in $window.MinWidth, 1400) {
     $window.Content.Measure([System.Windows.Size]::new($w, 620))
     $window.Content.Arrange([System.Windows.Rect]::new(0, 0, $w, 620))
     $window.Content.UpdateLayout()
-    $aboutH[$w] = [Math]::Round($aboutBlock.ActualHeight, 1)
+    $xNomi = @(); $xDesc = @(); $wDesc = @()
+    foreach ($c in $AboutTable.Children) {
+        $x = [Math]::Round($c.TranslatePoint([System.Windows.Point]::new(0, 0), $AboutTable).X, 1)
+        if ([System.Windows.Controls.Grid]::GetColumn($c) -eq 0) { $xNomi += $x }
+        else { $xDesc += $x; $wDesc += [Math]::Round($c.ActualWidth, 0) }
+    }
+    if (@($xNomi | Sort-Object -Unique).Count -ne 1) { throw "a $w px i nomi non sono allineati: $($xNomi -join ', ')" }
+    if (@($xDesc | Sort-Object -Unique).Count -ne 1) { throw "a $w px le descrizioni non sono allineate: $($xDesc -join ', ')" }
+    $larghezzeCelle[$w] = @($wDesc | Sort-Object -Unique)[0]
 }
-if ($aboutH[$window.MinWidth] -ne $aboutH[1400]) {
-    throw "il testo di About va a capo da solo alla larghezza minima: $($aboutH[$window.MinWidth])px contro $($aboutH[1400])px"
+if ($larghezzeCelle[1400] -le $larghezzeCelle[$window.MinWidth]) {
+    throw "la colonna delle descrizioni non si allarga con la finestra: $($larghezzeCelle[$window.MinWidth])px contro $($larghezzeCelle[1400])px"
 }
 $prevTab.IsSelected = $true
 $window.Content.Measure([System.Windows.Size]::new(900, 620))
 $window.Content.Arrange([System.Windows.Rect]::new(0, 0, 900, 620))
 $window.Content.UpdateLayout()
-"OK aboutw About non va a capo da solo a $([int]$window.MinWidth)px ($($aboutH[1400])px di altezza)"
+"OK abouttab tabella About allineata, descrizioni da $($larghezzeCelle[$window.MinWidth]) a $($larghezzeCelle[1400])px"
 
 # 15d) ...e sotto di lui il riquadro non deve avere un angolo arrotondato. Con un tab fissato
 # a destra, la curva in alto a destra del riquadro affiorava sotto la linguetta come uno

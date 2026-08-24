@@ -1023,49 +1023,93 @@
                          AutomationProperties.Name="About"
                          ToolTip="What this app does, where to report a bug, and the licence">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <!-- Descrizione vera: le cinque funzioni per nome e dove segnalare un
-                             problema. Prima era una riga che non diceva quasi niente, e non
-                             c'era modo di capire dove finiscono le segnalazioni.
-                             UNA FRASE PER RIGA, e ogni frase corta abbastanza da starci: e'
-                             il testo a capo automatico a spezzarle a meta' lasciando un
-                             mozzicone sulla riga dopo. A finestra molto stretta il ritorno a
-                             capo torna inevitabile, ma alla larghezza minima (760px) le righe
-                             qui sotto ci stanno.
-                             Niente trattini lunghi: i due punti separano meglio e non
-                             lasciano un segno lungo in mezzo alla riga.
-                             La nota finale su Claude Code e' volontaria: l'articolo 50
-                             dell'AI Act riguarda i sistemi AI e i contenuti generati, non gli
-                             strumenti con cui si scrive il codice, e questo programma non
-                             contiene nessun sistema AI. Sta qui perche' e' vero. -->
-                        <TextBlock TextWrapping="Wrap"
-                                   Foreground="{DynamicResource SubtleFgBrush}">
-                            WinGet Studio is a desktop front end for <Bold>winget</Bold>, the Windows package manager.<LineBreak/>
-                            <LineBreak/>
-                            <Bold>Updates</Bold>: list what has a newer version and upgrade the packages you tick, one at a time.<LineBreak/>
-                            A running queue can be stopped; the package in progress finishes and the rest are left alone.<LineBreak/>
-                            <Bold>Install</Bold>: search the winget catalogue as you type, optionally the Microsoft Store.<LineBreak/>
-                            <Bold>Installed</Bold>: the inventory of the machine, with a local filter and a guarded uninstall.<LineBreak/>
-                            <Bold>Pin</Bold>: block a package from being upgraded, from either list, until you remove the pin.<LineBreak/>
-                            <Bold>Export / Import</Bold>: save the package list to a .json file and rebuild a machine from it.<LineBreak/>
-                            <LineBreak/>
-                            It runs elevated, because installing and removing software requires it.<LineBreak/>
-                            No telemetry.<LineBreak/>
-                            <LineBreak/>
-                            Found a bug, or have an idea?
-                            <!-- I link li apre l'handler in Start-App. -->
-                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues"
-                                       Foreground="{DynamicResource AccentBrush}">Open an issue on GitHub</Hyperlink>.<LineBreak/>
-                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio"
-                                       Foreground="{DynamicResource AccentBrush}">Source code</Hyperlink> &#183;
-                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases"
-                                       Foreground="{DynamicResource AccentBrush}">Release notes</Hyperlink> &#183;
-                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE"
-                                       Foreground="{DynamicResource AccentBrush}">MIT licence</Hyperlink><LineBreak/>
-                            <LineBreak/>
-                            Made by <Hyperlink NavigateUri="https://github.com/FedeB2160"
-                                       Foreground="{DynamicResource AccentBrush}">FedeB2160</Hyperlink>,
-                            with the help of <Italic>Claude Code</Italic> (Anthropic).
-                        </TextBlock>
+                        <!-- ABOUT. Le cinque funzioni stanno in una TABELLA SENZA BORDI: una Grid
+                             a due colonne, nome a sinistra e descrizione a destra. In un blocco di
+                             prosa unico i nomi finivano in mezzo alle frasi e l'occhio non trovava
+                             dove comincia una funzione e dove finisce l'altra.
+                             Colonna dei nomi Auto: larga quanto il nome piu' lungo e non un pixel
+                             di piu', cosi' le descrizioni partono tutte dalla stessa ascissa.
+                             Colonna delle descrizioni elastica: prende tutto il resto. Una cella
+                             che va a capo rientra sotto la propria descrizione e non sotto il
+                             nome, ed e' il motivo per cui qui il ritorno a capo non e' un
+                             problema mentre nella prosa libera lo e'.
+                             Nomi in FgBrush e descrizioni in SubtleFgBrush: la gerarchia la fa il
+                             tono, non un bordo.
+                             La nota finale su Claude Code e' volontaria: l'articolo 50 dell'AI Act
+                             riguarda i sistemi AI e i contenuti generati, non gli strumenti con
+                             cui si scrive il codice, e questo programma non contiene nessun
+                             sistema AI. Sta qui perche' e' vero. -->
+                        <StackPanel>
+                            <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource SubtleFgBrush}"
+                                       Text="WinGet Studio is a desktop front end for winget, the Windows package manager."/>
+
+                            <Grid x:Name="AboutTable" Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Updates" FontWeight="SemiBold"
+                                           Margin="0,0,14,8" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource SubtleFgBrush}">
+                                    List what has a newer version and upgrade the packages you tick, one at a time.<LineBreak/>
+                                    A running queue can be stopped: the package in progress finishes, the rest are left alone.
+                                </TextBlock>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Install" FontWeight="SemiBold"
+                                           Margin="0,0,14,8" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource SubtleFgBrush}"
+                                           Text="Search the winget catalogue as you type, optionally the Microsoft Store, and pick the install scope."/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Installed" FontWeight="SemiBold"
+                                           Margin="0,0,14,8" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource SubtleFgBrush}"
+                                           Text="The inventory of the machine, with a local filter and an uninstall behind a confirmation."/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Pin" FontWeight="SemiBold"
+                                           Margin="0,0,14,8" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource SubtleFgBrush}"
+                                           Text="Block a package from being upgraded, from either list, until you remove the pin."/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Export / Import" FontWeight="SemiBold"
+                                           Margin="0,0,14,0" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource SubtleFgBrush}"
+                                           Text="Save the package list to a .json file and rebuild a machine from it."/>
+                            </Grid>
+
+                            <TextBlock TextWrapping="Wrap" Margin="0,18,0,0"
+                                       Foreground="{DynamicResource SubtleFgBrush}">
+                                It runs elevated, because installing and removing software requires it.<LineBreak/>
+                                No telemetry.<LineBreak/>
+                                <LineBreak/>
+                                Found a bug, or have an idea?
+                                <!-- I link li apre l'handler in Start-App. -->
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues"
+                                           Foreground="{DynamicResource AccentBrush}">Open an issue on GitHub</Hyperlink>.<LineBreak/>
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio"
+                                           Foreground="{DynamicResource AccentBrush}">Source code</Hyperlink> &#183;
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases"
+                                           Foreground="{DynamicResource AccentBrush}">Release notes</Hyperlink> &#183;
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE"
+                                           Foreground="{DynamicResource AccentBrush}">MIT licence</Hyperlink><LineBreak/>
+                                <LineBreak/>
+                                Made by <Hyperlink NavigateUri="https://github.com/FedeB2160"
+                                           Foreground="{DynamicResource AccentBrush}">FedeB2160</Hyperlink>,
+                                with the help of <Italic>Claude Code</Italic> (Anthropic).
+                            </TextBlock>
+                        </StackPanel>
                     </ScrollViewer>
                 </TabItem>
 

@@ -161,7 +161,7 @@ function Start-App([switch]$NoShow) {
         'BtnExport', 'BtnImport',
         'CmbTheme', 'TxtThemeHint', 'TxtVersion', 'BtnCheckUpdate', 'BtnUpdateApp',
         'UpdateSpinner', 'TxtUpdateStatus', 'ChkAutoCheck', 'CmbTabStyle',
-        'TabAbout',
+        'TabAbout', 'AboutTable',
         'TabInstall', 'TabInstalled', 'TabUpdates', 'TabSettings'
     )) {
         $c = $script:window.FindName($n)
