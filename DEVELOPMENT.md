@@ -41,7 +41,7 @@ assets\icon.ico                 app icon (embedded in the exe)
 tests\ Test-Ui.ps1              headless check of code, XAML, themes and startup
        Test-InvokeWinGet.ps1    winget execution and table parsing
 dist\  WinGetStudio.exe         build output (signed, gitignored)
-winget\1.9.0\                   winget-pkgs manifests for the published version
+winget\<version>\               winget-pkgs manifests, one folder per published version
 graphify-out\                   knowledge graph (report, graph.json and graph.html committed)
 ```
 
