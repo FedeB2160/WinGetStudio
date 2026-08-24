@@ -1,22 +1,15 @@
+# Created using wingetcreate 1.12.13.0
 # yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
 
 PackageIdentifier: FedeB2160.WinGetStudio
 PackageVersion: 1.10.0
-
-# portable: l'asset e' un eseguibile singolo, non un installer. winget lo copia nei suoi
-# percorsi e crea l'alias qui sotto nel PATH.
-InstallerType: portable
-# Il binario prodotto da ps2exe e' x86 e gira anche su x64 tramite WOW64.
 InstallerLocale: en-US
-ReleaseDate: 2026-08-24
-
+InstallerType: portable
+ElevationRequirement: elevatesSelf
 Installers:
-  - Architecture: x86
-    InstallerUrl: https://github.com/FedeB2160/WinGetStudio/releases/download/v1.10.0/WinGetStudio.exe
-    InstallerSha256: 48A5B5A73FB5AF1CDD7400EA2B4B8A80DFBA75948E6668AEC1E1B875B6ABBF1F
-    # L'exe ha un manifest requireAdministrator: si eleva da solo all'avvio, quindi
-    # l'installazione NON richiede privilegi, l'esecuzione si.
-    ElevationRequirement: elevatesSelf
-
+- Architecture: x86
+  InstallerUrl: https://github.com/FedeB2160/WinGetStudio/releases/download/v1.10.0/WinGetStudio.exe
+  InstallerSha256: 48A5B5A73FB5AF1CDD7400EA2B4B8A80DFBA75948E6668AEC1E1B875B6ABBF1F
 ManifestType: installer
 ManifestVersion: 1.12.0
+ReleaseDate: 2026-08-24

@@ -160,12 +160,17 @@ To install from them locally first, winget needs a feature enabled from an eleva
 
 `wingetcreate update FedeB2160.WinGetStudio --version 1.10.0 --urls <url> --submit` does all of this in one command for subsequent versions, once the package exists in the repository.
 
+It does **not** submit `winget\<version>\`, though. It downloads the manifest of the last published version, bumps the version, the URL, the hash and the date, and submits that. Everything version-specific in the local folder is lost, comments included, and `ReleaseNotes` is dropped because the previous version's notes no longer apply. The validator then compares the result against the published version and fails with `Missing property ReleaseNotes`, so the block has to be added back on the fork branch after the pull request exists. It also invents a `Documentations` entry pointing at the repository wiki, which has no pages.
+
+The local folder is therefore the source of the text, not of the submission. After the pull request is open, copy back what was actually submitted so the two agree.
+
 **Notes on the manifest**
 
 - `InstallerType: portable` — the asset is a bare executable, so winget copies it and puts an alias on the PATH rather than running an installer.
 - `Architecture: x86` — that is what ps2exe produces by default; it runs on x64 through WOW64.
 - `ElevationRequirement: elevatesSelf` — the exe carries a `requireAdministrator` manifest, so *installing* needs no privileges while *running* asks for them.
-- `PortableCommandAlias` is rejected by the validator as an unknown field, so the alias is left to winget (derived from the file name) and `Commands` is declared in the locale manifest instead.
+- `PortableCommandAlias` is rejected by the validator as an unknown field, so the alias is left to winget, which derives it from the file name.
+- `Commands` was declared in the locale manifest sent for 1.9.0 but is absent from the published 1.9.0, so it is gone from 1.10.0 too. Nothing depends on it: it only feeds searching a package by the command it provides.
 - Every value with a `:` inside must be quoted, or the YAML parser fails — `ShortDescription` is the one that bites.
 
 **Once the package is in the repository**, WinGet Studio will appear in its own Updates tab. Upgrading it from there cannot work — the file is in use — so it needs excluding from that list, or routing to the self-update path, which does the rename dance.
