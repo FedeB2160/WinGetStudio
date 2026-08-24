@@ -1,28 +1,52 @@
 # Changelog
 
-## Unreleased
+## v1.10.0
 
-- Settings is a tab pinned to the right of the strip instead of an overlay covering the window, so the progress bar and the log stay visible while you are in it. The gear button, the close button and Esc are gone with it. The three functional tabs are in alphabetical order — Install, Installed, Updates — and Updates is still the view the app opens on.
-- The *Update to vX.Y.Z* button is readable in the dark theme: its label was white on the accent colour, which measured 2.01:1 there. The light theme's warning glyph was also below the threshold and has been darkened. Every foreground/background pair in both themes is now measured by the test suite.
-- The scrollbars follow the theme. In the dark theme they used to stay white — the last piece of the window that Windows still painted its own way — because the system template hardcodes light colours and ignores what the app asks for.
-- The status icons in the RESULT column carry accessible names, so a screen reader announces "Succeeded" or "Failed" instead of reading out the character code behind the icon.
-- **The light theme has structure again.** Buttons, text boxes, the log and the tabs used to sit on a white page with an almost-white fill and a hairline border, so they were nearly invisible — and a disabled button vanished completely. The page is now a light grey with white controls on top of it, the way Windows 11 does it, and the border that marks an interactive control is a separate, stronger colour from the grid lines. Disabled buttons keep their outline and only dim their label.
-- **Fixed: two winget processes at once.** Typing in Install and switching straight to Installed could run `winget search` and `winget list` together, which is how a winget command ends up failing for no visible reason. A search now counts as winget work like everything else, and the update, install, uninstall and pin queues all pass through a single place that takes the busy state and refuses to start a second process.
-- The theme dropdown offers **System** where it used to say `Auto`, which says what it follows instead of leaving you to guess. A theme saved as `Auto` by an earlier version falls back to the default, which is System — the same behaviour under the other name.
-- Internal hardening: every winget invocation now uses the path resolved once at startup rather than looking the name up on each call, and a command line whose quotes do not balance is refused instead of being run.
-- **F5** rescans the active tab and **Ctrl+F** jumps to the search box.
-- The context menu entries say they act on the **highlighted** rows rather than the ticked ones. That was always true and always documented only in the code, which nobody reads with the right mouse button held down.
+Coming from v1.9.0: download the new exe and delete the old one, or let the app update itself from **Settings**. Your theme carries over; if it was set to `Auto` it becomes `System`, which is the same thing under a name that says what it does.
+
+### Settings and About are tabs now
+
+The gear button and the full-window overlay behind it are gone. **Settings** and **About** are tabs at the right end of the strip, so the progress bar and the log stay visible while you are in them — the overlay used to cover exactly the part of the window that tells you how an operation is going.
+
+The three functional tabs are in alphabetical order, **Install | Installed | Updates**, and Updates is still the view the app opens on, since that is what the startup scan fills.
+
+Every tab has an icon and a tooltip, and **Tab strip** in Settings chooses whether the strip shows the icon, the name, or both.
+
+**About** says what the app actually does: the five features in a table, name and description aligned, followed by links to the source, the release notes, the licence and where to report a bug.
+
+### Updates you can stop, and a list that stops lying
+
+**Update** turns into **Cancel** while its own queue runs. Cancelling lets the package in flight finish and then stops: nothing is killed halfway through an installer, and the packages that never ran keep their tick and an empty result.
+
+After an update, an install, an uninstall or an import, **Update** locks until the next **Check**, and the counter says why. Pressing it again used to re-run winget on packages that were already current, which exits non-zero and painted a red cross over rows that had in fact succeeded. Pins do not lock it: a pin blocks upgrades, it does not change installed versions.
+
+While a queue runs the ticks and the pin entries are visibly disabled rather than merely refusing to work, and the lists still scroll. They were blocked before; they just did not look it.
+
+### Fixed: two winget processes at once
+
+Typing in **Install** and switching straight to **Installed** could run `winget search` and `winget list` at the same time, which is how a winget command ends up failing for no visible reason. A search counts as winget work like everything else now, and the update, install, uninstall and pin queues all pass through a single place that takes the busy state and refuses to start a second process.
+
+### The light theme has structure again
+
+Buttons, text boxes, the log and the tabs sat on a white page with an almost-white fill and a hairline border, so they were nearly invisible — and a disabled button vanished completely. The page is a light grey with white controls on it now, the way Windows 11 does it, the border that marks an interactive control is a stronger colour than the grid lines, and a disabled button keeps its outline and only dims its label.
+
+The **Update to vX.Y.Z** button is readable in the dark theme: its label was white on the accent colour, which measured 2.01:1 there. The light theme's warning glyph was below the threshold too and has been darkened. Every foreground/background pair in both themes is measured by the test suite now, so this cannot come back quietly.
+
+The scrollbars follow the theme. In the dark theme they used to stay white, the last piece of the window that Windows still painted its own way.
+
+### Your choices are remembered
+
+**Unknown**, **MS Store** and **Scope** used to reset at every launch while the theme did not. They persist now, and ticking **Unknown** rescans immediately instead of quietly applying to the next check.
+
+The startup check for a new release can be turned off, from **Check for updates at startup**. It is on by default, as it always was; the point is that a program going online by itself should say so and leave you the choice.
+
+### Smaller things
+
+- **F5** rescans the active tab, **Ctrl+F** jumps to the search box.
 - The progress bar goes **indeterminate while scanning** rather than sitting at zero, which looked like something stuck. It shows real progress only for a queue, which knows how many packages it has.
-- The tabs are less padded and the gap between an icon and its name is wider: it used to be 18px of air at the sides against 4px in the middle.
-- The Settings rows have even spacing, the dropdowns are as wide as their longest value instead of a fixed 180px, and **About** names who made the project.
-- Every tab has an icon and a tooltip, and **Tab strip** in Settings chooses whether the strip shows the icon, the name, or both. Settings used to be the only tab with a glyph, which made it look like a different kind of thing rather than the last tab.
-- The startup check for a new release can be turned off, from **Check for updates at startup** in Settings. It is on by default, as it always was; the point is that a program going online by itself should at least say so and let you decide.
-- **About** is its own tab at the right end of the strip. The five things the app does are laid out as a table — name on the left, description on the right, aligned and without borders — followed by links to the source, the release notes, the licence and where to report a bug. The settings rows are laid out on a grid instead of being aligned by hand with fixed widths, so a longer label cannot break the column any more.
-- **Unknown**, **MS Store** and **Scope** are remembered between launches. They used to reset every time, while the theme did not. Ticking **Unknown** also rescans immediately instead of quietly applying to the next check.
-- **Update** turns into **Cancel** while its own queue runs. Cancelling lets the package in flight finish and then stops: nothing is killed halfway through an installer, and the packages that never ran keep their tick and an empty result.
-- After an update, an install, an uninstall or an import, **Update** locks until the next **Check**. Pressing it again used to re-run winget on packages that were already current, which exits non-zero and painted a red cross over rows that had in fact succeeded; the counter now says why the button is greyed. Pins do not lock it: a pin blocks upgrades, it does not change installed versions.
-- While a queue runs, the ticks and the pin entries are visibly disabled instead of merely refusing to work — and the lists still scroll. They were blocked before, they just did not look it.
-- The Settings tab sits flush with the content frame, with no step under it. It used to be 2px short of the frame, and the frame's rounded top-right corner showed through beneath it.
+- The context menu entries say they act on the **highlighted** rows rather than the ticked ones. That was always true and documented only in the code, which nobody reads with the right mouse button held down.
+- The status icons in the Result column carry accessible names, so a screen reader announces "Succeeded" or "Failed" instead of the character code behind the icon.
+- Internally: every winget invocation uses the path resolved once at startup rather than looking the name up on each call, and a command line whose quotes do not balance is refused instead of being run.
 
 ## v1.9.0
 
