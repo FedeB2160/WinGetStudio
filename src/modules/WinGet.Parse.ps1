@@ -112,6 +112,12 @@ function Get-WinGetTable([string]$raw, [int]$MaxColumns = 0) {
     return $results
 }
 
+# $wingetPath: il percorso risolto UNA VOLTA da Get-WinGetPath, passato nelle -Vars del job.
+# NON "& winget": quella forma risolve il NOME a ogni chiamata, quindi dipende dal PATH e
+# dall'alias di esecuzione app, che sotto un account elevato diverso da quello interattivo
+# possono non esserci. Get-WinGetPath esiste per non dipenderne, e usarlo in una via su
+# cinque era la premessa di un errore incomprensibile.
+#
 # Ricerca nel catalogo. Colonne: Nome | Id | Versione | [Corrispondenza] | [Origine] —
 # si usano solo le prime tre, le altre compaiono o no a seconda del risultato.
 #
@@ -123,7 +129,7 @@ function Get-WinGetSearch([string]$Query, [bool]$IncludeStore = $false, [int]$Co
     if ([string]::IsNullOrWhiteSpace($Query)) { return @() }
     $wgArgs = @('search', $Query, '--count', "$Count", '--accept-source-agreements')
     if (-not $IncludeStore) { $wgArgs += @('--source', 'winget') }
-    $raw = & winget @wgArgs 2>&1 | Out-String -Width 4096
+    $raw = & $wingetPath @wgArgs 2>&1 | Out-String -Width 4096
 
     $results = New-Object System.Collections.ArrayList
     foreach ($f in Get-WinGetTable $raw) {
@@ -142,7 +148,7 @@ function Get-WinGetSearch([string]$Query, [bool]$IncludeStore = $false, [int]$Co
 # Senza pin configurati winget stampa una frase e nessuna tabella, quindi esce un array
 # vuoto senza casi speciali.
 function Get-WinGetPins {
-    $raw = & winget pin list --accept-source-agreements 2>&1 | Out-String -Width 4096
+    $raw = & $wingetPath pin list --accept-source-agreements 2>&1 | Out-String -Width 4096
     $ids = New-Object System.Collections.ArrayList
     # -MaxColumns 3 e' obbligatorio: l'ultima intestazione ("Tipo di pin") contiene spazi
     # e senza il limite ogni riga verrebbe scartata come disallineata.
@@ -156,7 +162,7 @@ function Get-WinGetPins {
 # di tipo "ARP\Machine\X64\Nome Prodotto" (con spazi dentro, del tutto legittimi) e
 # Origine vuota.
 function Get-WinGetInstalled {
-    $raw = & winget list --accept-source-agreements 2>&1 | Out-String -Width 4096
+    $raw = & $wingetPath list --accept-source-agreements 2>&1 | Out-String -Width 4096
 
     $results = New-Object System.Collections.ArrayList
     foreach ($f in Get-WinGetTable $raw) {
@@ -181,7 +187,7 @@ function Get-WinGetUpgrades([bool]$IncludeUnknown = $false) {
     if ($IncludeUnknown) { $wgArgs += '--include-unknown' }
     # -Width alto: senza console (exe -noConsole) o con finestra stretta Out-String
     # manderebbe a capo le righe alla larghezza dell'host, spezzando la tabella.
-    $raw = & winget @wgArgs 2>&1 | Out-String -Width 4096
+    $raw = & $wingetPath @wgArgs 2>&1 | Out-String -Width 4096
 
     $results = New-Object System.Collections.ArrayList
     foreach ($f in Get-WinGetTable $raw) {

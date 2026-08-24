@@ -108,8 +108,10 @@ if (-not ('WgtRow' -as [type])) {
     Add-Type -TypeDefinition 'public class WgtRow {
         public bool Selected, Pinned; public string Name, Version, Available, Id, Status, StatusDetail; }'
 }
-# Stub di winget: il parser fa "& winget @wgArgs", quindi una funzione con questo nome
-# ha la precedenza sull'eseguibile e nessuna modifica al codice di produzione serve.
+# Stub di winget: il parser fa "& $wingetPath @wgArgs", e col NOME NUDO quella forma cerca
+# ancora un COMANDO, dove una funzione vince sull'eseguibile. Nessuna modifica al codice di
+# produzione serve; con un percorso assoluto lo stub non verrebbe raggiunto.
+$wingetPath = 'winget'
 function winget { $fixture }
 # Get-WinGetTable serve perche' Get-WinGetUpgrades la chiama.
 Invoke-Expression (Get-FunctionText 'Get-WinGetTable')
@@ -210,6 +212,19 @@ Check "ID corretti (7zip.7zip, VideoLAN.VLC)" `
 # La riproduzione del bug: senza il limite, l'intestazione con spazi fa perdere le righe.
 $prNoLimit = @(Get-WinGetTable $pinFixture)
 Check "senza -MaxColumns la tabella si perde (era il bug: $($prNoLimit.Count) righe)" ($prNoLimit.Count -lt 2)
+
+# ------------------------------------------------------------------
+Write-Host "`n7) Argomenti con apici sbilanciati" -ForegroundColor Cyan
+# La riga di comando si costruisce per concatenazione e la esegue cmd: un Id che contenesse
+# un apice doppio produrrebbe un comando malformato, che cmd eseguirebbe comunque. Gli Id
+# vengono dal catalogo e dal registro ARP, dove il nome lo scrive l'installer, e questo
+# processo gira elevato: meglio fermarsi con un errore chiaro.
+$threw = $false
+try { Invoke-WinGet 'cmd.exe' '/c echo "sbilanciato' } catch { $threw = $true }
+Check "apici sbilanciati rifiutati invece di eseguiti" $threw
+# E il caso normale non deve rompersi: gli apici bilanciati passano.
+$ok = Invoke-WinGet 'cmd.exe' '/c echo "bilanciato"'
+Check "apici bilanciati eseguiti (output '$($ok.Output.Trim())')" ($ok.Output -match 'bilanciato')
 
 # ------------------------------------------------------------------
 if ($failures -eq 0) { Write-Host "`nTutti i test passati.`n" -ForegroundColor Green; exit 0 }

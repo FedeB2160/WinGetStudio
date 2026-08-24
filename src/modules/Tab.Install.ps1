@@ -80,7 +80,7 @@ function Start-Search([bool]$IncludeStore = $false) {
     # butta. Senza questo, due ricerche che rientrano fuori ordine lascerebbero in
     # griglia i risultati della query precedente.
     [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetSearch' `
-        -Vars @{ q = $q; store = $IncludeStore } `
+        -Vars @{ q = $q; store = $IncludeStore; wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{ Query = $q; Rows = @(Get-WinGetSearch $q $store) }
         } `

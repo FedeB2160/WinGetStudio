@@ -229,6 +229,20 @@ $undef = @($needed | Sort-Object -Unique | Where-Object { $defined -notcontains 
 if ($undef) { throw "l'app chiama funzioni che nessun modulo definisce: $($undef -join ', ')" }
 "OK link   $(@($needed | Sort-Object -Unique).Count) funzioni richieste dall'avvio, tutte definite"
 
+# 7d) I comandi di LETTURA usano il percorso risolto, non il nome nudo, e ogni job che li
+# chiama glielo passa. Dimenticare una -Vars non da' errore: dentro il runspace $wingetPath
+# e' $null, la lettura torna vuota e sembra che winget non abbia trovato niente.
+$parseText = Get-Content (Join-Path $root 'src\modules\WinGet.Parse.ps1') -Raw
+if ($parseText -match '(?m)^\s*\$raw = & winget\b') {
+    throw "un comando di lettura usa ancora il nome nudo invece di `$wingetPath"
+}
+foreach ($fn in 'Load-Upgrades', 'Load-Installed', 'Start-Search', 'Update-PinFlags') {
+    if ((Get-FunctionSource $fn) -notmatch 'wingetPath\s*=\s*\$wingetPath') {
+        throw "$fn non passa `$wingetPath nelle -Vars del job: la lettura tornerebbe vuota"
+    }
+}
+"OK wgpath  4 comandi di lettura sul percorso risolto, 4 job che glielo passano"
+
 # 7c) Il file che ps2exe ricevera' e' valido? L'exe segue un percorso di caricamento
 # DIVERSO dal .ps1 (codice concatenato invece di dot-source) e un errore la' si
 # vedrebbe solo al doppio clic.

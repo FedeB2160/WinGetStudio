@@ -31,6 +31,7 @@ function Set-PinFlags([string[]]$PinIds) {
 # comparire comunque, ed e' winget la fonte di verita'.
 function Update-PinFlags {
     [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetPins' `
+        -Vars @{ wingetPath = $wingetPath } `
         -Script { Get-WinGetPins } `
         -OnDone {
             param($result)

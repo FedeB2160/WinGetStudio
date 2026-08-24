@@ -119,7 +119,7 @@ function Load-Upgrades {
     # insieme si contendono lo store e il comando esce in errore.
     # [void]: Start-BackgroundJob torna il job, che altrimenti finirebbe sulla pipeline.
     [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetUpgrades', 'Get-WinGetPins' `
-        -Vars @{ incUnknown = [bool]$ChkUnknown.IsChecked } `
+        -Vars @{ incUnknown = [bool]$ChkUnknown.IsChecked; wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{
                 Rows = @(Get-WinGetUpgrades $incUnknown)

@@ -79,6 +79,7 @@ function Load-Installed {
     # I pin si leggono nello STESSO job dell'inventario: due winget in parallelo si
     # contendono lo store e uno dei due esce in errore.
     [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetInstalled', 'Get-WinGetPins' `
+        -Vars @{ wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{
                 Rows = @(Get-WinGetInstalled)
