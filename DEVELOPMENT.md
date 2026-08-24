@@ -113,11 +113,11 @@ The update check reads the **latest** release of the repo, so publishing one is 
 
 1. Bump `$AppVersion` in `src\main.ps1` and rebuild — the build signs the exe.
 2. Update `CHANGELOG.md`, commit, push.
-3. Tag: `git tag v1.9.0 && git push origin v1.9.0`.
+3. Tag: `git tag v1.10.0 && git push origin v1.10.0`.
 4. On GitHub → **Releases** → *Draft a new release*, pick the tag, paste the changelog entry, and attach `dist\WinGetStudio.exe` as an asset.
 5. Publish. GitHub computes the SHA-256 of the asset by itself, and that is what the app verifies the download against.
 
-**Tag and `$AppVersion` must agree**: the app compares the tag (`v1.9.0`) with its own constant, so a mismatch means it either keeps proposing an update already installed, or never proposes one.
+**Tag and `$AppVersion` must agree**: the app compares the tag (`v1.10.0`) with its own constant, so a mismatch means it either keeps proposing an update already installed, or never proposes one.
 
 **Builds are not reproducible.** Compiling the same source twice produces two different binaries — ps2exe writes variable metadata into the PE and each signature carries a fresh timestamp — identical in size but not in hash. So a published asset **cannot** be validated by rebuilding and comparing hashes; what is verifiable is the SHA-256 GitHub publishes with the asset (which is what the app checks on download) and the Authenticode signature.
 
@@ -146,16 +146,16 @@ Manifests live in `winget\<version>\` — three files, as the community reposito
 Validate before opening anything (this is the same validator the moderators run):
 
 ```powershell
-winget validate --manifest .\winget\1.9.0
+winget validate --manifest .\winget\1.10.0
 ```
 
-To install from them locally first, winget needs a feature enabled from an elevated prompt — `winget settings --enable LocalManifestFiles` — then `winget install --manifest .\winget\1.9.0`. Not strictly needed: the winget-pkgs CI installs and uninstalls the package in a sandbox on every pull request.
+To install from them locally first, winget needs a feature enabled from an elevated prompt — `winget settings --enable LocalManifestFiles` — then `winget install --manifest .\winget\1.10.0`. Not strictly needed: the winget-pkgs CI installs and uninstalls the package in a sandbox on every pull request.
 
 **Opening the pull request**
 
 1. Fork `microsoft/winget-pkgs`.
 2. Copy the folder to `manifests\f\FedeB2160\WinGetStudio\<version>\` (first letter of the publisher, then publisher, package, version).
-3. Commit, push, open the PR against `master`. The title convention is `New version: FedeB2160.WinGetStudio version 1.9.0`.
+3. Commit, push, open the PR against `master`. The title convention is `New version: FedeB2160.WinGetStudio version 1.10.0`.
 4. Automated validation runs first (schema, URL reachable, hash, sandbox install). A human moderator then reviews it; the first submission of a new package takes longer than later updates.
 
 `wingetcreate update FedeB2160.WinGetStudio --version 1.10.0 --urls <url> --submit` does all of this in one command for subsequent versions, once the package exists in the repository.

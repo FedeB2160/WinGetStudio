@@ -11,7 +11,15 @@ Light and dark theme, no telemetry, no branding, a single `.exe` with nothing to
 
 ## Getting it
 
-Download `WinGetStudio.exe` from the [latest release](https://github.com/FedeB2160/WinGetStudio/releases) and run it. There is no installer and nothing is written outside the registry key holding your theme preference.
+Download `WinGetStudio.exe` from the [latest release](https://github.com/FedeB2160/WinGetStudio/releases) and run it. There is no installer and nothing is written outside the registry key holding your preferences.
+
+It is also in the winget catalogue:
+
+```powershell
+winget install FedeB2160.WinGetStudio
+```
+
+That copies the executable and puts an alias on the PATH, so `WinGetStudio` starts it from any terminal. It creates **no desktop or Start menu shortcut**: a portable package cannot, and the request to allow it is still open upstream as [winget-cli#2299](https://github.com/microsoft/winget-cli/issues/2299).
 
 **Windows will warn about an unknown publisher.** The exe *is* signed, but with a self-signed certificate, and Windows only trusts certificates issued by a recognised authority. You can either accept the warning (*More info* → *Run anyway*), or import `assets/WinGetStudio-codesign.cer` from this repository into *Trusted Root Certification Authorities* to make the signature trusted — see [DEVELOPMENT.md](DEVELOPMENT.md#signing) before doing that, since it affects anything signed with that certificate.
 
