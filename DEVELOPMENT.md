@@ -125,6 +125,20 @@ The asset is found as the **first `.exe` in the release**, not by exact name, so
 
 `gh release create` would do steps 4-5 from the command line, but the `gh` account on this machine has no push rights on the repo, which belongs to another account — the same reason `git push` works while `gh` does not. Either use the web UI or re-authenticate `gh` as the repo owner.
 
+## Working on a plan
+
+A change that takes more than one sitting is planned in `docs\superpowers\plans\<date>-<topic>.md` and the plan is **committed alongside the work**, so the reasoning travels with the diffs instead of living in someone's head.
+
+The discipline that goes with it:
+
+- One branch for the whole plan, `feature/vX.Y.Z`, with `main` left on what is published.
+- **One commit per task**, not per step. Each carries the code, the tests, the `README.md` and `DEVELOPMENT.md` lines that task invalidates, and one line under `## Unreleased` in the changelog. Documentation and code do not travel separately: a README describing yesterday's button is worse than no README.
+- **Both suites green before every commit.** There is no CI, so this gate is manual and it is the only one there is.
+- Push after each commit. If the session dies, the work is already out.
+- At release time the accumulated `## Unreleased` lines are promoted into the narrative entry for the version, rather than written from memory at the end.
+
+**The plan file is deleted when the plan is done** — every task executed, both suites green, and the result checked against what the plan established. It is a working document: git history keeps every version of it, and what deserves to outlive it has already been written into the changelog (what changed), this file (why it was done that way) and the README (what the user sees). A plan left in the repo after it has been executed starts to age and, eventually, to lie.
+
 ## Publishing to winget-pkgs
 
 Manifests live in `winget\<version>\` — three files, as the community repository requires. They are kept here so they can be reviewed and versioned with the code; the pull request is a copy of that folder.
