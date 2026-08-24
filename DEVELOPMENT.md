@@ -169,7 +169,7 @@ The local folder is therefore the source of the text, not of the submission. Aft
 - `InstallerType: portable` — the asset is a bare executable, so winget copies it and puts an alias on the PATH rather than running an installer.
 - `Architecture: x86` — that is what ps2exe produces by default; it runs on x64 through WOW64.
 - `ElevationRequirement: elevatesSelf` — the exe carries a `requireAdministrator` manifest, so *installing* needs no privileges while *running* asks for them.
-- `PortableCommandAlias` is rejected by the validator as an unknown field, so the alias is left to winget, which derives it from the file name.
+- `PortableCommandAlias` is rejected by the validator as an unknown field, so the alias is left to winget, which derives it from the file name. That alias is a symbolic link in `%LOCALAPPDATA%\Microsoft\WinGet\Links`, and creating one needs administrator rights or Developer Mode. Without either, winget still reports the alias as added but the link is not there, so testing a manifest from an ordinary prompt installs the package correctly and leaves `WinGetStudio` unknown to the shell. The sandbox the pull request runs in is elevated, so it does not see this.
 - `Commands` was declared in the locale manifest sent for 1.9.0 but is absent from the published 1.9.0, so it is gone from 1.10.0 too. Nothing depends on it: it only feeds searching a package by the command it provides.
 - Every value with a `:` inside must be quoted, or the YAML parser fails — `ShortDescription` is the one that bites.
 
