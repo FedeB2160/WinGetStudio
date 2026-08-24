@@ -21,6 +21,14 @@
         Foreground="{DynamicResource FgBrush}">
 
     <Window.Resources>
+        <!-- Cosa mostra la striscia dei tab: le riscrive Set-TabHeaderStyle, qui ci sono i
+             valori di partenza (Icon + Text). Sono Visibility e non colori, quindi NON stanno
+             nei file di tema — il controllo sulle chiavi guarda solo quelle che finiscono in
+             "Brush". Vivono nelle Resources della finestra, che Set-Theme non tocca: quel
+             metodo svuota solo i MergedDictionaries. -->
+        <Visibility x:Key="TabIconVis">Visible</Visibility>
+        <Visibility x:Key="TabTextVis">Visible</Visibility>
+
         <!-- Spinner riutilizzabile: 8 punti con opacita' decrescente, rotazione a
              8 step in 1s (equivalente WPF dell'esempio CSS). -->
         <Style x:Key="Spinner" TargetType="Control">
@@ -76,7 +84,7 @@
         <Style TargetType="Button">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -92,9 +100,13 @@
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="bd" Property="Background" Value="{DynamicResource CtrlPressBrush}"/>
                             </Trigger>
+                            <!-- Disabilitato: testo in tono minore, bordo e sfondo INTATTI.
+                                 Prima era Opacity 0.5 su tutto il bordo, che su un filo gia'
+                                 debole lo faceva sparire: un pulsante spento diventava
+                                 indistinguibile da un pulsante assente. Il colore del testo
+                                 e' il segnale, la cornice resta a dire che il pulsante c'e'. -->
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter Property="Foreground" Value="{DynamicResource SubtleFgBrush}"/>
-                                <Setter TargetName="bd" Property="Opacity" Value="0.5"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -177,7 +189,7 @@
              nelle celle della griglia il contenuto e' vuoto e non occupa spazio. -->
         <Style x:Key="ThemedCheckBox" TargetType="CheckBox">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -213,6 +225,16 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <!-- Griglia in sola lettura = coda in corso: la spunta e' gia' bloccata da
+                     IsReadOnly, ma senza questo continua a SEMBRARE cliccabile. Il trigger sta
+                     nello stile e non nel codice, cosi' vale per tutte e tre le griglie senza
+                     ripeterlo scheda per scheda. Fuori da una griglia (Unknown, MS Store) e
+                     l'antenato non esiste: il binding torna null e non succede niente. -->
+                <DataTrigger Binding="{Binding IsReadOnly, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <!-- Schede. Come per Button e DataGridColumnHeader il template di sistema (Aero2)
@@ -222,7 +244,7 @@
              copre quello alto del contenuto, cosi' i due si fondono. -->
         <Style TargetType="TabControl">
             <Setter Property="Background" Value="{DynamicResource BgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabControl">
@@ -231,10 +253,23 @@
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
-                            <!-- IsItemsHost: e' qui che il TabControl mette le linguette. -->
-                            <TabPanel Grid.Row="0" Panel.ZIndex="1" IsItemsHost="True"
-                                      Margin="0,0,0,-1" Background="Transparent"/>
-                            <Border Grid.Row="1" BorderThickness="1" CornerRadius="0,4,4,4"
+                            <!-- IsItemsHost: e' qui che il TabControl mette le linguette.
+                                 DockPanel e NON TabPanel: TabPanel le dispone in fila e non sa
+                                 fissarne una a destra. Con un DockPanel i tre tab funzionali
+                                 prendono il Dock di default (Left) e restano in ordine di
+                                 dichiarazione, mentre il tab Settings dichiara Dock="Right".
+                                 LastChildFill="False" e' OBBLIGATORIO: l'ultimo figlio di un
+                                 DockPanel riempie lo spazio residuo IGNORANDO il proprio Dock,
+                                 quindi senza questo il tab Settings si allargherebbe su tutta
+                                 la striscia. -->
+                            <DockPanel Grid.Row="0" Panel.ZIndex="1" IsItemsHost="True"
+                                       LastChildFill="False" Margin="0,0,0,-1" Background="Transparent"/>
+                            <!-- CornerRadius: ENTRAMBI gli angoli superiori quadrati, perche' su
+                                 entrambi i lati della striscia c'e' una linguetta. A sinistra lo
+                                 era gia' (la prima scheda ci si fonde sopra); a destra il raggio
+                                 di 4 era rimasto da quando lassu' non c'era nulla, e sotto il tab
+                                 Settings affiorava come uno scalino. -->
+                            <Border Grid.Row="1" BorderThickness="1" CornerRadius="0,0,4,4"
                                     Background="{TemplateBinding Background}"
                                     BorderBrush="{TemplateBinding BorderBrush}">
                                 <!-- PART_SelectedContentHost: nome richiesto da TabControl per
@@ -250,14 +285,56 @@
 
         <Style TargetType="TabItem">
             <Setter Property="Foreground" Value="{DynamicResource SubtleFgBrush}"/>
+            <!-- Header: icona + parola, e cosa si vede lo decide l'utente da Settings.
+                 Il glifo viene da Tag della linguetta, quindi c'e' UN solo template per tutti
+                 i tab e aggiungerne uno costa due attributi invece di un header a mano.
+                 Header resta la stringa: e' il nome accessibile, ed e' su quello che i
+                 controlli sull'ordine dei tab si appoggiano.
+                 I 7px di stacco stanno sull'ICONA e non sulla parola: un elemento Collapsed
+                 non occupa spazio, margine compreso, quindi in modalita' Text lo stacco
+                 sparisce da solo. Un trigger non servirebbe — e non funzionerebbe: il Binding
+                 di un DataTrigger non accetta un DynamicResource.
+                 AutomationProperties.Name vuoto sul glifo: il nome lo porta la linguetta. -->
+            <Setter Property="HeaderTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <!-- MinHeight: senza, in modalita' solo icona la linguetta si
+                             ACCORCIAVA di 2px, perche' il riquadro di riga del glifo e' piu'
+                             basso di quello del testo e con la parola collassata restava solo
+                             lui. 16 e' l'altezza che il testo occupa da solo, quindi la
+                             striscia resta identica nelle tre modalita'. -->
+                        <StackPanel Orientation="Horizontal" MinHeight="16">
+                            <!-- Lo stacco fra icona e parola sta sulla PAROLA, e il glifo non ha
+                                 margini: cosi' in sola icona e' esattamente al centro della
+                                 linguetta, ed e' la modalita' in cui uno scarto si vede (la
+                                 linguetta e' larga la meta').
+                                 In sola testo la parola resta 3,5px a destra del centro, perche'
+                                 il suo margine sinistro sopravvive all'icona collassata: su una
+                                 linguetta larga il triplo non si distingue, e le alternative
+                                 costano un DataTrigger che non puo' leggere un DynamicResource
+                                 oppure una Thickness nelle risorse, che fa fallire il layout. -->
+                            <TextBlock Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                       FontSize="13" VerticalAlignment="Center"
+                                       AutomationProperties.Name=""
+                                       Visibility="{DynamicResource TabIconVis}"/>
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center" Margin="7,0,0,0"
+                                       Visibility="{DynamicResource TabTextVis}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
                         <Border x:Name="bd" Margin="0,0,2,0" CornerRadius="4,4,0,0"
                                 BorderThickness="1,1,1,0"
                                 Background="{DynamicResource CtrlBgBrush}"
-                                BorderBrush="{DynamicResource BorderBrush2}">
-                            <ContentPresenter ContentSource="Header" Margin="14,6"
+                                BorderBrush="{DynamicResource CtrlBorderBrush}">
+                            <!-- 9px per lato contro i 7 di stacco fra icona e parola: prima erano
+                                 14 per lato contro 4 in mezzo, e la linguetta sembrava due cose
+                                 lontane dentro una scatola larga. -->
+                            <ContentPresenter ContentSource="Header" Margin="9,6"
                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -291,9 +368,12 @@
                 <!-- Icone di stato dal set di sistema di Windows 11 (fallback a
                      Segoe MDL2 Assets su Win10): forme PIENE e distinte fra loro,
                      leggibili anche senza distinguere i colori. Niente FontWeight:
-                     un icon font in Bold viene ingrassato per sintesi e sbava. -->
+                     un icon font in Bold viene ingrassato per sintesi e sbava.
+                     AutomationProperties.Name lo scrivono i DataTrigger insieme al glifo:
+                     senza, uno screen reader leggerebbe il codepoint del carattere. -->
                 <TextBlock x:Name="cellIcon" FontSize="16"
                            FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                           AutomationProperties.Name="No result yet"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            Visibility="Collapsed"/>
             </Grid>
@@ -305,18 +385,21 @@
                 <DataTrigger Binding="{Binding Status}" Value="ok">
                     <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="cellIcon" Property="Text" Value="&#xEC61;"/>
+                    <Setter TargetName="cellIcon" Property="AutomationProperties.Name" Value="Succeeded"/>
                     <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource OkBrush}"/>
                 </DataTrigger>
                 <!-- EB90 StatusErrorFull: cerchio pieno con X bianca -->
                 <DataTrigger Binding="{Binding Status}" Value="error">
                     <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="cellIcon" Property="Text" Value="&#xEB90;"/>
+                    <Setter TargetName="cellIcon" Property="AutomationProperties.Name" Value="Failed"/>
                     <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource ErrBrush}"/>
                 </DataTrigger>
                 <!-- E814 IncidentTriangle: triangolo pieno con ! bianco -->
                 <DataTrigger Binding="{Binding Status}" Value="warning">
                     <Setter TargetName="cellIcon" Property="Visibility" Value="Visible"/>
                     <Setter TargetName="cellIcon" Property="Text" Value="&#xE814;"/>
+                    <Setter TargetName="cellIcon" Property="AutomationProperties.Name" Value="Finished with a warning"/>
                     <Setter TargetName="cellIcon" Property="Foreground" Value="{DynamicResource WarnBrush}"/>
                 </DataTrigger>
             </DataTemplate.Triggers>
@@ -331,6 +414,7 @@
                        Foreground="{DynamicResource AccentBrush}"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        Visibility="Collapsed"
+                       AutomationProperties.Name="Pinned"
                        ToolTip="Pinned: winget will not upgrade it until the pin is removed"/>
             <DataTemplate.Triggers>
                 <DataTrigger Binding="{Binding Pinned}" Value="True">
@@ -348,6 +432,12 @@
                 <DataTrigger Binding="{Binding Pinned}" Value="True">
                     <Setter Property="IsEnabled" Value="False"/>
                 </DataTrigger>
+                <!-- Ripetuto e non ereditato: BasedOn porta con se' i Setter, e su una cosa
+                     che si nota solo guardando lo schermo preferisco non affidarmi
+                     all'ereditarieta' dei Trigger. Tre righe, zero dubbi. -->
+                <DataTrigger Binding="{Binding IsReadOnly, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="True">
+                    <Setter Property="IsEnabled" Value="False"/>
+                </DataTrigger>
             </Style.Triggers>
         </Style>
 
@@ -356,7 +446,7 @@
         <Style TargetType="ContextMenu">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -431,7 +521,7 @@
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Height" Value="26"/>
             <Setter Property="Template">
                 <Setter.Value>
@@ -462,7 +552,7 @@
                             <Popup x:Name="PART_Popup" Placement="Bottom" AllowsTransparency="True"
                                    IsOpen="{TemplateBinding IsDropDownOpen}" Focusable="False">
                                 <Border Background="{DynamicResource CtrlBgBrush}"
-                                        BorderBrush="{DynamicResource BorderBrush2}"
+                                        BorderBrush="{DynamicResource CtrlBorderBrush}"
                                         BorderThickness="1" CornerRadius="4" Padding="2"
                                         MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}">
                                     <ItemsPresenter/>
@@ -482,12 +572,92 @@
             </Setter>
         </Style>
 
-        <!-- Titolo di sezione nella scheda Settings -->
+        <!-- Cursore della barra di scorrimento: un rettangolo arrotondato che schiarisce
+             sotto il mouse e mentre si trascina. Margin 2: lascia un filo di traccia
+             visibile ai lati, come fa Windows 11. -->
+        <Style x:Key="ScrollThumb" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="bd" CornerRadius="4" Margin="2"
+                                Background="{DynamicResource CtrlBorderBrush}"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource SubtleFgBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="{DynamicResource SubtleFgBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Barra di scorrimento. Come CheckBox, header e ComboBox: il template di sistema
+             (Aero2) cabla colori chiari e ignora Background, quindi in Dark-Mode le barre
+             restavano BIANCHE, ed erano l'ultimo pezzo della finestra a non seguire il tema.
+             Template minimo: traccia + cursore, senza i pulsanti freccia (Windows 11 non li
+             disegna piu'). I due RepeatButton dentro il Track restano, trasparenti: sono loro
+             che fanno avanzare di una pagina quando si clicca nel vuoto della traccia, e senza
+             di loro quel clic non farebbe nulla.
+             PART_Track e' il nome che ScrollBar cerca per calcolare la posizione del cursore:
+             rinominarlo blocca la barra senza alcun errore.
+             IsDirectionReversed="True" e' la forma VERTICALE (il valore cresce verso il basso);
+             il trigger su Orientation lo toglie e scambia gli assi. -->
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
+            <Setter Property="Width" Value="12"/>
+            <Setter Property="MinWidth" Value="12"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Border Background="{TemplateBinding Background}">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageUpCommand" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource ScrollThumb}"/>
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="ScrollBar.PageDownCommand" Focusable="False">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate TargetType="RepeatButton">
+                                                <Border Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Horizontal">
+                                <Setter Property="Width"     Value="Auto"/>
+                                <Setter Property="MinWidth"  Value="0"/>
+                                <Setter Property="Height"    Value="12"/>
+                                <Setter Property="MinHeight" Value="12"/>
+                                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Titolo di sezione nella scheda Settings: piu' piccolo e in tono minore delle
+             etichette che introduce. Con lo stesso peso del testo sotto non separava niente. -->
         <Style x:Key="SettingsHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontSize" Value="11"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="Foreground" Value="{DynamicResource SubtleFgBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
         </Style>
 
         <!-- Campo di testo: la TextBox di sistema ha sfondo bianco cablato e in Dark-Mode
@@ -495,7 +665,7 @@
         <Style TargetType="TextBox">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="CaretBrush" Value="{DynamicResource FgBrush}"/>
             <Setter Property="Padding" Value="4,3"/>
         </Style>
@@ -503,7 +673,7 @@
         <Style TargetType="ProgressBar">
             <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
-            <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush2}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ProgressBar">
@@ -536,92 +706,9 @@
 
         <Grid Grid.Row="0">
             <TabControl x:Name="TabMain">
-                <TabItem Header="Updates">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>   <!-- top bar -->
-                            <RowDefinition Height="*"/>      <!-- elenco -->
-                            <RowDefinition Height="Auto"/>   <!-- action bar -->
-                        </Grid.RowDefinitions>
-
-                        <!-- Top bar della scheda: ricerca aggiornamenti + conteggio -->
-                        <DockPanel Grid.Row="0" Margin="0,0,0,8">
-                            <!-- "Check" e non "Check for updates": la scheda si chiama gia'
-                                 Updates. Larghezza uguale agli altri pulsanti della scheda. -->
-                            <Button x:Name="BtnRefresh" Content="Check" Width="104" Height="26" DockPanel.Dock="Left"/>
-                            <!-- Spunta ON = flag include-unknown passato a "winget upgrade"; spenta di
-                                 default. Foreground esplicito: la CheckBox di sistema forza il testo nero e
-                                 in Dark-Mode sparirebbe. Ha effetto alla ricerca successiva. -->
-                            <CheckBox x:Name="ChkUnknown" DockPanel.Dock="Left" IsChecked="False"
-                                      VerticalAlignment="Center" Margin="10,0,0,0"
-                                      Content="Unknown" Style="{StaticResource ThemedCheckBox}"
-                                      ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"
-                                      Foreground="{DynamicResource FgBrush}"/>
-                            <Control x:Name="TopSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
-                                     DockPanel.Dock="Left" Margin="10,0,0,0" Visibility="Collapsed"/>
-                            <TextBlock x:Name="TxtAvailable" VerticalAlignment="Center" Margin="12,0,0,0"
-                                       FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
-                        </DockPanel>
-
-                        <!-- Tabella upgrade -->
-                        <DataGrid x:Name="Grid" Grid.Row="1"
-                                  AutoGenerateColumns="False" CanUserAddRows="False"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                                  IsReadOnly="False" SelectionMode="Extended"
-                                  Background="{DynamicResource BgBrush}"
-                                  Foreground="{DynamicResource FgBrush}"
-                                  BorderBrush="{DynamicResource BorderBrush2}"
-                                  RowBackground="{DynamicResource BgBrush}"
-                                  AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
-                                  HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
-                                  ColumnHeaderStyle="{StaticResource GridHeader}"
-                                  CellStyle="{StaticResource GridCell}">
-                            <!-- Pin e Unpin agiscono sulle righe EVIDENZIATE, non su quelle
-                                 spuntate: la spunta di una riga pinnata e' disabilitata, quindi
-                                 con le spunte il pin non si potrebbe piu' togliere. -->
-                            <DataGrid.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem x:Name="MenuPinUpdates"   Header="Pin (block upgrades)"/>
-                                    <MenuItem x:Name="MenuUnpinUpdates" Header="Remove pin"/>
-                                </ContextMenu>
-                            </DataGrid.ContextMenu>
-                            <DataGrid.Columns>
-                                <DataGridCheckBoxColumn Header="SEL." Width="46"
-                                    ElementStyle="{StaticResource PinnableCheckBox}"
-                                    EditingElementStyle="{StaticResource PinnableCheckBox}"
-                                    Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                                <DataGridTemplateColumn Header="PIN" Width="42"
-                                                        CellTemplate="{StaticResource PinCell}"/>
-                                <DataGridTextColumn Header="NAME"              Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
-                                <DataGridTextColumn Header="INSTALLED VERSION" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
-                                <DataGridTextColumn Header="AVAILABLE VERSION" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
-                                <DataGridTextColumn Header="ID"                Width="2*"   IsReadOnly="True" Binding="{Binding Id}"/>
-                                <!-- Esito: spinner (in corso) oppure glyph colorato -->
-                                <DataGridTemplateColumn Header="RESULT" Width="70"
-                                                        CellTemplate="{StaticResource ResultCell}"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-
-                        <!-- Messaggio "nessun aggiornamento" (nascosto di default) -->
-                        <TextBlock x:Name="TxtEmpty" Grid.Row="1"
-                                   Text="No updates available."
-                                   FontSize="16" Foreground="{DynamicResource SubtleFgBrush}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center"
-                                   Visibility="Collapsed"/>
-
-                        <!-- Action bar: selezione + aggiorna + conteggio selezionati -->
-                        <DockPanel Grid.Row="2" Margin="0,8,0,0">
-                            <Button x:Name="BtnToggleAll" Content="Select all" Width="104" Height="26"
-                                    DockPanel.Dock="Left" IsEnabled="False"/>
-                            <Button x:Name="BtnUpdate" Content="Update" Width="104" Height="26"
-                                    DockPanel.Dock="Left" Margin="8,0,0,0" IsEnabled="False"/>
-                            <TextBlock x:Name="TxtSelected" VerticalAlignment="Center" Margin="12,0,0,0"
-                                       Foreground="{DynamicResource SubtleFgBrush}"/>
-                        </DockPanel>
-                    </Grid>
-                </TabItem>
-
-                <TabItem Header="Install">
+                <TabItem x:Name="TabInstall" Header="Install" Tag="&#xE896;"
+                         AutomationProperties.Name="Install"
+                         ToolTip="Search the winget catalogue as you type and install what you pick">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>   <!-- ricerca -->
@@ -678,7 +765,7 @@
                                   IsReadOnly="False" SelectionMode="Extended"
                                   Background="{DynamicResource BgBrush}"
                                   Foreground="{DynamicResource FgBrush}"
-                                  BorderBrush="{DynamicResource BorderBrush2}"
+                                  BorderBrush="{DynamicResource CtrlBorderBrush}"
                                   RowBackground="{DynamicResource BgBrush}"
                                   AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
@@ -719,7 +806,9 @@
                     </Grid>
                 </TabItem>
 
-                <TabItem Header="Installed">
+                <TabItem x:Name="TabInstalled" Header="Installed" Tag="&#xE71D;"
+                         AutomationProperties.Name="Installed"
+                         ToolTip="Everything installed on this machine: filter it, pin it, uninstall it">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>   <!-- comandi e filtro -->
@@ -762,7 +851,7 @@
                                   IsReadOnly="False" SelectionMode="Extended"
                                   Background="{DynamicResource BgBrush}"
                                   Foreground="{DynamicResource FgBrush}"
-                                  BorderBrush="{DynamicResource BorderBrush2}"
+                                  BorderBrush="{DynamicResource CtrlBorderBrush}"
                                   RowBackground="{DynamicResource BgBrush}"
                                   AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
@@ -770,8 +859,8 @@
                                   CellStyle="{StaticResource GridCell}">
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
-                                    <MenuItem x:Name="MenuPinInstalled"   Header="Pin (block upgrades)"/>
-                                    <MenuItem x:Name="MenuUnpinInstalled" Header="Remove pin"/>
+                                    <MenuItem x:Name="MenuPinInstalled"   Header="Pin highlighted (block upgrades)"/>
+                                    <MenuItem x:Name="MenuUnpinInstalled" Header="Remove pin from highlighted"/>
                                 </ContextMenu>
                             </DataGrid.ContextMenu>
                             <DataGrid.Columns>
@@ -814,21 +903,313 @@
                     </Grid>
                 </TabItem>
 
-            </TabControl>
+                <!-- IsSelected: l'ordine dei tab e' alfabetico, ma la vista di apertura resta
+                     Updates — la scansione lanciata da Add_ContentRendered popola proprio
+                     questa, e aprire su un tab che nessuno guarda nasconderebbe il conteggio. -->
+                <TabItem x:Name="TabUpdates" Header="Updates" Tag="&#xE777;" IsSelected="True"
+                         AutomationProperties.Name="Updates"
+                         ToolTip="Packages with a newer version available, and the queue that updates them">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>   <!-- top bar -->
+                            <RowDefinition Height="*"/>      <!-- elenco -->
+                            <RowDefinition Height="Auto"/>   <!-- action bar -->
+                        </Grid.RowDefinitions>
 
-            <!-- Ingranaggio in alto a destra: apre la schermata delle impostazioni.
-                 E713 (Settings), presente sia in Segoe Fluent Icons sia in Segoe MDL2
-                 Assets — Test-Ui.ps1 verifica nei font che ogni glifo usato esista. -->
-            <Button x:Name="BtnSettings" Width="30" Height="24" Panel.ZIndex="2"
-                    HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
-                    FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
-                    Content="&#xE713;" ToolTip="Settings"/>
+                        <!-- Top bar della scheda: ricerca aggiornamenti + conteggio -->
+                        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+                            <!-- "Check" e non "Check for updates": la scheda si chiama gia'
+                                 Updates. Larghezza uguale agli altri pulsanti della scheda. -->
+                            <Button x:Name="BtnRefresh" Content="Check" Width="104" Height="26" DockPanel.Dock="Left"/>
+                            <!-- Spunta ON = flag include-unknown passato a "winget upgrade"; spenta di
+                                 default. Foreground esplicito: la CheckBox di sistema forza il testo nero e
+                                 in Dark-Mode sparirebbe. Ha effetto alla ricerca successiva. -->
+                            <CheckBox x:Name="ChkUnknown" DockPanel.Dock="Left" IsChecked="False"
+                                      VerticalAlignment="Center" Margin="10,0,0,0"
+                                      Content="Unknown" Style="{StaticResource ThemedCheckBox}"
+                                      ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"
+                                      Foreground="{DynamicResource FgBrush}"/>
+                            <Control x:Name="TopSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                     DockPanel.Dock="Left" Margin="10,0,0,0" Visibility="Collapsed"/>
+                            <TextBlock x:Name="TxtAvailable" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
+                        </DockPanel>
+
+                        <!-- Tabella upgrade -->
+                        <DataGrid x:Name="Grid" Grid.Row="1"
+                                  AutoGenerateColumns="False" CanUserAddRows="False"
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                                  IsReadOnly="False" SelectionMode="Extended"
+                                  Background="{DynamicResource BgBrush}"
+                                  Foreground="{DynamicResource FgBrush}"
+                                  BorderBrush="{DynamicResource CtrlBorderBrush}"
+                                  RowBackground="{DynamicResource BgBrush}"
+                                  AlternatingRowBackground="{DynamicResource RowAltBgBrush}"
+                                  HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
+                                  ColumnHeaderStyle="{StaticResource GridHeader}"
+                                  CellStyle="{StaticResource GridCell}">
+                            <!-- Pin e Unpin agiscono sulle righe EVIDENZIATE, non su quelle
+                                 spuntate: la spunta di una riga pinnata e' disabilitata, quindi
+                                 con le spunte il pin non si potrebbe piu' togliere. -->
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem x:Name="MenuPinUpdates"   Header="Pin highlighted (block upgrades)"/>
+                                    <MenuItem x:Name="MenuUnpinUpdates" Header="Remove pin from highlighted"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <DataGridCheckBoxColumn Header="SEL." Width="46"
+                                    ElementStyle="{StaticResource PinnableCheckBox}"
+                                    EditingElementStyle="{StaticResource PinnableCheckBox}"
+                                    Binding="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                <DataGridTemplateColumn Header="PIN" Width="42"
+                                                        CellTemplate="{StaticResource PinCell}"/>
+                                <DataGridTextColumn Header="NAME"              Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
+                                <DataGridTextColumn Header="INSTALLED VERSION" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
+                                <DataGridTextColumn Header="AVAILABLE VERSION" Width="1.2*" IsReadOnly="True" Binding="{Binding Available}"/>
+                                <DataGridTextColumn Header="ID"                Width="2*"   IsReadOnly="True" Binding="{Binding Id}"/>
+                                <!-- Esito: spinner (in corso) oppure glyph colorato -->
+                                <DataGridTemplateColumn Header="RESULT" Width="70"
+                                                        CellTemplate="{StaticResource ResultCell}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                        <!-- Messaggio "nessun aggiornamento" (nascosto di default) -->
+                        <TextBlock x:Name="TxtEmpty" Grid.Row="1"
+                                   Text="No updates available."
+                                   FontSize="16" Foreground="{DynamicResource SubtleFgBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="Collapsed"/>
+
+                        <!-- Action bar: selezione + aggiorna + conteggio selezionati -->
+                        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+                            <Button x:Name="BtnToggleAll" Content="Select all" Width="104" Height="26"
+                                    DockPanel.Dock="Left" IsEnabled="False"/>
+                            <Button x:Name="BtnUpdate" Content="Update" Width="104" Height="26"
+                                    DockPanel.Dock="Left" Margin="8,0,0,0" IsEnabled="False"/>
+                            <TextBlock x:Name="TxtSelected" VerticalAlignment="Center" Margin="12,0,0,0"
+                                       Foreground="{DynamicResource SubtleFgBrush}"/>
+                        </DockPanel>
+                    </Grid>
+                </TabItem>
+
+
+                <!-- Impostazioni: un tab come gli altri, fissato a destra della striscia.
+                     PERCHE' NON UN OVERLAY: sovrapposto a tutta la finestra copriva barra di
+                     avanzamento e log, cioe' l'unico canale che dice come sta andando
+                     un'operazione, e serviva una catena di RowSpan, ZIndex, fuoco e Esc per
+                     comportarsi come una schermata. Da tab non serve niente di tutto questo.
+                     L'header e' glifo + parola: il testo fa anche da nome accessibile, che un
+                     header di sola icona non avrebbe (uno screen reader leggerebbe il
+                     codepoint). E713 (Settings) esiste in entrambi i font di sistema —
+                     Test-Ui.ps1 lo verifica.
+                     Nessun Foreground esplicito sui due TextBlock: cosi' ereditano quello della
+                     linguetta e seguono i trigger di selezione e hover. -->
+                <!-- Margine destro NEGATIVO: il template della linguetta tiene 2px di stacco a
+                     destra per separarla dalla successiva, ma qui a destra non c'e' nessuna
+                     successiva — c'e' il bordo del riquadro, e quei 2px lasciavano la linguetta
+                     disallineata rispetto a lui. Il -2 sposta la slot di layout 2px oltre il
+                     bordo del pannello, cosi' lo stacco interno cade fuori e il bordo visibile
+                     della linguetta finisce esattamente sul bordo del riquadro. -->
+                <!-- ORDINE DI DICHIARAZIONE E POSIZIONE NON COINCIDONO: in un DockPanel il
+                     PRIMO figlio con Dock="Right" prende il bordo destro e il successivo si
+                     mette alla sua sinistra. About e' dichiarato prima di Settings perche' e'
+                     lui a stare piu' a destra.
+                     Il margine destro negativo sta quindi su About: recupera i 2px di stacco
+                     che il template tiene a destra di ogni linguetta e che sull'ultima la
+                     lasciavano disallineata dal riquadro. -->
+                <TabItem x:Name="TabAbout" Header="About" Tag="&#xE946;"
+                         DockPanel.Dock="Right" Margin="0,0,-2,0"
+                         AutomationProperties.Name="About"
+                         ToolTip="What this app does, where to report a bug, and the licence">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <!-- ABOUT. Le cinque funzioni stanno in una TABELLA SENZA BORDI: una Grid
+                             a due colonne, nome a sinistra e descrizione a destra. In un blocco di
+                             prosa unico i nomi finivano in mezzo alle frasi e l'occhio non trovava
+                             dove comincia una funzione e dove finisce l'altra.
+                             Colonna dei nomi Auto: larga quanto il nome piu' lungo e non un pixel
+                             di piu', cosi' le descrizioni partono tutte dalla stessa ascissa.
+                             Colonna delle descrizioni elastica: prende tutto il resto. Una cella
+                             che va a capo rientra sotto la propria descrizione e non sotto il
+                             nome, ed e' il motivo per cui qui il ritorno a capo non e' un
+                             problema mentre nella prosa libera lo e'.
+                             Nomi in FgBrush e descrizioni in SubtleFgBrush: la gerarchia la fa il
+                             tono, non un bordo.
+                             La nota finale su Claude Code e' volontaria: l'articolo 50 dell'AI Act
+                             riguarda i sistemi AI e i contenuti generati, non gli strumenti con
+                             cui si scrive il codice, e questo programma non contiene nessun
+                             sistema AI. Sta qui perche' e' vero. -->
+                        <StackPanel>
+                            <TextBlock TextWrapping="Wrap" Foreground="{DynamicResource SubtleFgBrush}"
+                                       Text="WinGet Studio is a desktop front end for winget, the Windows package manager."/>
+
+                            <Grid x:Name="AboutTable" Margin="0,14,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Updates" FontWeight="SemiBold"
+                                           Margin="0,0,14,8" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource SubtleFgBrush}">
+                                    List what has a newer version and upgrade the packages you tick, one at a time.<LineBreak/>
+                                    A running queue can be stopped: the package in progress finishes, the rest are left alone.
+                                </TextBlock>
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="Install" FontWeight="SemiBold"
+                                           Margin="0,0,14,8" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource SubtleFgBrush}"
+                                           Text="Search the winget catalogue as you type, optionally the Microsoft Store, and pick the install scope."/>
+
+                                <TextBlock Grid.Row="2" Grid.Column="0" Text="Installed" FontWeight="SemiBold"
+                                           Margin="0,0,14,8" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource SubtleFgBrush}"
+                                           Text="The inventory of the machine, with a local filter and an uninstall behind a confirmation."/>
+
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Pin" FontWeight="SemiBold"
+                                           Margin="0,0,14,8" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="3" Grid.Column="1" TextWrapping="Wrap" Margin="0,0,0,8"
+                                           Foreground="{DynamicResource SubtleFgBrush}"
+                                           Text="Block a package from being upgraded, from either list, until you remove the pin."/>
+
+                                <TextBlock Grid.Row="4" Grid.Column="0" Text="Export / Import" FontWeight="SemiBold"
+                                           Margin="0,0,14,0" Foreground="{DynamicResource FgBrush}"/>
+                                <TextBlock Grid.Row="4" Grid.Column="1" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource SubtleFgBrush}"
+                                           Text="Save the package list to a .json file and rebuild a machine from it."/>
+                            </Grid>
+
+                            <TextBlock TextWrapping="Wrap" Margin="0,18,0,0"
+                                       Foreground="{DynamicResource SubtleFgBrush}">
+                                It runs elevated, because installing and removing software requires it.<LineBreak/>
+                                No telemetry.<LineBreak/>
+                                <LineBreak/>
+                                Found a bug, or have an idea?
+                                <!-- I link li apre l'handler in Start-App. -->
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues"
+                                           Foreground="{DynamicResource AccentBrush}">Open an issue on GitHub</Hyperlink>.<LineBreak/>
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio"
+                                           Foreground="{DynamicResource AccentBrush}">Source code</Hyperlink> &#183;
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases"
+                                           Foreground="{DynamicResource AccentBrush}">Release notes</Hyperlink> &#183;
+                                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE"
+                                           Foreground="{DynamicResource AccentBrush}">MIT licence</Hyperlink><LineBreak/>
+                                <LineBreak/>
+                                Made by <Hyperlink NavigateUri="https://github.com/FedeB2160"
+                                           Foreground="{DynamicResource AccentBrush}">FedeB2160</Hyperlink>,
+                                with the help of <Italic>Claude Code</Italic> (Anthropic).
+                            </TextBlock>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <TabItem x:Name="TabSettings" Header="Settings" Tag="&#xE713;"
+                         DockPanel.Dock="Right"
+                         AutomationProperties.Name="Settings"
+                         ToolTip="Theme, tab strip, version and updates">
+                    <!-- Impostazioni in colonna: sono pochi controlli e crescono in verticale.
+                         ScrollViewer per non tagliarli a finestra piccola. -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <!-- Due colonne: etichette a larghezza automatica, controlli elastici.
+                             Prima le etichette avevano Width="120" e la riga dei pulsanti un
+                             margine sinistro dello stesso valore per fingere l'allineamento: una
+                             etichetta piu' lunga rompeva tutto in silenzio.
+                             Spaziatura: 10px fra le righe di una sezione, 22 fra una sezione e la
+                             successiva. Le tendine sono larghe quanto serve al loro valore piu'
+                             lungo invece dei 180px fissi di prima, che su "Light" erano il triplo
+                             del necessario. -->
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" MinWidth="110"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>   <!-- 0 APPEARANCE -->
+                                <RowDefinition Height="Auto"/>   <!-- 1 tema -->
+                                <RowDefinition Height="Auto"/>   <!-- 2 striscia dei tab -->
+                                <RowDefinition Height="Auto"/>   <!-- 3 UPDATES -->
+                                <RowDefinition Height="Auto"/>   <!-- 4 versione -->
+                                <RowDefinition Height="Auto"/>   <!-- 5 spunta controllo all'avvio -->
+                                <RowDefinition Height="Auto"/>   <!-- 6 pulsanti -->
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="APPEARANCE"
+                                       Style="{StaticResource SettingsHeader}"/>
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Theme" Margin="0,0,14,10"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+                            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                                <!-- Le voci le riempie App.Theme.ps1: sono gli stessi valori che
+                                     finiscono nel registro (Light | Dark | System). -->
+                                <ComboBox x:Name="CmbTheme" Width="140"/>
+                                <TextBlock x:Name="TxtThemeHint" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           Foreground="{DynamicResource SubtleFgBrush}"/>
+                            </StackPanel>
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Tab strip" Margin="0,0,14,22"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+                            <!-- Le voci le riempie Initialize-TabHeaders: sono gli stessi valori
+                                 che finiscono nel registro (Icon | Text | Icon + Text). -->
+                            <ComboBox Grid.Row="2" Grid.Column="1" x:Name="CmbTabStyle" Width="140"
+                                      HorizontalAlignment="Left" Margin="0,0,0,22"
+                                      ToolTip="What the tabs show: the icon, the name, or both"/>
+
+                            <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="UPDATES"
+                                       Style="{StaticResource SettingsHeader}"/>
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Installed version" Margin="0,0,14,10"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="TxtVersion" Margin="0,0,0,10"
+                                       VerticalAlignment="Center" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource FgBrush}"/>
+                            <!-- Il controllo all'avvio e' una chiamata anonima all'API di GitHub.
+                                 Acceso di default (e' il comportamento di sempre), ma si spegne:
+                                 un programma che va in rete da solo deve almeno dirlo e lasciare
+                                 la scelta. Il pulsante qui sotto resta sempre attivo. -->
+                            <CheckBox Grid.Row="5" Grid.Column="1" x:Name="ChkAutoCheck" IsChecked="True"
+                                      Margin="0,0,0,10" HorizontalAlignment="Left"
+                                      Content="Check for updates at startup"
+                                      Style="{StaticResource ThemedCheckBox}"
+                                      ToolTip="One anonymous call to the GitHub API when the app starts. Turn it off to go online only when you press Check for updates"
+                                      Foreground="{DynamicResource FgBrush}"/>
+                            <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal">
+                                <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
+                                <!-- Compare solo quando una release e' piu' recente di questa.
+                                     Foreground dal tema e NON "White": l'accento del tema scuro
+                                     e' azzurro chiaro (#4CC2FF) e il bianco sopra faceva 2.01:1,
+                                     cioe' illeggibile sul pulsante piu' importante della
+                                     schermata. Test-Ui.ps1 misura la coppia. -->
+                                <Button x:Name="BtnUpdateApp" Height="26" Padding="12,0" Margin="8,0,0,0"
+                                        Visibility="Collapsed"
+                                        Background="{DynamicResource AccentBrush}"
+                                        Foreground="{DynamicResource AccentFgBrush}"/>
+                                <Control x:Name="UpdateSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                         Margin="10,0,0,0" Visibility="Collapsed"/>
+                                <TextBlock x:Name="TxtUpdateStatus" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           Foreground="{DynamicResource SubtleFgBrush}"/>
+                            </StackPanel>
+                        </Grid>
+                    </ScrollViewer>
+                </TabItem>
+
+            </TabControl>
         </Grid>
 
         <!-- Barra avanzamento della coda in corso (condivisa da tutte le schede) -->
         <ProgressBar x:Name="Progress" Grid.Row="1" Height="18" Margin="0,8,0,4"
                      Minimum="0" Maximum="100" Value="0"/>
 
+        <!-- Il log resta alto 140px FISSI. Un GridSplitter era stato provato e ritirato: le
+             righe che rendeva elastiche lasciavano una fascia vuota fra il riquadro delle
+             schede e la barra di avanzamento, e il log e' un pannello di servizio che sta
+             bene dove sta. -->
         <TextBlock Grid.Row="2" Text="Log:" Margin="0,4,0,2" FontWeight="Bold"
                    Foreground="{DynamicResource FgBrush}"/>
 
@@ -839,81 +1220,8 @@
                  FontFamily="Consolas" FontSize="12"
                  Background="{DynamicResource CtrlBgBrush}"
                  Foreground="{DynamicResource FgBrush}"
-                 BorderBrush="{DynamicResource BorderBrush2}"
+                 BorderBrush="{DynamicResource CtrlBorderBrush}"
                  CaretBrush="{DynamicResource FgBrush}"/>
 
-        <!-- ============================================================
-             SCHERMATA IMPOSTAZIONI
-             ============================================================
-             Sovrapposta a TUTTA la finestra (RowSpan su ogni riga, ZIndex sopra),
-             non una finestra separata: cosi' eredita le risorse del tema senza
-             doverle rimontare su una seconda Window, e non serve gestire
-             proprietario, modalita' e posizione. Il fondo e' opaco, quindi a
-             schermo e' una schermata a se'.
-             La chiude il pulsante in alto a destra oppure Esc. -->
-        <Border x:Name="SettingsPanel" Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="10"
-                Visibility="Collapsed"
-                Background="{DynamicResource BgBrush}">
-            <DockPanel Margin="4,2,4,4">
-                <!-- Intestazione: titolo e chiusura.
-                     LastChildFill="False" obbligatorio: l'ultimo figlio di un DockPanel
-                     riempie lo spazio residuo IGNORANDO il proprio Dock, quindi il
-                     pulsante di chiusura finiva al centro invece che a destra. -->
-                <DockPanel DockPanel.Dock="Top" Margin="0,0,0,14" LastChildFill="False">
-                    <TextBlock Text="Settings" FontSize="18" FontWeight="SemiBold"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource FgBrush}"/>
-                    <!-- E711 (Cancel): presente in entrambi i set di icone di sistema. -->
-                    <Button x:Name="BtnCloseSettings" Width="30" Height="26" DockPanel.Dock="Right"
-                            FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13"
-                            Content="&#xE711;" ToolTip="Close settings (Esc)"/>
-                </DockPanel>
-
-                <!-- Impostazioni in colonna: sono pochi controlli e crescono in verticale.
-                     ScrollViewer per non tagliarli a finestra piccola. -->
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel>
-                        <TextBlock Text="APPEARANCE" Style="{StaticResource SettingsHeader}"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,18">
-                            <TextBlock Text="Theme" VerticalAlignment="Center" Width="120"
-                                       Foreground="{DynamicResource FgBrush}"/>
-                            <!-- Le voci le riempie App.Theme.ps1: sono gli stessi valori
-                                 che finiscono nel registro (Light | Dark | Auto). -->
-                            <ComboBox x:Name="CmbTheme" Width="180"/>
-                            <TextBlock x:Name="TxtThemeHint" VerticalAlignment="Center" Margin="12,0,0,0"
-                                       Foreground="{DynamicResource SubtleFgBrush}"/>
-                        </StackPanel>
-
-                        <TextBlock Text="UPDATES" Style="{StaticResource SettingsHeader}"/>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                            <TextBlock Text="Installed version" VerticalAlignment="Center" Width="120"
-                                       Foreground="{DynamicResource FgBrush}"/>
-                            <!-- La versione sta qui, non nel titolo della finestra. -->
-                            <TextBlock x:Name="TxtVersion" VerticalAlignment="Center"
-                                       FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="120,0,0,18">
-                            <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
-                            <!-- Compare solo quando una release e' piu' recente di questa. -->
-                            <Button x:Name="BtnUpdateApp" Height="26" Padding="12,0" Margin="8,0,0,0"
-                                    Visibility="Collapsed"
-                                    Background="{DynamicResource AccentBrush}" Foreground="White"/>
-                            <Control x:Name="UpdateSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
-                                     Margin="10,0,0,0" Visibility="Collapsed"/>
-                            <TextBlock x:Name="TxtUpdateStatus" VerticalAlignment="Center" Margin="12,0,0,0"
-                                       Foreground="{DynamicResource SubtleFgBrush}"/>
-                        </StackPanel>
-
-                        <TextBlock Text="ABOUT" Style="{StaticResource SettingsHeader}"/>
-                        <TextBlock Foreground="{DynamicResource SubtleFgBrush}" TextWrapping="Wrap"
-                                   Text="A graphical front end for winget: update, install, uninstall, pin and export packages. Requires administrator rights, which it asks for at startup."/>
-                    </StackPanel>
-                </ScrollViewer>
-            </DockPanel>
-        </Border>
     </Grid>
 </Window>
-
-
-
-

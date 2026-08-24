@@ -48,6 +48,9 @@ function Set-InstalledBusy([bool]$busy) {
     $TxtFilter.IsEnabled           = -not $busy
     if ($busy) { [void]$GridInstalled.CommitEdit() }
     $GridInstalled.IsReadOnly = $busy
+    # Come nella scheda Updates: le voci di pin si spengono, la griglia resta scorrevole.
+    $MenuPinInstalled.IsEnabled   = -not $busy
+    $MenuUnpinInstalled.IsEnabled = -not $busy
     if ($busy) { $BtnUninstall.IsEnabled = $false } else { Refresh-InstalledState }
 }
 
@@ -59,7 +62,10 @@ function Test-InstalledMatch($row) {
 }
 
 function Load-Installed {
-    if ($script:isBusy) { return }
+    # Non si scansiona sopra un altro winget. Test-WinGetBusy e non isBusy: una ricerca in
+    # volo nella scheda Install non alza lo stato occupato, ed e' proprio entrando qui dal
+    # typeahead che partivano due winget insieme.
+    if (Test-WinGetBusy) { return }
     Set-AppBusy $true
     $script:installedLoaded = $true
     Write-Log "Listing installed packages..."
@@ -67,11 +73,13 @@ function Load-Installed {
     $TxtInstalledEmpty.Visibility = [System.Windows.Visibility]::Collapsed
     $GridInstalled.Visibility     = [System.Windows.Visibility]::Collapsed
     $InstalledSpinner.Visibility  = [System.Windows.Visibility]::Visible
+    $Progress.IsIndeterminate     = $true
     Refresh-InstalledState
 
     # I pin si leggono nello STESSO job dell'inventario: due winget in parallelo si
     # contendono lo store e uno dei due esce in errore.
     [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetInstalled', 'Get-WinGetPins' `
+        -Vars @{ wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{
                 Rows = @(Get-WinGetInstalled)
@@ -81,6 +89,7 @@ function Load-Installed {
         -OnDone {
             param($result)
             $InstalledSpinner.Visibility = [System.Windows.Visibility]::Collapsed
+            $Progress.IsIndeterminate    = $false
             $r = @($result)[0]
             if ($r) { foreach ($p in $r.Rows) { if ($p) { $installedItems.Add($p) } } }
 
@@ -125,7 +134,8 @@ function Start-UninstallSelected {
         return
     }
 
-    Set-AppBusy $true
+    # Lo stato occupato lo prende Start-WinGetQueue, che e' anche il punto in cui si controlla
+    # che non ci sia gia' un winget in corso.
     Start-WinGetQueue -Rows $sel -Verb 'Uninstall' -ArgsBuilder {
         param($r)
         # Match esatto sull'ID: vale anche per i pacchetti non installati con winget, il
@@ -134,6 +144,9 @@ function Start-UninstallSelected {
         "uninstall --id `"$($r.Id)`" -e --silent --disable-interactivity --accept-source-agreements"
     } -OnDone {
         Set-AppBusy $false
+        # Anche la scheda Updates ora mente: un pacchetto disinstallato puo' essere ancora
+        # in quell'elenco, e aggiornarlo fallirebbe.
+        Set-UpdatesStale
         # L'elenco non viene ricaricato da solo: cancellerebbe la colonna Result appena
         # scritta, che e' il resoconto di cosa e' andato come.
         Write-Log "Uninstall finished: press Refresh to rebuild the list."
@@ -162,13 +175,7 @@ function Initialize-InstalledTab {
     $MenuPinInstalled.Add_Click({   Set-PackagePin @($GridInstalled.SelectedItems) $true })
     $MenuUnpinInstalled.Add_Click({ Set-PackagePin @($GridInstalled.SelectedItems) $false })
 
-    $queueInstalledRefresh = {
-        $window.Dispatcher.BeginInvoke(
-            [System.Windows.Threading.DispatcherPriority]::Background,
-            [action]{ Refresh-InstalledState }) | Out-Null
-    }
-    $GridInstalled.Add_CellEditEnding($queueInstalledRefresh)
-    $GridInstalled.Add_PreviewMouseLeftButtonUp($queueInstalledRefresh)
+    Register-GridRefresh $GridInstalled 'Refresh-InstalledState'
 
     # Primo ingresso nella scheda: carica l'elenco da solo, cosi' non si paga l'attesa
     # all'avvio del programma chi non usa questa scheda.
@@ -178,6 +185,9 @@ function Initialize-InstalledTab {
         # reagisce solo all'evento del TabControl stesso.
         if ($e.OriginalSource -ne $TabMain) { return }
         if ($script:installedLoaded) { return }
-        if ($TabMain.SelectedItem -and $TabMain.SelectedItem.Header -eq 'Installed') { Load-Installed }
+        # Confronto con l'OGGETTO e non con l'header: una rinomina della linguetta non deve
+        # spegnere in silenzio il caricamento automatico, e l'header del tab Settings non e'
+        # nemmeno una stringa (glifo + parola).
+        if ($TabMain.SelectedItem -eq $TabInstalled) { Load-Installed }
     })
 }

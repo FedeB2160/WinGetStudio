@@ -26,7 +26,7 @@ function Get-ImportPackageCount([string]$Path) {
 # Scelta del file, poi l'azione. Sono separate perche' un dialog non si puo' pilotare da
 # un test headless, mentre Invoke-PackageExport si.
 function Start-Export {
-    if ($script:isBusy) { return }
+    if (Test-WinGetBusy) { return }
 
     $dlg = New-Object Microsoft.Win32.SaveFileDialog
     $dlg.Title    = 'Export installed packages'
@@ -38,8 +38,11 @@ function Start-Export {
 }
 
 function Invoke-PackageExport([string]$file) {
+    # Di nuovo: fra la scelta del file e qui puo' essere rientrata una ricerca.
+    if (Test-WinGetBusy) { return }
     Set-AppBusy $true
     $InstalledSpinner.Visibility = [System.Windows.Visibility]::Visible
+    $Progress.IsIndeterminate    = $true
     Write-Log "Exporting the package list to $file ..."
 
     # Una sola invocazione, non una coda: e' un comando unico su tutta la macchina.
@@ -56,6 +59,7 @@ function Invoke-PackageExport([string]$file) {
         -OnDone {
             param($result)
             $InstalledSpinner.Visibility = [System.Windows.Visibility]::Collapsed
+            $Progress.IsIndeterminate    = $false
             $r = @($result)[0]
             if ($r -and $r.Status -eq 'ok') {
                 $n = Get-ImportPackageCount $file
@@ -76,7 +80,7 @@ function Invoke-PackageExport([string]$file) {
 }
 
 function Start-Import {
-    if ($script:isBusy) { return }
+    if (Test-WinGetBusy) { return }
 
     $dlg = New-Object Microsoft.Win32.OpenFileDialog
     $dlg.Title  = 'Import packages from a list'
@@ -112,8 +116,10 @@ function Start-Import {
 }
 
 function Invoke-PackageImport([string]$file, [int]$count) {
+    if (Test-WinGetBusy) { return }
     Set-AppBusy $true
     $InstalledSpinner.Visibility = [System.Windows.Visibility]::Visible
+    $Progress.IsIndeterminate    = $true
     Write-Log "Importing $count packages from $file ..."
 
     # Una sola invocazione lunga, non una coda per pacchetto: e' winget a scorrere la
@@ -132,6 +138,7 @@ function Invoke-PackageImport([string]$file, [int]$count) {
         -OnDone {
             param($result)
             $InstalledSpinner.Visibility = [System.Windows.Visibility]::Collapsed
+            $Progress.IsIndeterminate    = $false
             $r = @($result)[0]
             switch ($r.Status) {
                 'ok'      { Write-Log "Import done ($($r.Seconds)s)." }
@@ -145,6 +152,8 @@ function Invoke-PackageImport([string]$file, [int]$count) {
             }
             Write-Log "Press Refresh to rebuild the installed list."
             Set-AppBusy $false
+            # L'import ha installato software: l'elenco degli aggiornamenti e' di prima.
+            Set-UpdatesStale
         })
 }
 

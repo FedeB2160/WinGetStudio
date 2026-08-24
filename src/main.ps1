@@ -19,7 +19,7 @@
 # UNICA fonte di verita': finisce nel titolo della finestra come "[x.y.z]" e, letta
 # da build.ps1 con questa stessa regex, nelle proprieta' dell'exe (scheda Dettagli).
 # Aggiornarla qui e basta; Test-Ui.ps1 verifica che la regex la trovi ancora.
-$AppVersion = '1.9.0'
+$AppVersion = '1.10.0'
 
 # ------------------------------------------------------------------
 # SELF-ELEVATION (fallback al manifest UAC generato da ps2exe)
@@ -82,12 +82,12 @@ $moduleNames = @(
     'WinGet.Exec.ps1'
     'WinGet.Parse.ps1'
     'App.Ui.ps1'
+    'App.Prefs.ps1'
     'App.Jobs.ps1'
     'App.Theme.ps1'
     'App.Pins.ps1'
     'App.Backup.ps1'
     'App.Update.ps1'
-    'App.Settings.ps1'
     'Tab.Updates.ps1'
     'Tab.Install.ps1'
     'Tab.Installed.ps1'
@@ -112,17 +112,3 @@ if (-not (Get-Command Get-WinGetPath -ErrorAction SilentlyContinue)) {
 }
 
 Start-App
-
-
-
-
-
-
-
-
-
-
-
-
-
-

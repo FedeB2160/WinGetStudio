@@ -14,6 +14,21 @@ $items = New-Object System.Collections.ObjectModel.ObservableCollection[object]
 
 $script:allSelected = $false
 
+# L'elenco rispecchia una fotografia della macchina scattata da Load-Upgrades. Appena qualcosa
+# la altera — un aggiornamento, un'installazione, una disinstallazione, un import — le versioni
+# a schermo non valgono piu', e ripremere Update rilancia winget su pacchetti gia' aggiornati:
+# quelli escono con codice non-zero e si dipingono di ROSSO su righe che erano andate bene.
+# Quindi il pulsante si blocca finche' non si rilegge.
+# PERCHE' NON UNA RICARICA AUTOMATICA: cancellerebbe la colonna Result appena scritta, che e'
+# il resoconto di com'e' andata.
+# I PIN non entrano qui: bloccano gli aggiornamenti, non cambiano le versioni installate.
+$script:listStale = $false
+
+function Set-UpdatesStale {
+    $script:listStale = $true
+    Refresh-SelectionState
+}
+
 # Ricalcola stato pulsanti/etichette in base a elenco e selezione (req 2/3/4).
 function Refresh-SelectionState {
     $total = $items.Count
@@ -21,8 +36,12 @@ function Refresh-SelectionState {
 
     # req3: "Seleziona tutto" attivo solo se c'e' almeno un elemento (e non occupato)
     $BtnToggleAll.IsEnabled = (-not $script:isBusy) -and ($total -gt 0)
-    # req4: "Aggiorna" attivo solo se almeno uno selezionato
-    $BtnUpdate.IsEnabled    = (-not $script:isBusy) -and ($sel -gt 0)
+    # req4: "Aggiorna" attivo solo se almeno uno selezionato. Ma mentre gira LA NOSTRA coda il
+    # pulsante e' Cancel e deve restare premibile: Set-PinFlags richiama questa funzione a
+    # stato ancora occupato, e senza la guardia spegneva il Cancel appena letti i pin.
+    if ($script:queueVerb -ne 'Update') {
+        $BtnUpdate.IsEnabled = (-not $script:isBusy) -and ($sel -gt 0) -and (-not $script:listStale)
+    }
 
     # Allinea l'etichetta del toggle allo stato reale della selezione
     $script:allSelected   = ($total -gt 0 -and $sel -eq $total)
@@ -30,7 +49,11 @@ function Refresh-SelectionState {
 
     # Due contatori: disponibili (top) e selezionati (action bar)
     $TxtAvailable.Text = if ($total -eq 0) { "" } elseif ($total -eq 1) { "1 update available" } else { "$total updates available" }
-    $TxtSelected.Text  = if ($sel -gt 0) { "$sel selected" } else { "" }
+    # A lista vecchia il contatore dei selezionati cede il posto al motivo per cui Update e'
+    # spento: un pulsante grigio senza spiegazione sembra un guasto.
+    $TxtSelected.Text  = if ($script:listStale) { "list out of date - press Check" }
+                         elseif ($sel -gt 0)    { "$sel selected" }
+                         else                   { "" }
 }
 
 # Applica lo stato occupato ai soli controlli di QUESTA scheda. La chiama Set-AppBusy
@@ -44,13 +67,27 @@ function Set-UpdatesBusy([bool]$busy) {
     # IsReadOnly blocca solo l'edit delle checkbox, che e' l'unica cosa da impedire.
     if ($busy) { [void]$Grid.CommitEdit() }
     $Grid.IsReadOnly = $busy
+    # Pin e Unpin spenti durante un'operazione: winget e' occupato, e una voce accesa che
+    # risponde "riprova fra un attimo" e' un rifiuto, non un blocco.
+    $MenuPinUpdates.IsEnabled   = -not $busy
+    $MenuUnpinUpdates.IsEnabled = -not $busy
+    # Il pulsante Update diventa Cancel SOLO se la coda in corso e' la nostra: un export o
+    # un'installazione dall'altra scheda alzano lo stesso stato occupato, e offrire di
+    # annullarli da qui sarebbe una bugia.
+    # Etichetta e tooltip si assegnano SEMPRE, non solo in un ramo: cosi' l'aspetto del
+    # pulsante e' una funzione di (occupato, quale coda) e non dipende da come ci si e'
+    # arrivati. Assegnandolo solo nel ramo a riposo restava "Cancel" a coda altrui avviata.
+    $ourQueue = $busy -and ($script:queueVerb -eq 'Update')
+    $BtnUpdate.Content = if ($ourQueue) { 'Cancel' } else { 'Update' }
+    $BtnUpdate.ToolTip = if ($ourQueue) { 'Finish the package in progress, then stop without starting the others' } else { $null }
+
     if ($busy) {
-        # Durante un'operazione i pulsanti selezione/aggiorna sono sempre spenti
+        # Durante un'operazione la selezione non si tocca.
         $BtnToggleAll.IsEnabled = $false
-        $BtnUpdate.IsEnabled    = $false
+        $BtnUpdate.IsEnabled    = $ourQueue
     }
     else {
-        # A riposo lo stato dipende da elenco e selezione
+        # A riposo lo stato dipende da elenco e selezione.
         Refresh-SelectionState
     }
 }
@@ -58,13 +95,20 @@ function Set-UpdatesBusy([bool]$busy) {
 # Carica/ricarica l'elenco upgrade in modo ASINCRONO (req 1): la scansione winget
 # gira in un runspace separato cosi' l'overlay di caricamento resta animato.
 function Load-Upgrades {
+    # Non si scansiona sopra un altro winget: la scheda Install non alza lo stato occupato
+    # mentre cerca, quindi il solo isBusy non basterebbe.
+    if (Test-WinGetBusy) { return }
+    # La lettura che si sta per fare E' la nuova fotografia: da qui il pulsante torna buono.
+    $script:listStale = $false
     Set-AppBusy $true
     Write-Log "Searching for updates..."
     $items.Clear()
     $TxtEmpty.Visibility     = [System.Windows.Visibility]::Collapsed
     $Grid.Visibility         = [System.Windows.Visibility]::Collapsed
     $TopSpinner.Visibility   = [System.Windows.Visibility]::Visible
-    # Azzera la barra: appartiene alla coda di aggiornamento precedente, non al nuovo elenco
+    # Barra indeterminata: una scansione non ha un avanzamento da mostrare, e una barra ferma
+    # a zero sembra un'operazione bloccata. I valori li rimette la coda di aggiornamento.
+    $Progress.IsIndeterminate = $true
     $Progress.Value   = 0
     $Progress.Maximum = 100
     Refresh-SelectionState
@@ -75,7 +119,7 @@ function Load-Upgrades {
     # insieme si contendono lo store e il comando esce in errore.
     # [void]: Start-BackgroundJob torna il job, che altrimenti finirebbe sulla pipeline.
     [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetUpgrades', 'Get-WinGetPins' `
-        -Vars @{ incUnknown = [bool]$ChkUnknown.IsChecked } `
+        -Vars @{ incUnknown = [bool]$ChkUnknown.IsChecked; wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{
                 Rows = @(Get-WinGetUpgrades $incUnknown)
@@ -84,6 +128,7 @@ function Load-Upgrades {
         } `
         -OnDone {
             param($result)
+            $Progress.IsIndeterminate = $false
             $TopSpinner.Visibility = [System.Windows.Visibility]::Collapsed
             $r = @($result)[0]
             if ($r) {
@@ -133,7 +178,8 @@ function Start-UpdateSelected {
         return
     }
 
-    Set-AppBusy $true
+    # Lo stato occupato lo prende Start-WinGetQueue, che e' anche il punto in cui si controlla
+    # che non ci sia gia' un winget in corso.
     Start-WinGetQueue -Rows $selected -Verb 'Update' -ArgsBuilder {
         param($r)
         # Aggiornamento silenzioso, match esatto sull'ID.
@@ -142,6 +188,11 @@ function Start-UpdateSelected {
         "upgrade --id `"$($r.Id)`" --include-unknown -e --silent --disable-interactivity --accept-source-agreements --accept-package-agreements"
     } -OnDone {
         Set-AppBusy $false
+        # L'elenco NON si ricarica da solo: cancellerebbe la colonna Result appena scritta,
+        # che e' il resoconto di com'e' andata. Ma le versioni mostrate ora sono vecchie,
+        # quindi Update si blocca fino al Check.
+        Set-UpdatesStale
+        Write-Log "The versions in this list are stale now: press Check to rescan."
     }
 }
 
@@ -150,6 +201,17 @@ function Initialize-UpdatesTab {
     Register-BusyHandler { param($busy) Set-UpdatesBusy $busy }
 
     $BtnRefresh.Add_Click({ Load-Upgrades })
+
+    # La spunta comanda --include-unknown. Si rilegge dalle preferenze e si risalva a ogni
+    # cambio; e ricarica subito, perche' una spunta che cambia COSA c'e' nell'elenco senza
+    # cambiare l'elenco costringe a premere Check per capire cosa ha fatto.
+    # IsChecked si imposta PRIMA di agganciare l'handler, altrimenti il ripristino farebbe
+    # partire una scansione a ogni avvio.
+    $ChkUnknown.IsChecked = [bool][int](Get-Pref 'IncludeUnknown' 0)
+    $ChkUnknown.Add_Click({
+        Set-Pref 'IncludeUnknown' ([int][bool]$ChkUnknown.IsChecked)
+        Load-Upgrades
+    })
 
     $BtnToggleAll.Add_Click({
         # Riallinea $script:allSelected allo stato REALE: il refresh differito di una spunta
@@ -166,30 +228,26 @@ function Initialize-UpdatesTab {
         Refresh-SelectionState
     })
 
-    $BtnUpdate.Add_Click({ Start-UpdateSelected })
+    # Lo stesso pulsante fa due cose: Update a riposo, Cancel mentre la nostra coda gira. Due
+    # pulsanti separati avrebbero significato uno sempre spento, a occupare spazio per dire
+    # niente.
+    $BtnUpdate.Add_Click({
+        if ($script:queueVerb -eq 'Update') {
+            Request-QueueCancel
+            $BtnUpdate.Content   = 'Cancelling...'
+            $BtnUpdate.IsEnabled = $false
+            Write-Log "Cancelling: the package in progress will finish, then the queue stops."
+            return
+        }
+        Start-UpdateSelected
+    })
 
     # Pin/Unpin dal menu contestuale, sulle righe EVIDENZIATE (non su quelle spuntate:
     # una riga pinnata ha la spunta disabilitata e non potrebbe piu' essere sbloccata).
     $MenuPinUpdates.Add_Click({   Set-PackagePin @($Grid.SelectedItems) $true })
     $MenuUnpinUpdates.Add_Click({ Set-PackagePin @($Grid.SelectedItems) $false })
 
-    # Aggiorna stato pulsanti/contatore quando l'utente spunta/despunta manualmente.
-    # Il binding e' UpdateSourceTrigger=PropertyChanged, ma il valore arriva sull'oggetto solo
-    # DOPO che il ToggleButton ha commutato: il ricalcolo va rimandato a priorita' Background.
-    # NB: BeginInvoke([action]{...}, 'Background') NON esiste come overload -> PowerShell
-    # risolve su BeginInvoke(Delegate, params Object[]) e passa 'Background' COME ARGOMENTO a
-    # un delegate senza parametri => TargetParameterCountException, che risale da ShowDialog().
-    # Va usata la forma con la priorita' PER PRIMA e l'enum tipizzato.
-    $queueSelectionRefresh = {
-        $window.Dispatcher.BeginInvoke(
-            [System.Windows.Threading.DispatcherPriority]::Background,
-            [action]{ Refresh-SelectionState }) | Out-Null
-    }
-    $Grid.Add_CellEditEnding($queueSelectionRefresh)
-    # PreviewMouseLeftButtonUp: evento tunneling, raggiunge la griglia prima che il CheckBox
-    # marchi l'evento come gestito -> contatore e label si aggiornano al click, non alla
-    # perdita di focus della cella.
-    $Grid.Add_PreviewMouseLeftButtonUp($queueSelectionRefresh)
+    # Contatore ed etichette si ricalcolano quando l'utente spunta o despunta: il come sta in
+    # Register-GridRefresh (App.Ui.ps1), uguale per tutte e tre le griglie.
+    Register-GridRefresh $Grid 'Refresh-SelectionState'
 }
-
-

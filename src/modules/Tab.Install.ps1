@@ -80,7 +80,7 @@ function Start-Search([bool]$IncludeStore = $false) {
     # butta. Senza questo, due ricerche che rientrano fuori ordine lascerebbero in
     # griglia i risultati della query precedente.
     [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetSearch' `
-        -Vars @{ q = $q; store = $IncludeStore } `
+        -Vars @{ q = $q; store = $IncludeStore; wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{ Query = $q; Rows = @(Get-WinGetSearch $q $store) }
         } `
@@ -134,7 +134,8 @@ function Install-Rows([object[]]$Rows) {
         Write-Log "         Per-user packages will install into that profile. Use Scope: Machine to install for all users."
     }
 
-    Set-AppBusy $true
+    # Lo stato occupato lo prende Start-WinGetQueue, che e' anche il punto in cui si controlla
+    # che non ci sia gia' un winget in corso.
     # Lo scope si calcola QUI e viaggia come variabile del runspace: -ArgsBuilder gira
     # dentro il runspace e non vedrebbe $script:installScope.
     $scopeArg = switch ($script:installScope) {
@@ -150,6 +151,7 @@ function Install-Rows([object[]]$Rows) {
     } -OnDone {
         Set-AppBusy $false
         # L'elenco della scheda Updates e' stato calcolato prima di queste installazioni.
+        Set-UpdatesStale
         Write-Log "The Updates list may be out of date now: press Check to rescan."
     }
 }
@@ -170,6 +172,13 @@ function Initialize-InstallTab {
     $GridSearch.ItemsSource = $searchItems
     $GridSearch.Visibility  = [System.Windows.Visibility]::Collapsed
     Register-BusyHandler { param($busy) Set-InstallBusy $busy }
+
+    # Le due scelte della scheda si rileggono dalle preferenze: prima si perdevano a ogni
+    # avvio. Lo Scope resta accanto al pulsante Install che lo usa, non in Settings.
+    $ChkStore.IsChecked = [bool][int](Get-Pref 'IncludeStore' 0)
+    $ChkStore.Add_Click({ Set-Pref 'IncludeStore' ([int][bool]$ChkStore.IsChecked) })
+    $saved = [string](Get-Pref 'InstallScope' 'Auto')
+    if ($saved -in @('Auto', 'User', 'Machine')) { $script:installScope = $saved }
     Update-ScopeButton
 
     # Suggerimenti mentre si digita: il timer riparte a ogni tasto e la ricerca scatta
@@ -210,6 +219,7 @@ function Initialize-InstallTab {
             default   { 'Auto' }
         }
         Update-ScopeButton
+        Set-Pref 'InstallScope' $script:installScope
     })
 
     $BtnInstall.Add_Click({ Start-InstallSelected })
@@ -221,14 +231,6 @@ function Initialize-InstallTab {
         if ($row) { Install-Rows @($row) }
     })
 
-    # Stesso meccanismo della scheda Updates: il valore della spunta arriva sull'oggetto
-    # solo dopo che il ToggleButton ha commutato, quindi il ricalcolo va rimandato.
-    $queueInstallRefresh = {
-        $window.Dispatcher.BeginInvoke(
-            [System.Windows.Threading.DispatcherPriority]::Background,
-            [action]{ Refresh-InstallState }) | Out-Null
-    }
-    $GridSearch.Add_CellEditEnding($queueInstallRefresh)
-    $GridSearch.Add_PreviewMouseLeftButtonUp($queueInstallRefresh)
+    Register-GridRefresh $GridSearch 'Refresh-InstallState'
 }
 

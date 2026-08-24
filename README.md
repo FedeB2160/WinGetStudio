@@ -17,7 +17,7 @@ Download `WinGetStudio.exe` from the [latest release](https://github.com/FedeB21
 
 ## Using it
 
-The window has three tabs. The **progress bar and the log at the bottom stay visible from every tab**, so you can start a long update, switch tab, and still see how it is going.
+The window has three tabs, plus **Settings** and **About** pinned to the right of the strip. **Unknown**, **MS Store** and **Scope** are remembered between launches, next to the theme. The **progress bar and the log at the bottom stay visible from every tab**, so you can start a long update, switch tab, and still see how it is going.
 
 ### Updates
 
@@ -25,8 +25,12 @@ The window has three tabs. The **progress bar and the log at the bottom stay vis
    - **Unknown** (off by default) also lists packages whose installed version winget cannot determine. It applies to the *next* check.
 2. Tick what you want, or **Select all**.
 3. **Update** upgrades them one at a time. Each row shows its own outcome, and slow installers are never cut off — the log writes a line every 30 seconds so you can see it is still working.
+   - While the queue runs, **Update** reads **Cancel**. Pressing it lets the package in progress finish and then stops, so nothing is interrupted halfway through an installer; the packages that never ran keep their tick and an empty result.
+4. When the queue ends, **Update** is greyed until you press **Check** again. The versions on screen describe the machine as it was before, so running the queue on them would report failures for packages that had in fact succeeded. The list is not rebuilt automatically on purpose: that would wipe the outcome of each row, which is the point of the Result column.
 
-The list stays scrollable while updating, and columns can be resized by dragging their edge in the header.
+The list stays scrollable while updating — the ticks and the pin entries are greyed, not the list — and columns can be resized by dragging their edge in the header.
+
+While a scan is running the progress bar is **indeterminate**: a scan has no progress to report, and a bar sitting at zero looks like something stuck. It shows real progress only for a queue, which knows how many packages it has.
 
 ### Install
 
@@ -55,14 +59,24 @@ After an uninstall the list is not rebuilt automatically, so you can read the ou
 
 A pin tells winget to leave a package alone until you remove the pin — for the one that keeps reappearing and that you do not want touched.
 
-**Right click a row** in Updates or Installed → *Pin (block upgrades)* or *Remove pin*. It works on the highlighted rows, not the ticked ones. A pinned package shows a pin icon and is skipped by updates, including *Select all*. It can still be uninstalled: a pin blocks upgrades, not removal.
+**Right click a row** in Updates or Installed → *Pin highlighted* or *Remove pin from highlighted*. It works on the highlighted rows, not the ticked ones, and the entries say so. A pinned package shows a pin icon and is skipped by updates, including *Select all*. It can still be uninstalled: a pin blocks upgrades, not removal.
 
 ### Settings
 
-The **gear button** in the top-right corner opens the settings screen; the **X** or **Esc** closes it.
+The **Settings** tab, on the right of the strip next to About, is a tab like the others — so the progress bar and the log stay visible while you are in it.
 
-- **Theme** — `Light`, `Dark`, or `Auto` to follow Windows (which it keeps following while the window is open).
+- **Theme** — `Light`, `Dark`, or `System` to follow Windows (which it keeps following while the window is open).
 - **Installed version** and **Check for updates** — see below.
+- **Tab strip** — whether the tabs show their icon, their name, or both. Every tab also has a tooltip saying what it is for.
+- **Check for updates at startup** — on by default, and it can be turned off: it is one anonymous call to the GitHub API every time the app starts. The **Check for updates** button always works regardless.
+
+### About
+
+Its own tab, at the very right end of the strip: what the app does function by function, and links to the source, the release notes, the licence and where to report a bug.
+
+### Keyboard
+
+**F5** rescans the active tab — Updates or Installed; it does nothing on the others. **Ctrl+F** jumps to the Install tab with the cursor in the search box.
 
 ### What the Result column means
 
@@ -75,7 +89,7 @@ The **gear button** in the top-right corner opens the settings screen; the **X**
 
 ## Automatic updates
 
-At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the settings screen, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, the file is verified against the checksum published with the release, and the app then replaces itself and restarts.
+At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the Settings tab, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, the file is verified against the checksum published with the release, and the app then replaces itself and restarts.
 
 If there is no newer release, no network, or you are running from source, the check says nothing at all. You can always ask explicitly with **Check for updates**, which does report the outcome either way.
 

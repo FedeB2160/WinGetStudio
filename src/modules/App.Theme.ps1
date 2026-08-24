@@ -1,5 +1,5 @@
 <#
-    App.Theme.ps1 — tema Light / Dark / Auto.
+    App.Theme.ps1 — tema Light / Dark / System.
 
     I colori stanno in ui\Theme.Light.xaml / ui\Theme.Dark.xaml e vengono montati in
     Resources.MergedDictionaries: UI.xaml li referenzia con DynamicResource, quindi
@@ -11,8 +11,6 @@
     Caricato dal bootstrap (src\main.ps1): dot-source come .ps1,
     concatenato nell'exe al posto del marcatore ###MODULES###.
 #>
-
-$themeKey = 'HKCU:\Software\WinGetStudio'
 
 # Tema di sistema: AppsUseLightTheme = 0 -> scuro. Assente su Win10 vecchi -> chiaro.
 function Test-SystemDark {
@@ -54,23 +52,24 @@ function Set-Theme {
         (Read-Xaml $(if ($dark) { 'Theme.Dark.xaml' } else { 'Theme.Light.xaml' })))
     Set-TitleBarDark $dark
 
-    # In Auto si dice quale dei due tempi sta seguendo, altrimenti la scelta non spiega
+    # In System si dice quale dei due tempi sta seguendo, altrimenti la scelta non spiega
     # cosa si vede a schermo.
-    $TxtThemeHint.Text = if ($script:themeMode -eq 'Auto') {
+    $TxtThemeHint.Text = if ($script:themeMode -eq 'System') {
         "following the system: $(if ($dark) { 'dark' } else { 'light' })"
     } else { '' }
 }
 
 function Initialize-Theme {
-    $script:themeMode = 'Auto'   # Auto | Light | Dark
-    try {
-        $saved = (Get-ItemProperty -Path $themeKey -Name Theme -ErrorAction Stop).Theme
-        if ($saved -in @('Auto', 'Light', 'Dark')) { $script:themeMode = $saved }
-    } catch { }
+    # System | Light | Dark. "System" e non "Auto": dice cosa segue invece di lasciarlo
+    # indovinare. Un valore fuori dai tre torna al default — compreso l'"Auto" che le versioni
+    # fino alla 1.9.0 salvavano, che e' esattamente lo stesso comportamento con un altro nome,
+    # quindi chi aggiorna non perde niente e non serve una conversione.
+    $saved = [string](Get-Pref 'Theme' 'System')
+    $script:themeMode = if ($saved -in @('System', 'Light', 'Dark')) { $saved } else { 'System' }
 
     # Le voci sono ANCHE i valori salvati nel registro: nessuna tabella di conversione
     # fra etichetta a schermo e valore memorizzato.
-    foreach ($m in 'Light', 'Dark', 'Auto') { [void]$CmbTheme.Items.Add($m) }
+    foreach ($m in 'Light', 'Dark', 'System') { [void]$CmbTheme.Items.Add($m) }
     $CmbTheme.SelectedItem = $script:themeMode
 
     # NB: Set-Theme non riscrive la selezione della tendina, altrimenti questo handler
@@ -79,14 +78,11 @@ function Initialize-Theme {
         $chosen = [string]$CmbTheme.SelectedItem
         if (-not $chosen -or $chosen -eq $script:themeMode) { return }
         $script:themeMode = $chosen
-        try {
-            if (-not (Test-Path $themeKey)) { New-Item -Path $themeKey -Force | Out-Null }
-            Set-ItemProperty -Path $themeKey -Name Theme -Value $script:themeMode
-        } catch { }   # scelta non persistita: non e' un motivo per non applicare il tema
+        Set-Pref 'Theme' $script:themeMode
         Set-Theme
     })
 
-    # In Auto: segue il tema di sistema a caldo.
+    # In System: segue il tema di sistema a caldo.
     # ponytail: poll a 5s invece di SystemEvents.UserPreferenceChanged — l'evento arriva su un
     # thread non-UI e va deiscritto a mano, altrimenti il processo non esce. Se servisse
     # reattivita' istantanea, passare all'evento con unsubscribe in Add_Closed.
@@ -94,7 +90,7 @@ function Initialize-Theme {
     $script:themeTimer = New-Object System.Windows.Threading.DispatcherTimer
     $script:themeTimer.Interval = [TimeSpan]::FromSeconds(5)
     $script:themeTimer.Add_Tick({
-        if ($script:themeMode -ne 'Auto') { return }
+        if ($script:themeMode -ne 'System') { return }
         $d = Test-SystemDark
         if ($d -ne $script:lastSysDark) { $script:lastSysDark = $d; Set-Theme }
     })

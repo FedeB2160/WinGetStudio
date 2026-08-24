@@ -51,7 +51,7 @@ function Get-LatestRelease([string]$Repo) {
 
         return [PSCustomObject]@{
             Tag    = $r.tag_name
-            # I tag sono "v1.6.0": la v va togliesta per confrontare come versione.
+            # I tag sono "v1.6.0": la v va tolta per confrontare come versione.
             Version = ($r.tag_name -replace '^[vV]', '')
             Name   = $asset.name
             Url    = $asset.browser_download_url
@@ -101,6 +101,9 @@ function Start-UpdateCheck([switch]$Manual) {
         if ($Manual) { $TxtUpdateStatus.Text = 'Updates apply to the compiled exe only; from source use git.' }
         return
     }
+    # Il controllo AUTOMATICO si puo' spegnere; quello chiesto dal pulsante no — chi lo premette
+    # lo sta chiedendo adesso.
+    if (-not $Manual -and -not $ChkAutoCheck.IsChecked) { return }
     if ($script:isBusy) { return }
 
     if ($Manual) {
@@ -144,7 +147,11 @@ function Start-UpdateCheck([switch]$Manual) {
 # Scarica, verifica e sostituisce. Chiamata dal pulsante, dopo conferma.
 function Start-SelfUpdate {
     $rel = $script:pendingUpdate
-    if (-not $rel -or $script:isBusy) { return }
+    # Test-WinGetBusy e non isBusy: questa funzione finisce sostituendo l'eseguibile e
+    # chiudendo la finestra, e farlo mentre un runspace sta ancora dentro winget e' l'ultima
+    # cosa da fare. Il controllo automatico degli aggiornamenti (Start-UpdateCheck) resta su
+    # isBusy: quello parla solo con GitHub e non tocca niente.
+    if (-not $rel -or (Test-WinGetBusy)) { return }
     $exe = Get-RunningExePath
     if (-not $exe) { return }
 
@@ -227,6 +234,8 @@ function Initialize-Update {
     Clear-OldExe                     # pulisce il residuo dell'aggiornamento precedente
     # La versione sta qui, non nel titolo della finestra.
     $TxtVersion.Text = "v$AppVersion"
+    $ChkAutoCheck.IsChecked = [bool][int](Get-Pref 'CheckAtStartup' 1)
+    $ChkAutoCheck.Add_Click({ Set-Pref 'CheckAtStartup' ([int][bool]$ChkAutoCheck.IsChecked) })
     $BtnUpdateApp.Add_Click({ Start-SelfUpdate })
     $BtnCheckUpdate.Add_Click({ Start-UpdateCheck -Manual })
     Register-BusyHandler {

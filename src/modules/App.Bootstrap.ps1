@@ -94,6 +94,38 @@ function Read-Xaml([string]$name) {
 }
 
 # ------------------------------------------------------------------
+# STRISCIA DEI TAB
+# ------------------------------------------------------------------
+# Cosa mostrano le linguette: icona, parola, o entrambe. Due Visibility nelle Resources
+# della finestra invece di otto controlli nominati — il template dell'header le legge con
+# DynamicResource, quindi riscriverle ridisegna la striscia senza ricostruire nulla.
+# Set-Theme non le tocca: quel metodo svuota i MergedDictionaries, non le Resources proprie.
+$script:tabStyles = @('Icon', 'Text', 'Icon + Text')
+
+function Set-TabHeaderStyle([string]$mode) {
+    $window.Resources['TabIconVis'] =
+        if ($mode -eq 'Text') { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible }
+    $window.Resources['TabTextVis'] =
+        if ($mode -eq 'Icon') { [System.Windows.Visibility]::Collapsed } else { [System.Windows.Visibility]::Visible }
+}
+
+function Initialize-TabHeaders {
+    $saved = [string](Get-Pref 'TabHeaderStyle' 'Icon + Text')
+    if ($saved -notin $script:tabStyles) { $saved = 'Icon + Text' }
+    foreach ($m in $script:tabStyles) { [void]$CmbTabStyle.Items.Add($m) }
+    # SelectedItem PRIMA di agganciare l'handler, altrimenti la scelta ripristinata verrebbe
+    # risalvata a ogni avvio.
+    $CmbTabStyle.SelectedItem = $saved
+    Set-TabHeaderStyle $saved
+    $CmbTabStyle.Add_SelectionChanged({
+        $chosen = [string]$CmbTabStyle.SelectedItem
+        if (-not $chosen) { return }
+        Set-TabHeaderStyle $chosen
+        Set-Pref 'TabHeaderStyle' $chosen
+    })
+}
+
+# ------------------------------------------------------------------
 # AVVIO
 # ------------------------------------------------------------------
 # -NoShow monta tutto senza aprire la finestra: e' la cucitura che permette a
@@ -128,8 +160,9 @@ function Start-App([switch]$NoShow) {
         'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
         'BtnExport', 'BtnImport',
         'CmbTheme', 'TxtThemeHint', 'TxtVersion', 'BtnCheckUpdate', 'BtnUpdateApp',
-        'UpdateSpinner', 'TxtUpdateStatus',
-        'BtnSettings', 'BtnCloseSettings', 'SettingsPanel'
+        'UpdateSpinner', 'TxtUpdateStatus', 'ChkAutoCheck', 'CmbTabStyle',
+        'TabAbout', 'AboutTable',
+        'TabInstall', 'TabInstalled', 'TabUpdates', 'TabSettings'
     )) {
         $c = $script:window.FindName($n)
         if (-not $c) { throw "Control not found in UI.xaml: $n" }
@@ -143,20 +176,55 @@ function Start-App([switch]$NoShow) {
         try { $script:window.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri]$iconPath) } catch { }
     }
 
+    # I link della scheda Settings: WPF non apre il browser da solo. Un solo handler sulla
+    # finestra invece di uno per link, cosi' un link nuovo non richiede codice nuovo.
+    # NB: l'app gira elevata, quindi il browser eredita l'elevazione. Aprirlo come utente
+    # interattivo richiederebbe una ShellExecute impersonata: se diventa un problema, i link
+    # diventano testo selezionabile.
+    $script:window.AddHandler(
+        [System.Windows.Documents.Hyperlink]::RequestNavigateEvent,
+        [System.Windows.Navigation.RequestNavigateEventHandler]{
+            param($s, $e)
+            try { Start-Process $e.Uri.AbsoluteUri } catch { Write-Log "Could not open $($e.Uri): $($_.Exception.Message)" }
+            $e.Handled = $true
+        })
+
+    # Scorciatoie. PreviewKeyDown sulla FINESTRA e non sui controlli: in tunneling la finestra
+    # vede il tasto per prima, mentre un DataGrid che ha il fuoco si mangerebbe F5 e Ctrl+F per
+    # conto suo. Il tab attivo decide cosa ricaricare: una scorciatoia che agisce su una scheda
+    # che non si sta guardando sorprende. Load-Upgrades e Load-Installed rifiutano gia' di
+    # partire sopra un altro winget, quindi qui non serve nessun controllo.
+    $script:window.Add_PreviewKeyDown({
+        param($s, $e)
+        if ($e.Key -eq [System.Windows.Input.Key]::F5) {
+            if     ($TabMain.SelectedItem -eq $TabUpdates)   { Load-Upgrades;  $e.Handled = $true }
+            elseif ($TabMain.SelectedItem -eq $TabInstalled) { Load-Installed; $e.Handled = $true }
+        }
+        elseif ($e.Key -eq [System.Windows.Input.Key]::F -and
+                ($e.KeyboardDevice.Modifiers -band [System.Windows.Input.ModifierKeys]::Control)) {
+            $TabInstall.IsSelected = $true
+            [void]$TxtSearch.Focus()
+            $e.Handled = $true
+        }
+    })
+
     # 5) Aggancio dei controlli: da qui in poi i moduli possono lavorare.
     Initialize-Theme
+    Initialize-TabHeaders
     Initialize-UpdatesTab
     Initialize-InstallTab
     Initialize-InstalledTab
     Initialize-Backup
     Initialize-Update
-    Initialize-Settings
 
-    # Alla chiusura: ferma timer e chiudi i job pendenti, cosi' il processo termina
-    # davvero (niente thread in background lasciati vivi).
+    # Alla chiusura: ferma i timer e chiudi i job pendenti, cosi' il processo termina
+    # davvero (niente thread in background lasciati vivi). ENTRAMBI i timer: se la ragione
+    # vale per quello del tema, vale anche per quello del typeahead.
     $script:window.Add_Closed({
         Stop-AllJobs
-        if ($script:themeTimer) { try { $script:themeTimer.Stop() } catch { } }
+        foreach ($t in $script:themeTimer, $script:searchTimer) {
+            if ($t) { try { $t.Stop() } catch { } }
+        }
     })
 
     # Carica gli upgrade all'apertura. Secondo Set-Theme: al primo giro la finestra non
@@ -166,7 +234,3 @@ function Start-App([switch]$NoShow) {
     if ($NoShow) { return }
     $script:window.ShowDialog() | Out-Null
 }
-
-
-
-

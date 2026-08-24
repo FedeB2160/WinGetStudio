@@ -49,6 +49,16 @@ function Get-UpdateStatus([int]$code) {
 # $Tick viene invocato ogni 30s con i secondi trascorsi (log "elapsed"). Nessun
 # timeout: gli installer lenti non vengono troncati.
 function Invoke-WinGet([string]$exePath, [string]$argLine, [scriptblock]$Tick) {
+    # La riga finisce dentro cmd per CONCATENAZIONE, e ogni chiamante interpola l'Id del
+    # pacchetto fra apici (--id "$($r.Id)"). Con un numero DISPARI di apici doppi il comando
+    # che cmd vede non e' quello che intendevamo, e cmd lo esegue lo stesso: meglio fermarsi.
+    # Gli Id vengono dal catalogo winget e dal registro ARP, dove il nome lo scrive
+    # l'installer — cioe' una terza parte — e questo processo gira elevato.
+    # NB: NON copre l'espansione di %VAR% che cmd fa sulla riga di comando. E' un problema
+    # diverso e questa guardia non va creduta completa.
+    if ((($argLine.ToCharArray() | Where-Object { $_ -eq '"' }).Count % 2) -ne 0) {
+        throw "winget arguments have unbalanced quotes, refusing to run: $argLine"
+    }
     $outFile = Join-Path ([IO.Path]::GetTempPath()) "wgt_$([Guid]::NewGuid().ToString('N')).out"
     $errFile = [IO.Path]::ChangeExtension($outFile, 'err')
     try {

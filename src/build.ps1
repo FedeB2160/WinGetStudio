@@ -143,5 +143,3 @@ else {
 }
 
 Write-Host "`nFatto: $out (versione $version)" -ForegroundColor Green
-
-
