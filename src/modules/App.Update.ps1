@@ -83,6 +83,19 @@ function Get-RunningExePath {
     return $exe
 }
 
+# Installato da winget come pacchetto "portable"? Allora l'exe sta dentro la cartella che
+# winget gestisce, e sostituirlo da soli rompe l'installazione: winget ha registrato lo
+# SHA256 del file, quindi dopo un auto-update considera il pacchetto modificato e rifiuta
+# upgrade e uninstall senza --force; il ".old" lasciato accanto gli impedisce di ripulire
+# la cartella, perche' non e' un file che ha installato lui; e la voce di uninstall continua
+# a dichiarare la versione vecchia, cosi' un "winget install" risponde gia-presente.
+# Risultato: l'app non si avvia piu' e non si reinstalla. In questo caso l'aggiornamento
+# spetta a winget, non a noi.
+function Test-IsWinGetPortable {
+    $exe = Get-RunningExePath
+    return [bool]($exe -and $exe -like '*\Microsoft\WinGet\Packages\*')
+}
+
 # Rimuove il ".old" lasciato dall'aggiornamento precedente. Best effort: se il file e'
 # ancora in uso si riprovera' al prossimo avvio.
 function Clear-OldExe {
@@ -99,6 +112,11 @@ function Clear-OldExe {
 function Start-UpdateCheck([switch]$Manual) {
     if (-not (Get-RunningExePath)) {
         if ($Manual) { $TxtUpdateStatus.Text = 'Updates apply to the compiled exe only; from source use git.' }
+        return
+    }
+    # Non si propone nulla: il pulsante di aggiornamento non deve nemmeno comparire.
+    if (Test-IsWinGetPortable) {
+        if ($Manual) { $TxtUpdateStatus.Text = "Installed with winget: update with 'winget upgrade $SelfPackageId'." }
         return
     }
     # Il controllo AUTOMATICO si puo' spegnere; quello chiesto dal pulsante no — chi lo premette
@@ -151,7 +169,7 @@ function Start-SelfUpdate {
     # chiudendo la finestra, e farlo mentre un runspace sta ancora dentro winget e' l'ultima
     # cosa da fare. Il controllo automatico degli aggiornamenti (Start-UpdateCheck) resta su
     # isBusy: quello parla solo con GitHub e non tocca niente.
-    if (-not $rel -or (Test-WinGetBusy)) { return }
+    if (-not $rel -or (Test-WinGetBusy) -or (Test-IsWinGetPortable)) { return }
     $exe = Get-RunningExePath
     if (-not $exe) { return }
 

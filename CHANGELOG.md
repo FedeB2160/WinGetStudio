@@ -1,5 +1,29 @@
 # Changelog
 
+## v1.10.1
+
+Fixes only, all of them found in 1.10.0. Coming from v1.10.0: download the new exe and delete the old one, or let the app update itself from **Settings** — unless you installed it with winget, in which case read the first entry.
+
+### Installed with winget, the app no longer replaces itself
+
+A winget `portable` package is a file winget owns: it keeps the exe in its own folder, records the file's SHA-256, and expects to find exactly that back. Updating from **Settings** renamed that file and wrote a new one over it, which left winget with a hash that no longer matched, a leftover `.exe.old` it had never installed, and an uninstall entry still naming the old version. From there `winget upgrade` and `winget uninstall` refused to touch the package and `winget install` answered that it was already installed, so the app could neither start nor be reinstalled.
+
+When the running exe sits in winget's package folder, the update button no longer appears and **Check for updates** says to use `winget upgrade FedeB2160.WinGetStudio` instead. Nothing changes for a copy of the exe you placed yourself.
+
+If a machine is already in that state: `winget uninstall FedeB2160.WinGetStudio --force`, then install again from an elevated prompt.
+
+### Tooltips belonging to something else
+
+Hovering a control with no tooltip of its own showed the tooltip of the tab it was in — hovering **Check for updates** in Settings explained the Settings tab. WPF looks for a tooltip by walking up from the control, and it walks the logical tree, where the content of a tab hangs off the tab itself; the text has moved off the tab and onto the tab's own header, so it stays where it belongs.
+
+The Result column had a second one: an empty grey box opened over every row that had no result yet, because an empty string is a tooltip as far as WPF is concerned. It only appears now when there is a result to explain.
+
+Tooltips also follow the theme, instead of arriving white with black text over the dark one, and a long one wraps rather than running off the screen.
+
+### The Updates section of Settings reads in two lines
+
+Version, **Check for updates** and its outcome share one line, the startup check the next, each with its label on the left like the rest of the page. Before, three of them were stacked with nothing in the label column, so the checkbox and the buttons floated in the middle of the page.
+
 ## v1.10.0
 
 Coming from v1.9.0: download the new exe and delete the old one, or let the app update itself from **Settings**. Your theme carries over; if it was set to `Auto` it becomes `System`, which is the same thing under a name that says what it does.

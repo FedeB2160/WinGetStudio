@@ -327,8 +327,20 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
+                        <!-- Il ToolTip della linguetta sta QUI e non sul TabItem. WPF cerca il
+                             tooltip risalendo anche l'albero LOGICO, e nell'albero logico il
+                             padre del contenuto di una scheda e' il TabItem stesso: con il
+                             ToolTip sul TabItem, ogni controllo della pagina che non ne aveva
+                             uno proprio mostrava quello della linguetta (verificato a finestra
+                             aperta: cursore sul pulsante Check for updates, tooltip aperto con
+                             PlacementTarget = TabItem[TabSettings]). Il Border del template
+                             copre tutta la linguetta e non e' antenato del contenuto, quindi il
+                             tooltip resta dove serve e non cola nella pagina. Il testo vive in
+                             AutomationProperties.HelpText della linguetta, che e' anche il posto
+                             giusto per uno screen reader. -->
                         <Border x:Name="bd" Margin="0,0,2,0" CornerRadius="4,4,0,0"
                                 BorderThickness="1,1,1,0"
+                                ToolTip="{Binding Path=(AutomationProperties.HelpText), RelativeSource={RelativeSource TemplatedParent}}"
                                 Background="{DynamicResource CtrlBgBrush}"
                                 BorderBrush="{DynamicResource CtrlBorderBrush}">
                             <!-- 9px per lato contro i 7 di stacco fra icona e parola: prima erano
@@ -362,7 +374,7 @@
              Sta qui come risorsa perche' la usano tutte le griglie (Updates, Install e
              le prossime), sempre identica. -->
         <DataTemplate x:Key="ResultCell">
-            <Grid HorizontalAlignment="Center" ToolTip="{Binding StatusDetail}">
+            <Grid HorizontalAlignment="Center">
                 <Control x:Name="cellSpinner" Width="18" Height="18"
                          Style="{StaticResource Spinner}" Visibility="Collapsed"/>
                 <!-- Icone di stato dal set di sistema di Windows 11 (fallback a
@@ -371,8 +383,15 @@
                      un icon font in Bold viene ingrassato per sintesi e sbava.
                      AutomationProperties.Name lo scrivono i DataTrigger insieme al glifo:
                      senza, uno screen reader leggerebbe il codepoint del carattere. -->
+                <!-- Il ToolTip sta sul GLIFO e non sulla Grid della cella: la Grid c'e'
+                     sempre, e Start-WinGetQueue azzera StatusDetail a stringa VUOTA, che per WPF
+                     non e' "nessun tooltip" ma "tooltip vuoto". Risultato: un rettangolino
+                     vuoto che si apriva passando sulla colonna Result di qualunque riga
+                     senza esito. Un elemento Collapsed non riceve il mouse, quindi con il
+                     tooltip qui compare solo quando c'e' davvero un esito da spiegare. -->
                 <TextBlock x:Name="cellIcon" FontSize="16"
                            FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                           ToolTip="{Binding StatusDetail}"
                            AutomationProperties.Name="No result yet"
                            HorizontalAlignment="Center" VerticalAlignment="Center"
                            Visibility="Collapsed"/>
@@ -439,6 +458,39 @@
                     <Setter Property="IsEnabled" Value="False"/>
                 </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <!-- Tooltip: stessa storia del menu contestuale. Aero2 lo disegna bianco con testo
+             nero, quindi in tema scuro era un rettangolo chiaro in mezzo alla pagina. Stesse
+             chiavi del menu contestuale, cosi' i due riquadri che si aprono sopra la pagina si
+             somigliano. HasDropShadow spento: l'ombra la disegna il tema di sistema e resta
+             chiara comunque.
+             Un TextBlock e non un ContentPresenter perche' serve TextWrapping: il tooltip piu'
+             lungo (quello del controllo aggiornamenti all'avvio) e' una riga da oltre 500px che
+             usciva dallo schermo, e TextWrapping non e' una proprieta' ereditata, quindi su un
+             ContentPresenter non si puo' imporre. Tutti i tooltip di questa interfaccia sono
+             stringhe; se un domani ne servisse uno con dentro dei controlli, qui va un
+             ContentPresenter e il capo a riga si risolve altrimenti. -->
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="{DynamicResource CtrlBgBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource FgBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CtrlBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="HasDropShadow" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Padding="{TemplateBinding Padding}" CornerRadius="4">
+                            <TextBlock Text="{TemplateBinding Content}" TextWrapping="Wrap"
+                                       MaxWidth="360" Foreground="{TemplateBinding Foreground}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <!-- Menu contestuale: quello di sistema (Aero2) disegna sfondo chiaro e testo nero,
@@ -708,7 +760,7 @@
             <TabControl x:Name="TabMain">
                 <TabItem x:Name="TabInstall" Header="Install" Tag="&#xE896;"
                          AutomationProperties.Name="Install"
-                         ToolTip="Search the winget catalogue as you type and install what you pick">
+                         AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>   <!-- ricerca -->
@@ -808,7 +860,7 @@
 
                 <TabItem x:Name="TabInstalled" Header="Installed" Tag="&#xE71D;"
                          AutomationProperties.Name="Installed"
-                         ToolTip="Everything installed on this machine: filter it, pin it, uninstall it">
+                         AutomationProperties.HelpText="Everything installed on this machine: filter it, pin it, uninstall it">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>   <!-- comandi e filtro -->
@@ -908,7 +960,7 @@
                      questa, e aprire su un tab che nessuno guarda nasconderebbe il conteggio. -->
                 <TabItem x:Name="TabUpdates" Header="Updates" Tag="&#xE777;" IsSelected="True"
                          AutomationProperties.Name="Updates"
-                         ToolTip="Packages with a newer version available, and the queue that updates them">
+                         AutomationProperties.HelpText="Packages with a newer version available, and the queue that updates them">
                     <Grid>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>   <!-- top bar -->
@@ -1021,7 +1073,7 @@
                 <TabItem x:Name="TabAbout" Header="About" Tag="&#xE946;"
                          DockPanel.Dock="Right" Margin="0,0,-2,0"
                          AutomationProperties.Name="About"
-                         ToolTip="What this app does, where to report a bug, and the licence">
+                         AutomationProperties.HelpText="What this app does, where to report a bug, and the licence">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <!-- ABOUT. Le cinque funzioni stanno in una TABELLA SENZA BORDI: una Grid
                              a due colonne, nome a sinistra e descrizione a destra. In un blocco di
@@ -1116,7 +1168,7 @@
                 <TabItem x:Name="TabSettings" Header="Settings" Tag="&#xE713;"
                          DockPanel.Dock="Right"
                          AutomationProperties.Name="Settings"
-                         ToolTip="Theme, tab strip, version and updates">
+                         AutomationProperties.HelpText="Theme, tab strip, version and updates">
                     <!-- Impostazioni in colonna: sono pochi controlli e crescono in verticale.
                          ScrollViewer per non tagliarli a finestra piccola. -->
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
@@ -1138,9 +1190,8 @@
                                 <RowDefinition Height="Auto"/>   <!-- 1 tema -->
                                 <RowDefinition Height="Auto"/>   <!-- 2 striscia dei tab -->
                                 <RowDefinition Height="Auto"/>   <!-- 3 UPDATES -->
-                                <RowDefinition Height="Auto"/>   <!-- 4 versione -->
+                                <RowDefinition Height="Auto"/>   <!-- 4 versione, pulsanti ed esito -->
                                 <RowDefinition Height="Auto"/>   <!-- 5 spunta controllo all'avvio -->
-                                <RowDefinition Height="Auto"/>   <!-- 6 pulsanti -->
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="APPEARANCE"
@@ -1164,22 +1215,18 @@
 
                             <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="UPDATES"
                                        Style="{StaticResource SettingsHeader}"/>
+                            <!-- Versione, pulsanti ed esito su UNA riga, con la sua etichetta a
+                                 sinistra come nelle righe di APPEARANCE. Prima erano tre righe
+                                 impilate e due di quelle avevano la prima colonna vuota: la
+                                 spunta e i pulsanti restavano appesi a meta' pagina, rientrati
+                                 rispetto a un'etichetta che non c'era. La sezione ha due voci,
+                                 non sei, quindi va letta in due righe. -->
                             <TextBlock Grid.Row="4" Grid.Column="0" Text="Installed version" Margin="0,0,14,10"
                                        VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" x:Name="TxtVersion" Margin="0,0,0,10"
-                                       VerticalAlignment="Center" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource FgBrush}"/>
-                            <!-- Il controllo all'avvio e' una chiamata anonima all'API di GitHub.
-                                 Acceso di default (e' il comportamento di sempre), ma si spegne:
-                                 un programma che va in rete da solo deve almeno dirlo e lasciare
-                                 la scelta. Il pulsante qui sotto resta sempre attivo. -->
-                            <CheckBox Grid.Row="5" Grid.Column="1" x:Name="ChkAutoCheck" IsChecked="True"
-                                      Margin="0,0,0,10" HorizontalAlignment="Left"
-                                      Content="Check for updates at startup"
-                                      Style="{StaticResource ThemedCheckBox}"
-                                      ToolTip="One anonymous call to the GitHub API when the app starts. Turn it off to go online only when you press Check for updates"
-                                      Foreground="{DynamicResource FgBrush}"/>
-                            <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal">
+                            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock x:Name="TxtVersion" VerticalAlignment="Center"
+                                           FontWeight="SemiBold" Margin="0,0,18,0"
+                                           Foreground="{DynamicResource FgBrush}"/>
                                 <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
                                 <!-- Compare solo quando una release e' piu' recente di questa.
                                      Foreground dal tema e NON "White": l'accento del tema scuro
@@ -1192,9 +1239,24 @@
                                         Foreground="{DynamicResource AccentFgBrush}"/>
                                 <Control x:Name="UpdateSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
                                          Margin="10,0,0,0" Visibility="Collapsed"/>
+                                <!-- TextTrimming: l'esito piu' lungo ("No release found...") non
+                                     deve allargare la pagina e far comparire la barra in basso. -->
                                 <TextBlock x:Name="TxtUpdateStatus" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           TextTrimming="CharacterEllipsis"
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
+                            <!-- Il controllo all'avvio e' una chiamata anonima all'API di GitHub.
+                                 Acceso di default (e' il comportamento di sempre), ma si spegne:
+                                 un programma che va in rete da solo deve almeno dirlo e lasciare
+                                 la scelta. Il pulsante qui sopra resta sempre attivo. -->
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Automatic" Margin="0,0,14,0"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+                            <CheckBox Grid.Row="5" Grid.Column="1" x:Name="ChkAutoCheck" IsChecked="True"
+                                      HorizontalAlignment="Left" VerticalAlignment="Center"
+                                      Content="Check for updates at startup"
+                                      Style="{StaticResource ThemedCheckBox}"
+                                      ToolTip="One anonymous call to the GitHub API when the app starts. Turn it off to go online only when you press Check for updates"
+                                      Foreground="{DynamicResource FgBrush}"/>
                         </Grid>
                     </ScrollViewer>
                 </TabItem>

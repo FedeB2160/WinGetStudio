@@ -461,7 +461,10 @@ if ($aboutIntro.Text -notmatch 'front end for') { throw "il tab About non contie
 # continua a fare da nome accessibile e i controlli sull'ordine dei tab restano validi.
 foreach ($t in $TabMain.Items) {
     if (-not $t.Tag)     { throw "il tab '$($t.Header)' non ha un glifo in Tag" }
-    if (-not $t.ToolTip) { throw "il tab '$($t.Header)' non ha un tooltip" }
+    # Il testo del tooltip vive in HelpText e NON in ToolTip sul TabItem: vedi il controllo
+    # sulla ricaduta qui sotto.
+    $help = [System.Windows.Automation.AutomationProperties]::GetHelpText($t)
+    if (-not $help) { throw "il tab '$($t.Header)' non ha un tooltip (AutomationProperties.HelpText)" }
     $n = [System.Windows.Automation.AutomationProperties]::GetName($t)
     if (-not $n) { throw "il tab '$($t.Header)' non ha un nome accessibile: in modalita' Icon non annuncerebbe niente" }
 }
@@ -490,6 +493,58 @@ $initSrc = Get-FunctionSource 'Initialize-TabHeaders'
 if ($initSrc -notmatch "Get-Pref\s+'TabHeaderStyle'") { throw "la modalita' non si rilegge dalle preferenze" }
 if ($initSrc -notmatch "Set-Pref\s+'TabHeaderStyle'") { throw "la modalita' non si salva" }
 "OK tabicon 4 tab con icona, tooltip e nome accessibile; tre modalita' di visualizzazione"
+
+# 11b) Il tooltip di una linguetta non deve ricadere sui controlli della scheda. WPF cerca il
+# tooltip risalendo anche l'albero LOGICO, e nell'albero logico il padre del contenuto di una
+# scheda e' il TabItem: finche' il ToolTip stava sul TabItem, ogni controllo senza tooltip
+# proprio mostrava quello della linguetta. Verificato a finestra aperta prima di questo
+# controllo: cursore sul pulsante Check for updates e tooltip aperto con
+# PlacementTarget = TabItem[TabSettings]. Ora il testo sta in AutomationProperties.HelpText e
+# il tooltip lo porta il Border del template, che non e' antenato del contenuto.
+# La risalita guarda ENTRAMBI i padri, visivo e logico: il logico e' la strada che sfuggiva.
+function Get-TipOwner($el) {
+    $stack = New-Object System.Collections.Stack
+    $stack.Push($el)
+    $seen = New-Object 'System.Collections.Generic.HashSet[object]'
+    while ($stack.Count) {
+        $cur = $stack.Pop()
+        if ($null -eq $cur) { continue }
+        if (-not $seen.Add($cur)) { continue }
+        if ($null -ne [System.Windows.Controls.ToolTipService]::GetToolTip($cur)) { return $cur }
+        if ($cur -is [System.Windows.Media.Visual]) { $stack.Push([System.Windows.Media.VisualTreeHelper]::GetParent($cur)) }
+        if ($cur -is [System.Windows.FrameworkElement]) { $stack.Push($cur.Parent) }
+    }
+    $null
+}
+$controllatiTip = 0
+foreach ($t in $TabMain.Items) {
+    # Il tooltip della linguetta si vede ancora: lo porta il Border del template.
+    [void]$t.ApplyTemplate()
+    $bd = $t.Template.FindName('bd', $t)
+    if (-not $bd) { throw "il tab '$($t.Header)' non ha il Border 'bd' nel template" }
+    $tipBordo = [string][System.Windows.Controls.ToolTipService]::GetToolTip($bd)
+    $atteso   = [string][System.Windows.Automation.AutomationProperties]::GetHelpText($t)
+    if ($tipBordo -ne $atteso) {
+        throw "il tab '$($t.Header)' non mostra il suo tooltip: bordo '$tipBordo', atteso '$atteso'"
+    }
+    # ...e non ricade su nessun controllo della pagina. Si scende nell'albero LOGICO, che
+    # esiste anche a scheda non ancora realizzata.
+    $coda = New-Object System.Collections.Queue
+    $coda.Enqueue($t.Content)
+    while ($coda.Count) {
+        $el = $coda.Dequeue()
+        if ($el -isnot [System.Windows.DependencyObject]) { continue }
+        if ($el -is [System.Windows.FrameworkElement]) {
+            $controllatiTip++
+            $owner = Get-TipOwner $el
+            if ($owner -is [System.Windows.Controls.TabItem]) {
+                throw "'$($el.GetType().Name)' nella scheda '$($t.Header)' erediterebbe il tooltip della linguetta"
+            }
+        }
+        foreach ($c in [System.Windows.LogicalTreeHelper]::GetChildren($el)) { $coda.Enqueue($c) }
+    }
+}
+"OK tabtip  tooltip sulle linguette, nessuna ricaduta sui $controllatiTip controlli delle schede"
 
 # Mentre una coda gira, spunte e pin non devono essere DISPONIBILI, ma la UI resta viva: la
 # griglia si scorre, il log si legge. Prima le spunte erano bloccate (IsReadOnly) ma
@@ -1199,6 +1254,23 @@ if ($updSrc -notmatch 'Get-FileHash.*SHA256|SHA256') { throw "il file scaricato 
 if ($updSrc -notmatch 'Tls12') { throw "manca TLS 1.2: PowerShell 5.1 negozia TLS 1.0 e GitHub rifiuta" }
 $getRelSrc = Get-FunctionSource 'Get-LatestRelease'
 if ($getRelSrc -notmatch "User-Agent") { throw "manca lo User-Agent: l'API di GitHub risponde 403 senza" }
+
+# Guardia winget: se l'exe gira dalla cartella portable di winget l'auto-update deve stare
+# fermo, altrimenti rompe l'installazione (hash registrato, ".old" di troppo, voce di
+# uninstall alla versione vecchia: l'app non parte piu' e non si reinstalla).
+# Si finge il percorso, non serve rete: la guardia esce prima di qualunque job.
+$realExePath = ${function:Get-RunningExePath}
+function Get-RunningExePath { 'C:\Users\tizio\AppData\Local\Microsoft\WinGet\Packages\FedeB2160.WinGetStudio__DefaultSource\WinGetStudio.exe' }
+if (-not (Test-IsWinGetPortable)) { throw "Test-IsWinGetPortable non riconosce la cartella portable di winget" }
+$BtnUpdateApp.Visibility = [System.Windows.Visibility]::Collapsed
+$TxtUpdateStatus.Text = ''
+Start-UpdateCheck -Manual
+if ($TxtUpdateStatus.Text -notmatch 'winget upgrade') { throw "installato da winget: il controllo non rimanda a winget upgrade ('$($TxtUpdateStatus.Text)')" }
+if ($BtnUpdateApp.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "installato da winget: il pulsante di aggiornamento non deve comparire" }
+$selfGuardSrc = Get-FunctionSource 'Start-SelfUpdate'
+if ($selfGuardSrc -notmatch 'Test-IsWinGetPortable') { throw "Start-SelfUpdate non ha la guardia Test-IsWinGetPortable" }
+${function:Get-RunningExePath} = $realExePath
+"OK winget  con l'exe dentro %LOCALAPPDATA%\Microsoft\WinGet\Packages l'auto-update sta fermo"
 
 # Chiamata reale all'API pubblica (una richiesta, limite anonimo 60/ora).
 $rel = Get-LatestRelease 'FedeB2160/WinGetStudio'

@@ -19,7 +19,7 @@
 # UNICA fonte di verita': finisce nel titolo della finestra come "[x.y.z]" e, letta
 # da build.ps1 con questa stessa regex, nelle proprieta' dell'exe (scheda Dettagli).
 # Aggiornarla qui e basta; Test-Ui.ps1 verifica che la regex la trovi ancora.
-$AppVersion = '1.10.0'
+$AppVersion = '1.10.1'
 
 # ------------------------------------------------------------------
 # SELF-ELEVATION (fallback al manifest UAC generato da ps2exe)
