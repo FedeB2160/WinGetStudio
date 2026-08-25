@@ -113,17 +113,17 @@ The update check reads the **latest** release of the repo, so publishing one is 
 
 1. Bump `$AppVersion` in `src\main.ps1` and rebuild — the build signs the exe.
 2. Update `CHANGELOG.md`, commit, push.
-3. Tag: `git tag v1.10.0 && git push origin v1.10.0`.
+3. Tag: `git tag v1.10.1 && git push origin v1.10.1`.
 4. On GitHub → **Releases** → *Draft a new release*, pick the tag, paste the changelog entry, and attach `dist\WinGetStudio.exe` as an asset.
 5. Publish. GitHub computes the SHA-256 of the asset by itself, and that is what the app verifies the download against.
 
-**Tag and `$AppVersion` must agree**: the app compares the tag (`v1.10.0`) with its own constant, so a mismatch means it either keeps proposing an update already installed, or never proposes one.
+**Tag and `$AppVersion` must agree**: the app compares the tag (`v1.10.1`) with its own constant, so a mismatch means it either keeps proposing an update already installed, or never proposes one.
 
 **Builds are not reproducible.** Compiling the same source twice produces two different binaries — ps2exe writes variable metadata into the PE and each signature carries a fresh timestamp — identical in size but not in hash. So a published asset **cannot** be validated by rebuilding and comparing hashes; what is verifiable is the SHA-256 GitHub publishes with the asset (which is what the app checks on download) and the Authenticode signature.
 
 The asset is found as the **first `.exe` in the release**, not by exact name, so renaming the exe does not break older or newer releases.
 
-`gh release create` would do steps 4-5 from the command line, but the `gh` account on this machine has no push rights on the repo, which belongs to another account — the same reason `git push` works while `gh` does not. Either use the web UI or re-authenticate `gh` as the repo owner.
+`gh release create v1.10.1 --title v1.10.1 --notes-file <file> dist\WinGetStudio.exe` does steps 4-5 from the command line, and is how 1.10.1 was published. `gh` holds more than one account on this machine and the active one is not always the repo owner: `gh auth status` says which it is, `gh auth switch --hostname github.com --user FedeB2160` picks the right one. Without that switch `git push` fails asking for a password, because the credential helper serves the token of whichever account is active.
 
 ## Working on a plan
 
@@ -155,10 +155,10 @@ To install from them locally first, winget needs a feature enabled from an eleva
 
 1. Fork `microsoft/winget-pkgs`.
 2. Copy the folder to `manifests\f\FedeB2160\WinGetStudio\<version>\` (first letter of the publisher, then publisher, package, version).
-3. Commit, push, open the PR against `master`. The title convention is `New version: FedeB2160.WinGetStudio version 1.10.0`.
+3. Commit, push, open the PR against `master`. The title convention is `New version: FedeB2160.WinGetStudio version 1.10.1`.
 4. Automated validation runs first (schema, URL reachable, hash, sandbox install). A human moderator then reviews it; the first submission of a new package takes longer than later updates.
 
-`wingetcreate update FedeB2160.WinGetStudio --version 1.10.0 --urls <url> --submit` does all of this in one command for subsequent versions, once the package exists in the repository.
+`wingetcreate update FedeB2160.WinGetStudio --version 1.10.1 --urls <url> --submit` does all of this in one command for subsequent versions, once the package exists in the repository.
 
 It does **not** submit `winget\<version>\`, though. It downloads the manifest of the last published version, bumps the version, the URL, the hash and the date, and submits that. Everything version-specific in the local folder is lost, comments included, and `ReleaseNotes` is dropped because the previous version's notes no longer apply. The validator then compares the result against the published version and fails with `Missing property ReleaseNotes`, so the block has to be added back on the fork branch after the pull request exists. It also invents a `Documentations` entry pointing at the repository wiki, which has no pages.
 

@@ -18,7 +18,7 @@ powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
 
 # winget manifests
-winget validate --manifest .\winget\1.10.0
+winget validate --manifest .\winget\1.10.1
 ```
 
 `Test-Ui.ps1` requires `-STA` (WPF), touches winget read-only, and runs one real pin cycle on `7zip.7zip`. There is no single-test selector: each script is one file of sequential assertions — comment out or run the file.
