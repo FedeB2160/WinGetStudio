@@ -23,6 +23,57 @@ That copies the executable and puts an alias on the PATH, so `WinGetStudio` star
 
 **Windows will warn about an unknown publisher.** The exe *is* signed, but with a self-signed certificate, and Windows only trusts certificates issued by a recognised authority. You can either accept the warning (*More info* → *Run anyway*), or import `assets/WinGetStudio-codesign.cer` from this repository into *Trusted Root Certification Authorities* to make the signature trusted — see [DEVELOPMENT.md](DEVELOPMENT.md#signing) before doing that, since it affects anything signed with that certificate.
 
+### If an antivirus quarantines the executable
+
+`WinGetStudio.exe` is a PowerShell script compiled by ps2exe and signed with a self-signed certificate, so it carries no reputation with any antivirus engine. Microsoft Defender's machine-learning heuristic sometimes decides that combination is malware and reports it as `Trojan:Win32/Wacatac` or `Trojan:Script/Wacatac` — `.C!ml`, `.F!ml` and `.H!ml` have all been seen on the same build. The `!ml` suffix marks a verdict reached by the model rather than by a signature — a false positive, and not a sign that one release differs from the ones before it.
+
+It surfaces in three ways, none of which names the antivirus:
+
+- Installing from winget stops with `0x8a150040 : Error reading stream`. The hash check *passes* first: the file is taken away between verification and the copy.
+- The app vanishes while running, or will not start, and `%LOCALAPPDATA%\Microsoft\WinGet\Packages\FedeB2160.WinGetStudio*` is empty even though `winget list` still reports the package as installed.
+- The automatic update reports a failed download from a release other machines download without trouble.
+
+Confirm it before changing anything, from an elevated PowerShell:
+
+```powershell
+Get-MpThreatDetection | Sort-Object InitialDetectionTime -Descending |
+    Select-Object -First 5 InitialDetectionTime, Resources | Format-List
+```
+
+If the paths listed are the ones above, the file was quarantined.
+
+#### Getting it back
+
+The fix that asks nothing of anyone installing the app is to report the file to Microsoft as a false positive, at [the Windows Defender file submission page](https://www.microsoft.com/en-us/wdsi/filesubmission), submitting as a software developer. It costs nothing, usually gets an answer within a day or two, and once accepted the detection is dropped for every Defender installation.
+
+On a machine managed by a company, expect the exclusion not to hold. Where Microsoft Defender for Endpoint is onboarded (`OnboardingState` is `1` under `HKLM:\SOFTWARE\Microsoft\Windows Advanced Threat Protection\Status`) or Defender is driven by Intune or group policy, cloud-delivered blocking overrides anything added locally, and the file is removed again within a minute of being written — including while the app is running, which reads as the window simply disappearing. There the only routes are the Microsoft submission above or an allow-list entry made by whoever administers the tenant.
+
+To use the app before that, exclude it from scanning. **An exclusion stops the antivirus from scanning that path for every file it contains, not only this one** — worth doing for a program you compiled yourself, worth thinking about otherwise. Run it from an elevated PowerShell, and first check that `$env:LOCALAPPDATA` and `$env:TEMP` are the profile you are signed in with, not the profile of the account you elevated with:
+
+```powershell
+Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\Microsoft\WinGet\Packages"
+Add-MpPreference -ExclusionPath "$env:TEMP\WinGet"
+```
+
+Both paths are needed: the first is where winget keeps the installed executable, the second is where it downloads it. Print the two variables before trusting them: on a profile whose name contains a dot, `%TEMP%` expands to an 8.3 short path such as `C:\Users\FB5FE~1.BOR\AppData\Local\Temp`, which is the form winget writes to and therefore the form the exclusion has to match. If instead you run the exe from a folder of your own, exclude that one file with `-ExclusionPath` pointing at it. `Remove-MpPreference -ExclusionPath` undoes any of this.
+
+Then reinstall, from a prompt that is **not** elevated:
+
+```powershell
+winget install FedeB2160.WinGetStudio
+```
+
+The log will say `Failed to create symlink at ...\WinGet\Links\WinGetStudio.exe`. That is expected without elevation and is not the failure: winget falls back to appending the package directory to the user PATH, so `WinGetStudio` works from any terminal opened afterwards.
+
+Elevation matters here. winget will not uninstall or replace a user-scope package from an elevated prompt — it answers *"The package installed for user scope cannot be uninstalled when running with administrator privileges"* — so the winget half of the recovery has to run unelevated, even though creating the PATH alias would need elevation (see the manifest notes in [DEVELOPMENT.md](DEVELOPMENT.md)). Reinstalling is simpler than restoring the quarantined copy with `MpCmdRun.exe -Restore`, and it gets the current version.
+
+If winget insists the package is already installed while there is nothing left to run, the uninstall entry outlived its files. Remove it, unelevated, and install again:
+
+```powershell
+Remove-Item "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\FedeB2160.WinGetStudio*" -Recurse -Force
+Remove-Item "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\FedeB2160.WinGetStudio*" -Recurse -Force
+```
+
 ## Using it
 
 The window has three tabs, plus **Settings** and **About** pinned to the right of the strip. **Unknown**, **MS Store** and **Scope** are remembered between launches, next to the theme. The **progress bar and the log at the bottom stay visible from every tab**, so you can start a long update, switch tab, and still see how it is going.
