@@ -21,4 +21,10 @@ La modalità `-Offline` salta WinGet reale e le API GitHub, mantenendo WPF e fix
 
 ## Verifica remota
 
-Da completare dopo push e apertura della PR: registrare URL e risultati effettivi dei due job GitHub Actions. I test locali non provano da soli l'esecuzione sui runner GitHub.
+- Commit applicativo/CI: `ba10b69`, pubblicato su `codex/bugfixes-1.10.2-ci`.
+- [PR #2](https://github.com/FedeB2160/WinGetStudio/pull/2), base `main`, collegata alla conversazione Codex.
+- [GitHub Actions run 37344813499](https://github.com/FedeB2160/WinGetStudio/actions/runs/37344813499): **success**.
+- Job **PowerShell 5.1 and WPF tests**: **success** sul runner GitHub.
+- Job **Build and verify executable**: **success**, inclusi installazione del modulo fissato, compilazione, verifica metadati/changelog e caricamento dell'artefatto unsigned.
+
+Questo esito verifica la CI remota sul commit applicativo ba10b69. Il successivo aggiornamento della sola documentazione viene sottoposto allo stesso workflow; l'esito corrente è consultabile nella PR. Nessun merge, tag o rilascio eseguito. La modifica al certificato resta locale e non inclusa nella PR.
