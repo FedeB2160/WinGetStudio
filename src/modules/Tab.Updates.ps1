@@ -118,12 +118,12 @@ function Load-Upgrades {
     # I pin si leggono nello STESSO job, non in uno successivo: due processi winget
     # insieme si contendono lo store e il comando esce in errore.
     # [void]: Start-BackgroundJob torna il job, che altrimenti finirebbe sulla pipeline.
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetUpgrades', 'Get-WinGetPins' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetUpgrades', 'Get-WinGetPins' `
         -Vars @{ incUnknown = [bool]$ChkUnknown.IsChecked; wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{
-                Rows = @(Get-WinGetUpgrades $incUnknown)
-                Pins = @(Get-WinGetPins)
+                Upgrades = Get-WinGetUpgrades $incUnknown
+                Pins     = Get-WinGetPins
             }
         } `
         -OnDone {
@@ -132,28 +132,41 @@ function Load-Upgrades {
             $TopSpinner.Visibility = [System.Windows.Visibility]::Collapsed
             $r = @($result)[0]
             if ($r) {
-                $self = $false
-                foreach ($u in $r.Rows) {
-                    if (-not $u) { continue }
-                    # L'app non si aggiorna da questa lista: winget non puo' sovrascrivere
-                    # un eseguibile in esecuzione. Se ne occupa il pulsante nelle
-                    # impostazioni, che si rinomina e riavvia.
-                    if (Test-IsSelfPackage $u) { $self = $true; continue }
-                    $items.Add($u)
+                if (-not $r.Upgrades.Success) {
+                    $message = Format-WinGetReadError 'upgrade' $r.Upgrades
+                    $TxtEmpty.Text = $message
+                    $TxtEmpty.Visibility = [System.Windows.Visibility]::Visible
+                    $Grid.Visibility = [System.Windows.Visibility]::Collapsed
+                    Write-Log $message
                 }
-                if ($self) { Write-Log "An update for WinGet Studio itself is available: use the gear button." }
-            }
+                else {
+                    $self = $false
+                    foreach ($u in $r.Upgrades.Rows) {
+                        if (-not $u) { continue }
+                        # L'app non si aggiorna da questa lista: winget non puo' sovrascrivere
+                        # un eseguibile in esecuzione. Se ne occupa il pulsante nelle
+                        # impostazioni, che si rinomina e riavvia.
+                        if (Test-IsSelfPackage $u) { $self = $true; continue }
+                        $u.Pinned = $script:lastPinIds -contains $u.Id
+                        $items.Add($u)
+                    }
+                    if ($self) { Write-Log "An update for WinGet Studio itself is available: use the gear button." }
 
-            if ($items.Count -eq 0) {
-                $TxtEmpty.Visibility = [System.Windows.Visibility]::Visible
-                $Grid.Visibility     = [System.Windows.Visibility]::Collapsed
-                Write-Log "No updates available."
+                    if ($items.Count -eq 0) {
+                        $TxtEmpty.Text = 'No updates available.'
+                        $TxtEmpty.Visibility = [System.Windows.Visibility]::Visible
+                        $Grid.Visibility = [System.Windows.Visibility]::Collapsed
+                        Write-Log "No updates available."
+                    }
+                    else {
+                        $Grid.Visibility = [System.Windows.Visibility]::Visible
+                        Write-Log "Found $($items.Count) updates."
+                    }
+                }
+
+                if ($r.Pins.Success) { Set-PinFlags @($r.Pins.Rows) }
+                else { Write-Log (Format-WinGetReadError 'pin list' $r.Pins) }
             }
-            else {
-                $Grid.Visibility = [System.Windows.Visibility]::Visible
-                Write-Log "Found $($items.Count) updates."
-            }
-            if ($r) { Set-PinFlags @($r.Pins) }
             Set-AppBusy $false
         })
 }

@@ -38,7 +38,7 @@ ui\    UI.xaml                  window: layout and styles
        Theme.Dark.xaml          dark palette
 assets\icon.ico                 app icon (embedded in the exe)
        WinGetStudio-codesign.cer  public signing certificate (no private key)
-tests\ Test-Ui.ps1              headless check of code, XAML, themes and startup
+tests\ Test-Ui.ps1              hidden WPF integration test; live Winget requires opt-in
        Test-InvokeWinGet.ps1    winget execution and table parsing
 dist\  WinGetStudio.exe         build output (signed, gitignored)
 winget\<version>\               winget-pkgs manifests, one folder per published version
@@ -127,17 +127,19 @@ The asset is found as the **first `.exe` in the release**, not by exact name, so
 
 ## Working on a plan
 
-A change that takes more than one sitting is planned in `docs\superpowers\plans\<date>-<topic>.md` and the plan is **committed alongside the work**, so the reasoning travels with the diffs instead of living in someone's head.
+A change that takes more than one sitting is planned in `docs\superpowers\plans\<date>-<topic>.md`. Save every plan in the project directory and update its execution status as work proceeds.
 
 The discipline that goes with it:
 
-- One branch for the whole plan, `feature/vX.Y.Z`, with `main` left on what is published.
-- **One commit per task**, not per step. Each carries the code, the tests, the `README.md` and `DEVELOPMENT.md` lines that task invalidates, and one line under `## Unreleased` in the changelog. Documentation and code do not travel separately: a README describing yesterday's button is worse than no README.
-- **Both suites green before every commit.** There is no CI, so this gate is manual and it is the only one there is.
-- Push after each commit. If the session dies, the work is already out.
-- At release time the accumulated `## Unreleased` lines are promoted into the narrative entry for the version, rather than written from memory at the end.
+- At every execution or resumption, check every agreed requirement against the implementation and evidence. Before reporting completion, classify each item as implemented, verified, skipped or pending; unchecked work must remain explicit.
+- Update the affected project documentation in the same execution: plan, verification report, changelog, README and development notes as applicable.
+- Include versioning in the completion checklist. Update `$AppVersion` for application changes and keep the changelog and current-version documentation aligned. Use a patch increment for compatible bug fixes; keep unpublished versions clearly labelled.
+- Use an isolated branch/worktree when available; document any environment restriction. The default branch prefix is `codex/`.
+- **Commits, pushes, tags and releases require user authorization.** Authorization to commit, push and create a PR does not authorize merging or publishing a release.
+- Integrate through pull requests and the Windows CI checks. Both suites must pass, with live/environment-dependent skips reported explicitly.
+- At publication, remove the unreleased label only when the corresponding release actually exists.
 
-**The plan file is deleted when the plan is done** — every task executed, both suites green, and the result checked against what the plan established. It is a working document: git history keeps every version of it, and what deserves to outlive it has already been written into the changelog (what changed), this file (why it was done that way) and the README (what the user sees). A plan left in the repo after it has been executed starts to age and, eventually, to lie.
+Retain the plan and its final status in the project, especially while changes are uncommitted. Preserve test evidence and outstanding limits in the verification report; do not delete the only durable record of work.
 
 ## Publishing to winget-pkgs
 
@@ -187,12 +189,23 @@ The decision stands until #2299 closes, or until moving to a real installer type
 
 ## Tests
 
+The CI workflow is `.github/workflows/ci.yml`. It runs **on GitHub Actions**, using GitHub-hosted `windows-2022` runners, on pull requests, pushes to `main` and manual dispatch. Its two jobs run regression tests and build/verify the executable. Actions are pinned to commit SHAs, the token has only `contents: read`, and ps2exe is pinned to 1.0.18. The unsigned exe artifact is retained for seven days; the workflow does not publish releases or use signing keys.
+
+Repeat the CI tests locally with:
+
 ```powershell
-powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1 -Offline
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Offline
+```
+
+`-Offline` disables real Winget and GitHub API calls; WPF, process tests, local fixtures and the temporary registry probe still run. It does not mean the CI runs locally. Real integration checks remain available with explicit opt-in:
+
+```powershell
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -ConfirmLiveWinget
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
 ```
 
-`Test-InvokeWinGet.ps1` needs no admin rights and installs nothing. `Test-Ui.ps1` opens no windows, but it does touch winget for real in read-only ways (search, list, export) and runs one full pin cycle on `7zip.7zip`, removing the pin in a `finally` so a mid-test failure cannot leave a package silently blocked.
+`Test-InvokeWinGet.ps1` needs no admin rights and installs nothing. `Test-Ui.ps1` is a hidden WPF integration test, not a headless check. Live mode requires `-ConfirmLiveWinget` before starting the app because it performs live Winget reads/export and may temporarily add a pin to `7zip.7zip` when that package is installed and initially unpinned. It preserves a pre-existing pin and verifies cleanup of a pin it created. The filter check uses fixture rows and does not depend on 7-Zip being installed. The registry persistence check is skipped only when the current process lacks HKCU write access. `-Offline` and `-ConfirmLiveWinget` cannot be combined.
 
 **`Test-Ui.ps1`** checks that every file parses, that no module is missing from (or orphaned by) `$moduleNames`, that `UI.xaml` provides every control the code asks for, that both themes define the same keys, that every `DynamicResource` resolves, that column headers are non-empty, uppercase and centred, that every `&#x....;` glyph exists in both system icon fonts, and that the two grid-freeze regressions have not come back. Four checks are worth knowing about, because they catch what static analysis cannot:
 
@@ -250,6 +263,7 @@ Things that look odd until you know why. Most of them are bugs that were paid fo
 
 ### Running winget
 
+- Table reads return `Success`, `Rows`, `ExitCode` and `Output`. Parse tables only on exit zero; `APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND` is a valid empty result for search/list/upgrade. Failed pin reads retain the last successful pin IDs, including when a refresh replaces row objects.
 - winget is launched with its output redirected to a file and the wait bound to the process exit, not to the pipe: child installers that inherit stdout can no longer block the wait indefinitely. `--disable-interactivity` matters because without a console (`-noConsole`) a prompt would hang forever. The process is started with `Process.Start` (with `cmd` doing the redirect) rather than `Start-Process -PassThru`, whose `Process` object loses `ExitCode` when the process exits before the native handle is cached — an empty `ExitCode` casts to `0`, which would paint a failure green.
 - The output file is read back as **UTF-8**: winget writes UTF-8, while `Get-Content` on PowerShell 5.1 assumes the system ANSI codepage, which turned localized messages into mojibake.
 - **Never two winget processes at once.** Reading the pins used to run *after* the busy state was released, so a click on Update in that window ran a second winget and one of the two failed with exit 1. The scans read the pins inside the same job, and after a pin/unpin the busy state is released by the pin re-read, which is the last step. Busy state is global: each tab registers a handler with `Set-AppBusy`.

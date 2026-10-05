@@ -12,8 +12,11 @@
 # Segna quali righe hanno un pin. $PinIds arriva da Get-WinGetPins.
 # Riguarda entrambe le griglie: lo stesso pacchetto puo' essere elencato in Updates e in
 # Installed, e il pin e' lo stesso.
+# L'ultima lettura riuscita sopravvive alla sostituzione delle righe nei refresh.
+$script:lastPinIds = @()
 function Set-PinFlags([string[]]$PinIds) {
     $pins = @($PinIds)
+    $script:lastPinIds = $pins
     foreach ($row in @($items) + @($installedItems)) {
         $row.Pinned = ($pins -contains $row.Id)
     }
@@ -30,12 +33,14 @@ function Set-PinFlags([string[]]$PinIds) {
 # Rilegge invece di dare per buono l'esito: un pin aggiunto da riga di comando deve
 # comparire comunque, ed e' winget la fonte di verita'.
 function Update-PinFlags {
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetPins' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetPins' `
         -Vars @{ wingetPath = $wingetPath } `
         -Script { Get-WinGetPins } `
         -OnDone {
             param($result)
-            Set-PinFlags @($result)
+            $r = @($result)[0]
+            if ($r.Success) { Set-PinFlags @($r.Rows) }
+            else { Write-Log (Format-WinGetReadError 'pin list' $r) }
             Set-AppBusy $false
         })
 }

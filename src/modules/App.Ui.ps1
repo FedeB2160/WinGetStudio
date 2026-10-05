@@ -13,6 +13,14 @@ function Write-Log([string]$msg) {
     $TxtLog.ScrollToEnd()
 }
 
+function Format-WinGetReadError([string]$Command, $Result) {
+    $detail = ([string]$Result.Output).Trim()
+    if ($detail.Length -gt 240) { $detail = $detail.Substring(0, 240) + '…' }
+    $message = "winget $Command failed (exit $($Result.ExitCode))"
+    if ($detail) { $message += ": $detail" }
+    return $message
+}
+
 # ------------------------------------------------------------------
 # STATO "OCCUPATO" GLOBALE
 # ------------------------------------------------------------------

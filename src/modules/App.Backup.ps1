@@ -14,10 +14,29 @@
 # Torna $null se il file non e' un export valido: meglio dirlo prima di lanciare winget.
 function Get-ImportPackageCount([string]$Path) {
     try {
-        $json = Get-Content $Path -Raw -Encoding UTF8 | ConvertFrom-Json
-        if (-not $json.Sources) { return $null }
+        $raw = Get-Content $Path -Raw -Encoding UTF8
+        # La pipeline PowerShell enumera una radice array con un solo oggetto:
+        # verificare il tipo JSON prima di perderne la forma nella conversione.
+        if ($raw -notmatch '^\s*\{') { return $null }
+        $json = $raw | ConvertFrom-Json
+        if ($null -eq $json -or $json -isnot [PSCustomObject]) { return $null }
+        $sourcesProperty = $json.PSObject.Properties['Sources']
+        if (-not $sourcesProperty -or $sourcesProperty.Value -isnot [Array]) { return $null }
+
         $n = 0
-        foreach ($s in $json.Sources) { $n += @($s.Packages).Count }
+        foreach ($source in $sourcesProperty.Value) {
+            if ($null -eq $source -or $source -isnot [PSCustomObject]) { return $null }
+            $packagesProperty = $source.PSObject.Properties['Packages']
+            if (-not $packagesProperty -or $packagesProperty.Value -isnot [Array]) { return $null }
+
+            foreach ($package in $packagesProperty.Value) {
+                if ($null -eq $package -or $package -isnot [PSCustomObject]) { return $null }
+                $identifierProperty = $package.PSObject.Properties['PackageIdentifier']
+                if (-not $identifierProperty -or $identifierProperty.Value -isnot [string] -or
+                    [string]::IsNullOrWhiteSpace($identifierProperty.Value)) { return $null }
+                $n++
+            }
+        }
         return $n
     }
     catch { return $null }

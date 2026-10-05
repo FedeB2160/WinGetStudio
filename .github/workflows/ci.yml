@@ -1,0 +1,73 @@
+name: Windows CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: powershell
+
+jobs:
+  tests:
+    name: PowerShell 5.1 and WPF tests
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify Windows PowerShell 5.1
+        run: |
+          if ($PSVersionTable.PSVersion.Major -ne 5 -or $PSVersionTable.PSVersion.Minor -ne 1) {
+            throw 'Windows PowerShell 5.1 is required'
+          }
+      - name: Process and parser regressions
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1 -Offline
+      - name: Hidden WPF integration and fixtures
+        run: powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Offline
+
+  build:
+    name: Build and verify executable
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install pinned build dependency
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Install-PackageProvider NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
+          Install-Module ps2exe -RequiredVersion 1.0.18 -Scope CurrentUser -Force -Repository PSGallery
+      - name: Compile executable
+        run: .\src\build.ps1
+      - name: Verify version metadata
+        run: |
+          $source = Get-Content .\src\main.ps1 -Raw -Encoding UTF8
+          $match = [regex]::Match($source, '(?m)^\s*\$AppVersion\s*=\s*''(\d+\.\d+\.\d+)''')
+          if (-not $match.Success) { throw 'AppVersion missing' }
+          $expected = [version]$match.Groups[1].Value
+          $exe = (Get-Item .\dist\WinGetStudio.exe).VersionInfo
+          if ([version]$exe.FileVersion -ne $expected -or [version]$exe.ProductVersion -ne $expected) {
+            throw "Executable version mismatch: expected $expected, got $($exe.FileVersion) / $($exe.ProductVersion)"
+          }
+          if ((Get-Content CHANGELOG.md -Raw) -notmatch [regex]::Escape("## v$expected")) {
+            throw "Changelog entry missing for $expected"
+          }
+      - name: Upload unsigned test build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: WinGetStudio-ci-${{ github.sha }}
+          path: dist/WinGetStudio.exe
+          if-no-files-found: error
+          retention-days: 7

@@ -79,10 +79,10 @@ function Start-Search([bool]$IncludeStore = $false) {
     # ORA nel campo e, se l'utente ha continuato a digitare, il risultato vecchio si
     # butta. Senza questo, due ricerche che rientrano fuori ordine lascerebbero in
     # griglia i risultati della query precedente.
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetSearch' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetSearch' `
         -Vars @{ q = $q; store = $IncludeStore; wingetPath = $wingetPath } `
         -Script {
-            [PSCustomObject]@{ Query = $q; Rows = @(Get-WinGetSearch $q $store) }
+            [PSCustomObject]@{ Query = $q; Search = Get-WinGetSearch $q $store }
         } `
         -OnDone {
             param($result)
@@ -99,8 +99,15 @@ function Start-Search([bool]$IncludeStore = $false) {
             # sparire dalla griglia proprio i pacchetti in corso, con il loro esito.
             if ($script:isBusy) { return }
 
+            if (-not $r.Search.Success) {
+                $message = Format-WinGetReadError "search '$($r.Query)'" $r.Search
+                Show-SearchMessage $message
+                Write-Log $message
+                return
+            }
+
             $searchItems.Clear()
-            foreach ($p in $r.Rows) { if ($p) { $searchItems.Add($p) } }
+            foreach ($p in $r.Search.Rows) { if ($p) { $searchItems.Add($p) } }
 
             if ($searchItems.Count -eq 0) {
                 Show-SearchMessage "No package matches '$($r.Query)'."

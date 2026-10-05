@@ -1,5 +1,11 @@
 # Existing WinGet Studio Bugs Implementation Plan
 
+**Integration follow-up (2026-10-05):** the user subsequently authorized commit, push and PR with CI. The earlier local-only restriction and suspended commit steps below describe the implementation phase; integration is tracked in [the PR/CI plan](2026-10-04-pr-ci.md).
+
+**Execution status (2026-10-04):** implemented and reviewed locally; no implementation commits or pushes, as requested. Both suites pass. The live WPF run used WinGet 1.29.380 under the interactive user account (not an elevated token): search, inventory, registry, export and GitHub update checks passed. The live pin cycle was skipped because `7zip.7zip` is absent. See [verification report](../reports/2026-10-04-existing-bugs-verification.md) for evidence, review fixes and remaining limits. Commit steps below are suspended by the user's instruction.
+
+**Review correction:** `APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND` (`-1978335212`) is a valid empty result for `search`, `list` and `upgrade` reads. Preserve its exit code, return no rows, and continue to reject other nonzero statuses. Pin flags use the last successful pin read when refreshed rows replace old ones.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Fix the reproduced Winget read failures and malformed import count, and remove brittle/unsafe assumptions from the live UI test.
@@ -12,6 +18,8 @@
 
 ## Global Constraints
 
+- At every execution or resumption, audit every agreed requirement and update the affected project documentation before reporting completion.
+- Update the application version for these fixes: local target **1.10.2**, explicitly unpublished. Keep source, binary metadata and changelog aligned after rebuilding.
 - Do not treat Winget command failure as an empty successful result.
 - Preserve successful parsing, including localized tables and multi-table upgrade output.
 - Do not clear existing pin state after a failed pin read or remove a pin that existed before the test.
@@ -39,23 +47,23 @@
 - Modify: `tests/Test-Ui.ps1`
 - Modify: `DEVELOPMENT.md`
 
-- [ ] **Step 1: Pin the filter behavior with deterministic rows**
+- [x] **Step 1: Pin the filter behavior with deterministic rows**
 
 Replace the hard-coded `7zip` inventory filter around the current lines 1126-1136 with two temporary `WgtRow` fixtures: one matching and one not matching. Assert that only the match is visible and both remain in the backing collection. Remove both fixtures in `finally`. Run the existing test before the code change and confirm the reported failure `il filtro '7zip' mostra 0 righe su 146` is eliminated by the fixture.
 
-- [ ] **Step 2: Add a live-test opt-in before startup**
+- [x] **Step 2: Add a live-test opt-in before startup**
 
 Add `param([switch]$ConfirmLiveWinget)` at the top of `Test-Ui.ps1`. Without the switch, exit nonzero before `Start-App -NoShow` and before any Winget process. With the switch, print a warning that the hidden WPF test performs live Winget reads/export and may temporarily change one pin.
 
-- [ ] **Step 3: Protect pre-existing pin state**
+- [x] **Step 3: Protect pre-existing pin state**
 
 Before the live pin cycle, skip if `7zip.7zip` is absent or already pinned. If initially unpinned, mark cleanup as required immediately before attempting `pin add`; in `finally`, remove only that target and verify it is absent. This also cleans up if Winget added the pin but the UI wait/assertion then failed.
 
-- [ ] **Step 4: Correct the test documentation**
+- [x] **Step 4: Correct the test documentation**
 
 Change the `Test-Ui.ps1` header and `DEVELOPMENT.md` inventory entry from “headless check” to “hidden WPF integration test; uses live Winget; requires `-ConfirmLiveWinget`; temporary pin is restored.”
 
-- [ ] **Step 5: Verify the guard, filter, and cleanup**
+- [x] **Step 5: Verify the guard, filter, and cleanup**
 
 Run without opt-in: `powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1`
 Expected: a clear nonzero exit before `Start-App` or any Winget process.
@@ -83,27 +91,27 @@ git commit -m "test: make live UI integration deterministic and safe"
 
 **Interfaces:**
 - Add `Invoke-WinGetRead([string[]]$Arguments, [int]$MaxColumns = 0) -> PSCustomObject` in `WinGet.Parse.ps1`.
-- Result fields: `Success: bool`, `Rows: object[]`, `ExitCode: int`, `Output: string`. Capture `$LASTEXITCODE` immediately after the native command. Parse rows only after success.
+- Result fields: `Success: bool`, `Rows: object[]`, `ExitCode: int`, `Output: string`. Capture `$LASTEXITCODE` immediately after the native command. Parse rows only on exit zero; the documented no-match status for `search`, `list` and `upgrade` is a valid empty result.
 - `Get-WinGetSearch`, `Get-WinGetInstalled`, `Get-WinGetUpgrades`, and `Get-WinGetPins` return the same result shape. The first three map fields to `WgtRow`; pins return string IDs.
 - UI callbacks show the failed command and exit code; they do not show no-results/no-updates/empty-inventory messages. Pin flags remain unchanged after a failed read.
 
-- [ ] **Step 1: Add failing simulated exit-code cases**
+- [x] **Step 1: Add failing simulated exit-code cases**
 
 Extend `Test-InvokeWinGet.ps1`’s existing stub: set `$global:LASTEXITCODE = 1` and emit `Failed to open source: test fixture`. Assert all four read functions report failure, exit code 1, and diagnostic output. The current code reproduces the defect as zero rows for all four commands.
 
-- [ ] **Step 2: Add UI failure-state assertions**
+- [x] **Step 2: Add UI failure-state assertions**
 
 Use the existing hidden WPF harness to feed failed read results to update, installed, search, and pin callbacks. Assert error status is visible, no empty-success message appears, and previously set `Pinned` flags remain unchanged. Confirm these assertions fail before the callback changes.
 
-- [ ] **Step 3: Implement the exit-aware read helper**
+- [x] **Step 3: Implement the exit-aware read helper**
 
 Keep native argument arrays. `Invoke-WinGetRead` runs Winget, snapshots exit status before another native command can overwrite it, captures diagnostic output, and parses only successful output. Preserve each reader’s current success-row contents.
 
-- [ ] **Step 4: Update background jobs and consumers**
+- [x] **Step 4: Update background jobs and consumers**
 
 Pass `Invoke-WinGetRead` to each relevant runspace. Update all four reader consumers to handle `Success = $false`; `Update-PinFlags` calls `Set-PinFlags` only after successful retrieval.
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1`
 Expected: existing table parser cases pass; each simulated exit-1 read returns an explicit error result.
@@ -129,24 +137,24 @@ git commit -m "fix: surface winget read command failures"
 - Return a count only for a valid `Sources`/`Packages` structure whose package entries contain a non-empty `PackageIdentifier`. A valid export with empty package arrays returns zero.
 - Keep import preflight behavior: invalid input never reaches `Invoke-PackageImport`.
 
-- [ ] **Step 1: Add failing JSON fixtures**
+- [x] **Step 1: Add failing JSON fixtures**
 
 Cover one-package and empty valid exports. Reject malformed JSON, missing `Sources`, `Sources: [{}]`, missing/non-array `Packages`, and package entries without `PackageIdentifier`. The existing repro `{"Sources":[{}]}` must fail instead of returning 1.
 
-- [ ] **Step 2: Run focused import assertions**
+- [x] **Step 2: Run focused import assertions**
 
 Run: `powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -ConfirmLiveWinget`
 Expected before the fix: `{"Sources":[{}]}` is counted as 1.
 
-- [ ] **Step 3: Validate structure before counting**
+- [x] **Step 3: Validate structure before counting**
 
 Update `Get-ImportPackageCount` to reject invalid root/source/package shapes and unusable package identifiers. Keep its `try/catch` behavior for malformed JSON or missing files.
 
-- [ ] **Step 4: Prove invalid files never launch import**
+- [x] **Step 4: Prove invalid files never launch import**
 
 Use the existing import checks to assert invalid files are rejected before `Invoke-PackageImport`; valid empty and one-package fixtures return 0 and 1.
 
-- [ ] **Step 5: Run the focused import suite**
+- [x] **Step 5: Run the focused import suite**
 
 Run: `powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -ConfirmLiveWinget`
 Expected: every malformed fixture returns `$null`, valid fixtures return their exact counts, and Winget is not invoked for invalid input.
@@ -164,7 +172,7 @@ git commit -m "fix: reject malformed winget export files"
 - Verify: `tests/Test-InvokeWinGet.ps1`
 - Verify: `tests/Test-Ui.ps1`
 
-- [ ] **Step 1: Run both suites**
+- [x] **Step 1: Run both suites**
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
@@ -173,11 +181,19 @@ powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Co
 
 Expected: both finish successfully; no test requires 7-Zip. The live UI test reports its Winget usage and restores only a pin it added.
 
-- [ ] **Step 2: Record elevation-dependent skips honestly**
+- [x] **Step 2: Record elevation-dependent skips honestly**
 
 The earlier non-elevated run skipped the Winget live portion. Run from an elevated session for live command coverage; if elevation is unavailable, report the live check as skipped, not passed. Do not install or uninstall packages.
 
-- [ ] **Step 3: Review final repository state**
+- [x] **Step 3: Review final repository state**
 
 Run: `git status --short --branch`
-Expected: only intended changes are present; each implementation commit includes its focused regression test.
+Expected: only intended local changes are present, with their focused regression tests. No implementation commits or pushes are permitted in this session.
+
+### Completion follow-up: version and documentation
+
+- [x] Audit all four tasks against implementation, test evidence and reported skips.
+- [x] Update `$AppVersion`, README and changelog to local unpublished version 1.10.2.
+- [x] Record the recurring completion/documentation rule and reconcile the project workflow with the user's local-only instruction.
+- [x] Rebuild locally and verify executable version metadata plus the existing regression gate: build exit 0, FileVersion/ProductVersion 1.10.2, both suites exit 0.
+- [x] Append the final evidence and remaining limitations to the verification report: real pin cycle skipped, UAC startup unverified, signing root not trusted locally.

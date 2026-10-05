@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.10.2 (unreleased)
+
+- Report failed Winget reads in the UI instead of showing successful empty lists; preserve normal no-match results and the last known pin state across refresh failures.
+- Reject malformed package export structures before import confirmation.
+- Require explicit opt-in for the live WPF test, use deterministic filter fixtures, and protect existing pins during test cleanup.
+- Credit Codex (OpenAI) alongside Claude Code (Anthropic) in About.
+- Add GitHub Actions Windows CI with offline PowerShell 5.1/WPF regression tests, executable version checks and unsigned build artifacts.
+
 ## v1.10.1
 
 Fixes only, all of them found in 1.10.0. Coming from v1.10.0: download the new exe and delete the old one, or let the app update itself from **Settings** — unless you installed it with winget, in which case read the first entry.

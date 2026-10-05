@@ -1,11 +1,20 @@
 <#
-    Test-Ui.ps1 — controllo headless di UI e temi (non apre finestre, non tocca winget).
-    Uso: powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
+    Test-Ui.ps1 — integrazione WPF nascosta; -Offline per CI, live con opt-in.
+    Uso: powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -ConfirmLiveWinget
 
     Serve per accorgersi subito se un ritocco a ui\*.xaml rompe qualcosa: XAML non
     valido, un x:Name rinominato, una chiave di colore presente in un tema e non
     nell'altro, un marcatore ###...### perso, un modulo che non entra nell'exe.
 #>
+param([switch]$ConfirmLiveWinget, [switch]$Offline)
+
+if ($Offline -and $ConfirmLiveWinget) { throw 'Scegli -Offline oppure -ConfirmLiveWinget, non entrambi.' }
+if (-not $Offline -and -not $ConfirmLiveWinget) {
+    throw "Test-Ui.ps1 avvia una finestra WPF nascosta, usa Winget reale e puo' modificare temporaneamente il pin di 7zip.7zip. Ripeti con -ConfirmLiveWinget per autorizzarlo."
+}
+if ($Offline) { 'OFFLINE: test WPF e fixture locali; Winget reale e API GitHub esclusi.' }
+else { Write-Warning 'Test UI live: esegue letture/export Winget e puo'' aggiungere e rimuovere il pin 7zip.7zip se installato e inizialmente non pinnato.' }
+
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
@@ -117,6 +126,9 @@ if ($missing) { throw "chiavi referenziate ma assenti dai temi: $($missing -join
 # piu' importante della schermata. Soglie WCAG: 4.5:1 per il testo, 3:1 per gli elementi
 # grafici (i glifi di esito, il riempimento della barra).
 $uiTextEarly = Get-Content (Join-Path $root 'ui\UI.xaml') -Raw
+if ($uiTextEarly -notmatch 'Claude Code' -or $uiTextEarly -notmatch 'Codex') {
+    throw "ABOUT non elenca Claude Code e Codex come strumenti di sviluppo"
+}
 function Get-Luminance([System.Windows.Media.Color]$c) {
     $ch = @($c.R, $c.G, $c.B) | ForEach-Object {
         $s = $_ / 255
@@ -406,7 +418,7 @@ foreach ($m in $moduleNames) { . (Join-Path $root "src\modules\$m") }
 # Deve essere il vero percorso, perche' le code (update/install/uninstall/pin) lanciano
 # $wingetPath tramite cmd: con un percorso finto cmd esce 1 con "Impossibile trovare il
 # percorso specificato" e sembrerebbe un errore di winget.
-$realWinget = (Get-Command winget -ErrorAction SilentlyContinue).Source
+$realWinget = if (-not $Offline) { (Get-Command winget -ErrorAction SilentlyContinue).Source } else { $null }
 function Get-WinGetPath { if ($realWinget) { $realWinget } else { 'C:\winget-stub\winget.exe' } }
 $AppVersion = $mv.Groups[1].Value
 Start-App -NoShow
@@ -620,14 +632,22 @@ foreach ($t in @($script:themeTimer)) { if ($t) { $t.Stop() } }
 # invece di far esplodere l'avvio. Si scrive un nome di prova e si cancella subito: la chiave
 # e' la stessa dell'app, quindi non si toccano i valori veri dell'utente.
 $probe = "TestProbe$PID"
+$softwareKey = $null
+try { $softwareKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software', $true) }
+catch { }
+$canWritePrefs = $null -ne $softwareKey
+if ($softwareKey) { $softwareKey.Dispose() }
 try {
     if ($null -ne (Get-Pref $probe $null)) { throw "il nome di prova esisteva gia': $probe" }
     if ((Get-Pref $probe 'fallback') -ne 'fallback') { throw "un valore assente non torna il default" }
-    Set-Pref $probe 42
-    if ((Get-Pref $probe 0) -ne 42) { throw "Set-Pref/Get-Pref non fanno il giro: $(Get-Pref $probe 0)" }
+    if ($canWritePrefs) {
+        Set-Pref $probe 42
+        if ((Get-Pref $probe 0) -ne 42) { throw "Set-Pref/Get-Pref non fanno il giro: $(Get-Pref $probe 0)" }
+    }
+    else { "SKIP prefs HKCU non scrivibile dal token di test; verificati i default" }
 }
 finally {
-    Remove-ItemProperty -Path $PrefsKey -Name $probe -ErrorAction SilentlyContinue
+    if ($canWritePrefs) { Remove-ItemProperty -Path $PrefsKey -Name $probe -ErrorAction SilentlyContinue }
 }
 # I tre toggle che si perdevano a ogni avvio ora si rileggono e si risalvano. Controllo
 # statico: farli girare davvero vorrebbe dire sporcare le preferenze di chi esegue i test.
@@ -644,7 +664,8 @@ foreach ($pair in @(@('Initialize-UpdatesTab', 'IncludeUnknown'),
 if ((Get-FunctionSource 'Initialize-UpdatesTab') -notmatch '(?s)ChkUnknown\.Add_Click[\s\S]{0,300}Load-Upgrades') {
     throw "la spunta Unknown non ricarica l'elenco"
 }
-"OK prefs  giro completo su registro, 4 preferenze lette e salvate, Unknown ricarica"
+if ($canWritePrefs) { "OK prefs  giro completo su registro, 4 preferenze lette e salvate, Unknown ricarica" }
+else { "OK prefs  default, 4 preferenze e ricaricamento Unknown verificati; scrittura saltata per ACL" }
 
 # 12d) Il ricalcolo differito dei contatori era copiato in tutte e tre le schede col solo
 # nome della funzione diverso. Vive in un posto solo: se una scheda tornasse a scriverselo a
@@ -690,7 +711,6 @@ $descrizioni = @($AboutTable.Children | Where-Object { [System.Windows.Controls.
 if ($descrizioni.Count -ne $nomiFunzioni.Count) {
     throw "la tabella di About ha $($nomiFunzioni.Count) nomi e $($descrizioni.Count) descrizioni"
 }
-if ($uiTextEarly -notmatch 'Claude Code') { throw "manca la nota sullo strumento con cui e' stato scritto" }
 if ($uiTextEarly -notmatch 'github\.com/FedeB2160"') { throw "ABOUT non dice chi ha fatto il progetto" }
 # Niente trattini lunghi nel testo a schermo: separano peggio dei due punti e lasciano un
 # segno lungo in mezzo alla riga. Sul markup SENZA COMMENTI, perche' nei commenti italiani
@@ -819,8 +839,8 @@ if ($null -ne $script:queueVerb) { throw "Set-AppBusy `$false non azzera il verb
 #      primo sia davvero partito prima di annullare, altrimenti la richiesta batte la coda e
 #      questo pezzo non verrebbe provato;
 #   4. a coda finita il pulsante torna Update ma resta bloccato, e il perche' e' a schermo.
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    "SKIP queue  winget non presente su questa macchina"
+if (-not $realWinget) {
+    "SKIP queue  modalita' offline o winget non presente"
 }
 else {
     # Righe finte spuntate, e poi si chiama la funzione VERA del pulsante Update: cosi' passano
@@ -906,8 +926,8 @@ if ((Get-FunctionSource 'Load-Upgrades') -notmatch 'listStale\s*=\s*\$false') { 
 # 14) La ricerca della scheda Install: debounce, soglia dei 3 caratteri e scarto dei
 # risultati superati. E' l'unica parte della suite che chiama winget davvero, ma solo in
 # lettura e sul solo indice LOCALE (--source winget), quindi non tocca la rete.
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    "SKIP search  winget non presente su questa macchina"
+if (-not $realWinget) {
+    "SKIP search  modalita' offline o winget non presente"
 }
 else {
     # Sotto i 3 caratteri non deve partire nulla: solo il messaggio guida.
@@ -1098,14 +1118,117 @@ if ($uninstallSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma non h
 if ($uninstallSrc -notmatch 'MessageBoxButton\]::YesNo') { throw "la conferma non e' una scelta Yes/No" }
 "OK confirm disinstallazione dietro conferma Yes/No con default No, prima della coda"
 
-# 17) Elenco installati e filtro locale. Tocca winget in lettura (winget list).
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    "SKIP list    winget non presente su questa macchina"
+# 16b) Gli errori dei comandi di lettura restano errori visibili, non liste vuote.
+# Il .cmd temporaneo simula il confine reale del processo e non tocca Winget o la macchina.
+$wingetReadStub = Join-Path ([IO.Path]::GetTempPath()) "wgt-read-failure-$PID.cmd"
+$wingetPathBeforeReadTest = $wingetPath
+$installedLoadedBeforeReadTest = $script:installedLoaded
+$searchTextBeforeReadTest = $TxtSearch.Text
+[IO.File]::WriteAllLines($wingetReadStub,
+    @('@echo off', 'echo Failed to open source: test fixture 1>&2', 'exit /b 1'),
+    [Text.Encoding]::ASCII)
+$readUiFailures = New-Object System.Collections.ArrayList
+try {
+    Stop-AllJobs
+    $wingetPath = $wingetReadStub
+
+    $TxtLog.Clear()
+    Load-Upgrades
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw "test errore upgrade non terminato" }
+    if ($TxtEmpty.Visibility -ne [System.Windows.Visibility]::Visible -or
+        $TxtEmpty.Text -notmatch 'winget upgrade failed \(exit 1\)') {
+        [void]$readUiFailures.Add("upgrade status: '$($TxtEmpty.Text)'")
+    }
+    if ($TxtLog.Text -match 'No updates available\.') { [void]$readUiFailures.Add('upgrade mostrato come lista vuota') }
+
+    $TxtLog.Clear()
+    Load-Installed
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw "test errore inventario non terminato" }
+    if ($TxtInstalledEmpty.Visibility -ne [System.Windows.Visibility]::Visible -or
+        $TxtInstalledEmpty.Text -notmatch 'winget list failed \(exit 1\)') {
+        [void]$readUiFailures.Add("installed status: '$($TxtInstalledEmpty.Text)'")
+    }
+    if ($TxtLog.Text -match 'No installed package found\.') { [void]$readUiFailures.Add('inventario mostrato come vuoto') }
+
+    $script:searchTimer.Stop()
+    $script:searchInFlight = 0
+    $TxtSearch.Text = 'wgt-failure-fixture-query'
+    $script:searchTimer.Stop()
+    $TxtLog.Clear()
+    Start-Search $false
+    if (-not (Wait-For { $script:searchInFlight -eq 0 } 30)) { throw "test errore ricerca non terminato" }
+    if ($TxtSearchEmpty.Visibility -ne [System.Windows.Visibility]::Visible -or
+        $TxtSearchEmpty.Text -notmatch 'winget search .*failed \(exit 1\)') {
+        [void]$readUiFailures.Add("search status: '$($TxtSearchEmpty.Text)'")
+    }
+    if ($TxtSearchEmpty.Text -match 'No package matches') { [void]$readUiFailures.Add('ricerca mostrata come vuota') }
+
+    $pinnedUpdateProbe = [WgtRow]@{ Name = 'Pinned update fixture'; Id = 'WgtStudio.PinnedUpdateFixture'; Pinned = $true }
+    $pinnedInstalledProbe = [WgtRow]@{ Name = 'Pinned installed fixture'; Id = 'WgtStudio.PinnedInstalledFixture'; Pinned = $true }
+    $items.Add($pinnedUpdateProbe)
+    $installedItems.Add($pinnedInstalledProbe)
+    $TxtLog.Clear()
+    Update-PinFlags
+    if (-not (Wait-For { $script:jobs.Count -eq 0 } 30)) { throw "test errore pin non terminato" }
+    if (-not $pinnedUpdateProbe.Pinned -or -not $pinnedInstalledProbe.Pinned) {
+        [void]$readUiFailures.Add('la lettura pin fallita ha azzerato flag esistenti')
+    }
+    if ($TxtLog.Text -notmatch 'winget pin list failed \(exit 1\)') {
+        [void]$readUiFailures.Add("pin diagnostic non visibile: '$($TxtLog.Text.Trim())'")
+    }
+
+    # Inventario valido e sola lettura dei pin fallita: anche le NUOVE righe devono
+    # conservare l'ultimo stato noto, dopo due refresh consecutivi.
+    Set-PinFlags @('WgtStudio.PinnedUpdateFixture', 'WgtStudio.PinnedInstalledFixture')
+    [IO.File]::WriteAllLines($wingetReadStub, @(
+        '@echo off',
+        'if "%~1"=="pin" exit /b 1',
+        'echo Name               Id                                Version Available',
+        'echo --------------------------------------------------------------------',
+        'echo Pinned update      WgtStudio.PinnedUpdateFixture     1.0     2.0',
+        'echo Pinned installed   WgtStudio.PinnedInstalledFixture  1.0     2.0',
+        'exit /b 0'
+    ), [Text.Encoding]::ASCII)
+    foreach ($refresh in 1..2) {
+        Load-Upgrades
+        if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'refresh upgrade fixture non terminato' }
+        Load-Installed
+        if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'refresh installed fixture non terminato' }
+        foreach ($rows in @(@($items), @($installedItems))) {
+            if ($rows.Count -ne 2 -or @($rows | Where-Object { -not $_.Pinned }).Count) {
+                [void]$readUiFailures.Add("refresh $refresh perde i pin sulle nuove righe")
+            }
+        }
+    }
+    Set-PinFlags @()
+    if (@(@($items) + @($installedItems) | Where-Object { $_.Pinned }).Count) {
+        [void]$readUiFailures.Add('lettura pin vuota valida non rimuove i vecchi flag')
+    }
+
+    if ($readUiFailures.Count) { throw "errori Winget non gestiti dalla UI: $($readUiFailures -join '; ')" }
+    "OK readerr letture Winget fallite visibili; stati vuoti falsi esclusi e pin preservati"
+}
+finally {
+    Stop-AllJobs
+    $wingetPath = $wingetPathBeforeReadTest
+    $script:installedLoaded = $installedLoadedBeforeReadTest
+    $TxtSearch.Text = $searchTextBeforeReadTest
+    $script:searchTimer.Stop()
+    $items.Clear()
+    $installedItems.Clear()
+    Remove-Item -LiteralPath $wingetReadStub -Force -ErrorAction SilentlyContinue
+}
+
+# 17) Elenco installati e filtro locale. Il caricamento live e' facoltativo in base alla
+# presenza di Winget; la verifica del filtro usa sempre righe deterministiche.
+if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
+$total = 0
+if (-not $realWinget) {
+    "SKIP list    modalita' offline o winget non presente"
 }
 else {
     # Il caricamento parte da solo al PRIMO ingresso nella scheda: non si chiama la
     # funzione a mano, si cambia scheda come farebbe l'utente.
-    if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
     $TabInstalled.IsSelected = $true
     if (-not (Wait-For { $installedItems.Count -gt 0 -and -not $script:isBusy } 120)) {
         throw "aprendo la scheda Installed l'elenco non si e' caricato"
@@ -1122,40 +1245,102 @@ else {
     Start-Sleep -Milliseconds 300
     if ($script:isBusy) { throw "selezionare una riga ha riavviato il caricamento dell'elenco" }
 
-    # Il filtro nasconde righe senza toglierle dalla collezione.
-    $TxtFilter.Text = '7zip'
-    $shown = @($script:installedView).Count
-    if ($installedItems.Count -ne $total) { throw "il filtro ha rimosso righe dalla collezione invece di nasconderle" }
-    if ($shown -ge $total -or $shown -eq 0) { throw "il filtro '7zip' mostra $shown righe su $total" }
-    foreach ($r in @($script:installedView)) {
-        if ($r.Name -notlike '*7zip*' -and $r.Id -notlike '*7zip*') { throw "il filtro ha lasciato passare '$($r.Name)'" }
+    Stop-AllJobs
+}
+
+$filterTag = "WgtStudioFilterFixture$PID"
+$filterMatch = [WgtRow]@{ Name = "$filterTag matching row"; Id = "$filterTag.Match" }
+$filterMiss = [WgtRow]@{ Name = 'Unrelated fixture row'; Id = 'WgtStudio.UnrelatedFixture' }
+$installedItems.Add($filterMatch)
+$installedItems.Add($filterMiss)
+try {
+    # Il filtro nasconde righe senza toglierle dalla collezione. I dati non dipendono
+    # dall'inventario installato né dalla presenza di 7-Zip.
+    $TxtFilter.Text = $filterTag
+    $shown = @($script:installedView)
+    if ($shown.Count -ne 1 -or $shown[0].Id -ne $filterMatch.Id) {
+        throw "il filtro fixture mostra $($shown.Count) righe; attesa solo '$($filterMatch.Id)'"
+    }
+    if ($installedItems.Count -ne ($total + 2) -or
+        -not $installedItems.Contains($filterMatch) -or -not $installedItems.Contains($filterMiss)) {
+        throw "il filtro ha alterato la collezione sottostante"
     }
 
     # PUNTO CRITICO: una riga selezionata e poi nascosta dal filtro resta in coda per la
     # disinstallazione. Deve essere dichiarato a schermo, non solo nella conferma.
-    $victim = @($installedItems | Where-Object { $_.Name -notlike '*7zip*' -and $_.Id -notlike '*7zip*' })[0]
-    $victim.Selected = $true
+    $filterMiss.Selected = $true
     Refresh-InstalledState
     if ($TxtInstalledInfo.Text -notmatch 'hidden by the filter') {
-        throw "un pacchetto selezionato ma nascosto dal filtro non viene segnalato: '$($TxtInstalledInfo.Text)'"
+        throw "una riga selezionata ma nascosta non viene segnalata: '$($TxtInstalledInfo.Text)'"
     }
-    $victim.Selected = $false
+    $filterMiss.Selected = $false
+    "OK list    filtro deterministico, collezione intatta e avviso sui selezionati nascosti"
+}
+finally {
     $TxtFilter.Text = ''
+    $filterMatch.Selected = $false
+    $filterMiss.Selected = $false
+    [void]$installedItems.Remove($filterMatch)
+    [void]$installedItems.Remove($filterMiss)
     Refresh-InstalledState
-    Stop-AllJobs
-    "OK list    $total pacchetti installati, filtro locale e avviso sui selezionati nascosti"
 }
 
-# 18) Ciclo completo del pin su un pacchetto reale: pin add -> winget lo elenca -> il
-# flag sulla riga si accende -> pin remove -> si spegne. E' l'unico test che MODIFICA lo
-# stato della macchina, quindi il pin viene rimosso in ogni caso dal finally, anche se
-# un'asserzione fallisce a meta'.
+# 18) Ciclo completo del pin su un pacchetto reale. Non tocca pin preesistenti e ripulisce
+# soltanto il pin creato dal test.
+function Remove-TestPin {
+    $pinsAfter = winget pin list --disable-interactivity 2>&1 | Out-String
+    $pinsAfterExit = $LASTEXITCODE
+    # Il target era assente prima del test: anche se la lettura fallisce, tentare
+    # la rimozione. L'assenza va confermata da una lettura successiva riuscita.
+    if ($pinsAfterExit -ne 0 -or $pinsAfter -match '7zip\.7zip') {
+        [void](winget pin remove --id 7zip.7zip -e --disable-interactivity 2>&1)
+        $removeExit = $LASTEXITCODE
+        $pinsAfter = winget pin list --disable-interactivity 2>&1 | Out-String
+        $pinsAfterExit = $LASTEXITCODE
+        if ($removeExit -ne 0 -or $pinsAfterExit -ne 0 -or $pinsAfter -match '7zip\.7zip') {
+            throw "cleanup pin non riuscito (remove exit $removeExit, list exit $pinsAfterExit): $pinsAfter"
+        }
+    }
+}
+
+# Prova il cleanup senza toccare pin reali: la prima lettura fallisce dopo l'add,
+# la rimozione deve comunque essere tentata e seguita da una verifica.
+& {
+    $cleanupProbe = @{ Calls = @(); Lists = 0 }
+    function winget {
+        $cleanupProbe.Calls += $args[1]
+        $global:LASTEXITCODE = 0
+        if ($args[1] -eq 'list') {
+            $cleanupProbe.Lists++
+            if ($cleanupProbe.Lists -eq 1) { $global:LASTEXITCODE = 1; 'Read failed' }
+        }
+    }
+    $cleanupError = $null
+    try { Remove-TestPin } catch { $cleanupError = $_ }
+    if ($cleanupError -or ($cleanupProbe.Calls -join ',') -ne 'list,remove,list') {
+        throw "cleanup non ripristina il pin dopo una lettura fallita: $($cleanupProbe.Calls -join ','); $cleanupError"
+    }
+}
+"OK cleanup rimozione e verifica anche dopo una lettura pin fallita"
+
 $pinTarget = @($installedItems | Where-Object { $_.Id -eq '7zip.7zip' })[0]
 if (-not $pinTarget) {
     "SKIP pin     7zip.7zip non installato: nessun bersaglio sicuro per il test"
 }
+elseif ($pinTarget.Pinned) {
+    "SKIP pin     7zip.7zip e' gia' pinnato; stato preesistente preservato"
+}
 else {
+    $pinsBefore = winget pin list --disable-interactivity 2>&1 | Out-String
+    $pinsBeforeExit = $LASTEXITCODE
+    if ($pinsBeforeExit -ne 0) { throw "impossibile leggere i pin prima del test (exit $pinsBeforeExit): $pinsBefore" }
+    if ($pinsBefore -match '7zip\.7zip') {
+        "SKIP pin     7zip.7zip e' gia' pinnato in Winget; stato preesistente preservato"
+    }
+    else {
+        $cleanupPin = $false
     try {
+        $cleanupPin = $true
         Set-PackagePin @($pinTarget) $true
         if (-not (Wait-For { -not $script:isBusy -and $pinTarget.Pinned } 90)) {
             # Le ultime righe del log riportano l'output di winget: senza, un errore qui
@@ -1177,10 +1362,9 @@ else {
         "OK pin     pin add/list/remove su 7zip.7zip, flag della riga allineato a winget"
     }
     finally {
-        # Rete di sicurezza: un pin dimenticato bloccherebbe in silenzio gli
-        # aggiornamenti di quel pacchetto.
-        [void](winget pin remove --id 7zip.7zip -e 2>&1)
         Stop-AllJobs
+        if ($cleanupPin) { Remove-TestPin }
+    }
     }
 }
 
@@ -1196,9 +1380,46 @@ if ($importSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma di impor
 if ((Get-FunctionSource 'Invoke-PackageImport') -notmatch '--ignore-unavailable') {
     throw "manca --ignore-unavailable: un solo pacchetto non piu' pubblicato farebbe fallire tutto l'import"
 }
+$countPos = $importSrc.IndexOf('Get-ImportPackageCount')
+$rejectPos = $importSrc.IndexOf('$null -eq $count')
+$rejectReturnPos = $importSrc.IndexOf('return', $rejectPos)
+if ($countPos -lt 0 -or $rejectPos -lt $countPos -or $rejectReturnPos -lt $rejectPos -or $rejectReturnPos -gt $posRun) {
+    throw "un export non valido potrebbe raggiungere Invoke-PackageImport"
+}
 
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    "SKIP export  winget non presente su questa macchina"
+# Il conteggio accetta solo la struttura Sources/Packages di Winget e ID non vuoti.
+$importFixtures = @(
+    [PSCustomObject]@{ Name = 'one-package'; Json = '{"Sources":[{"Packages":[{"PackageIdentifier":"FedeB2160.WinGetStudio"}]}]}'; Count = 1 },
+    [PSCustomObject]@{ Name = 'empty-packages'; Json = '{"Sources":[{"Packages":[]}]}'; Count = 0 },
+    [PSCustomObject]@{ Name = 'root-array'; Json = '[{"Sources":[{"Packages":[{"PackageIdentifier":"FedeB2160.WinGetStudio"}]}]}]'; Count = $null },
+    [PSCustomObject]@{ Name = 'malformed-json'; Json = '{"Sources":['; Count = $null },
+    [PSCustomObject]@{ Name = 'missing-sources'; Json = '{"hello":"world"}'; Count = $null },
+    [PSCustomObject]@{ Name = 'sources-not-array'; Json = '{"Sources":{}}'; Count = $null },
+    [PSCustomObject]@{ Name = 'missing-packages'; Json = '{"Sources":[{}]}'; Count = $null },
+    [PSCustomObject]@{ Name = 'packages-not-array'; Json = '{"Sources":[{"Packages":{"PackageIdentifier":"FedeB2160.WinGetStudio"}}]}'; Count = $null },
+    [PSCustomObject]@{ Name = 'missing-identifier'; Json = '{"Sources":[{"Packages":[{}]}]}'; Count = $null },
+    [PSCustomObject]@{ Name = 'empty-identifier'; Json = '{"Sources":[{"Packages":[{"PackageIdentifier":" "}]}]}'; Count = $null }
+)
+$importFixtureFailures = New-Object System.Collections.ArrayList
+$importFixturePaths = New-Object System.Collections.ArrayList
+try {
+    foreach ($fixture in $importFixtures) {
+        $path = Join-Path ([IO.Path]::GetTempPath()) "wgt-import-$PID-$($fixture.Name).json"
+        [void]$importFixturePaths.Add($path)
+        Set-Content -LiteralPath $path -Value $fixture.Json -Encoding UTF8
+        $actual = Get-ImportPackageCount $path
+        if ($null -eq $fixture.Count) {
+            if ($null -ne $actual) { [void]$importFixtureFailures.Add("$($fixture.Name) -> $actual") }
+        }
+        elseif ($actual -ne $fixture.Count) { [void]$importFixtureFailures.Add("$($fixture.Name) -> $actual, atteso $($fixture.Count)") }
+    }
+}
+finally { foreach ($path in $importFixturePaths) { Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue } }
+if ($importFixtureFailures.Count) { throw "conteggio export errato: $($importFixtureFailures -join '; ')" }
+"OK import  struttura valida, conteggi 0/1 e fixture malformate rifiutate"
+
+if (-not $realWinget) {
+    "SKIP export  modalita' offline o winget non presente"
 }
 else {
     $expFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-test-export-$PID.json"
@@ -1273,9 +1494,9 @@ ${function:Get-RunningExePath} = $realExePath
 "OK winget  con l'exe dentro %LOCALAPPDATA%\Microsoft\WinGet\Packages l'auto-update sta fermo"
 
 # Chiamata reale all'API pubblica (una richiesta, limite anonimo 60/ora).
-$rel = Get-LatestRelease 'FedeB2160/WinGetStudio'
+$rel = if (-not $Offline) { Get-LatestRelease 'FedeB2160/WinGetStudio' } else { $null }
 if (-not $rel) {
-    "SKIP rel     nessuna release con asset .exe pubblicata (o rete assente)"
+    "SKIP rel     modalita' offline, nessuna release con asset .exe pubblicata o rete assente"
 }
 else {
     if ($rel.Version -notmatch '^\d+\.\d+') { throw "versione della release non numerica: '$($rel.Version)'" }

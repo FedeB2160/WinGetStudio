@@ -4,6 +4,10 @@ A Windows desktop front end for `winget`. Everything happens in one table with c
 
 Light and dark theme, no telemetry, no branding, a single `.exe` with nothing to install.
 
+The local development version is **1.10.2**, not yet published. See [CHANGELOG.md](CHANGELOG.md) for its fixes; the download link below points to the latest published release.
+
+[Windows CI](https://github.com/FedeB2160/WinGetStudio/actions/workflows/ci.yml) runs PowerShell 5.1/WPF tests and builds a test executable on GitHub-hosted Windows runners for every pull request and push to `main`. CI artifacts are unsigned test builds, not published releases.
+
 ## Requirements
 
 - Windows 10 or 11 with **winget** (the *App Installer* package from the Microsoft Store). Without it the app says so at startup and exits.

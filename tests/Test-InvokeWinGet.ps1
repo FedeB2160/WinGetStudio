@@ -9,6 +9,8 @@
     Esce 0 se tutto passa, 1 al primo assert fallito.
 #>
 
+param([switch]$Offline)
+
 $ErrorActionPreference = 'Stop'
 $failures = 0
 function Check([string]$what, [bool]$ok, [string]$detail = '') {
@@ -90,8 +92,8 @@ Check "nessun BeginInvoke([action]...) nel codice dell'app" ($badCalls.Count -eq
 
 # ------------------------------------------------------------------
 Write-Host "`n3) Smoke test su winget" -ForegroundColor Cyan
-$wg = Get-Command winget -ErrorAction SilentlyContinue
-if (-not $wg) { Write-Host "  SKIP winget non presente" -ForegroundColor Yellow }
+$wg = if (-not $Offline) { Get-Command winget -ErrorAction SilentlyContinue } else { $null }
+if (-not $wg) { Write-Host "  SKIP modalita' offline o winget non presente" -ForegroundColor Yellow }
 else {
     $v = Invoke-WinGet $wg.Source '--version'
     Check "winget --version exit 0 (=$($v.ExitCode))" ($v.ExitCode -eq 0)
@@ -112,9 +114,10 @@ if (-not ('WgtRow' -as [type])) {
 # ancora un COMANDO, dove una funzione vince sull'eseguibile. Nessuna modifica al codice di
 # produzione serve; con un percorso assoluto lo stub non verrebbe raggiunto.
 $wingetPath = 'winget'
-function winget { $fixture }
+function winget { $global:LASTEXITCODE = 0; $fixture }
 # Get-WinGetTable serve perche' Get-WinGetUpgrades la chiama.
 Invoke-Expression (Get-FunctionText 'Get-WinGetTable')
+Invoke-Expression (Get-FunctionText 'Invoke-WinGetRead')
 Invoke-Expression (Get-FunctionText 'Get-WinGetUpgrades')
 
 $fixture = @'
@@ -132,7 +135,9 @@ Nome    Id              Versione Disponibile Origine
 Discord Discord.Discord 1.0.9249 1.0.9250    winget
 '@
 
-$rows = @(Get-WinGetUpgrades $true)
+$upgradeRead = Get-WinGetUpgrades $true
+$rows = @($upgradeRead.Rows)
+Check "upgrade con fixture terminata correttamente" $upgradeRead.Success "(exit $($upgradeRead.ExitCode))"
 $ids  = @($rows | ForEach-Object { $_.Id })
 Check "5 pacchetti (4 + 1 a targeting esplicito), trovati $($rows.Count)" ($rows.Count -eq 5) ($ids -join ', ')
 Check "nessuna riga fantasma dall'header della 2a tabella" (@($rows | Where-Object { $_.Id -eq 'Id' -or $_.Name -eq 'Nome' }).Count -eq 0)
@@ -214,6 +219,50 @@ $prNoLimit = @(Get-WinGetTable $pinFixture)
 Check "senza -MaxColumns la tabella si perde (era il bug: $($prNoLimit.Count) righe)" ($prNoLimit.Count -lt 2)
 
 # ------------------------------------------------------------------
+Write-Host "`n6b) I lettori distinguono l'errore Winget da una lista vuota" -ForegroundColor Cyan
+Invoke-Expression (Get-FunctionText 'Get-WinGetSearch')
+Invoke-Expression (Get-FunctionText 'Get-WinGetPins')
+Invoke-Expression (Get-FunctionText 'Get-WinGetInstalled')
+$failureFixture = 'Failed to open source: test fixture'
+function winget {
+    $global:LASTEXITCODE = 1
+    $failureFixture
+}
+$readCases = @(
+    [PSCustomObject]@{ Name = 'search';    Result = Get-WinGetSearch 'fixture' },
+    [PSCustomObject]@{ Name = 'pins';      Result = Get-WinGetPins },
+    [PSCustomObject]@{ Name = 'installed'; Result = Get-WinGetInstalled },
+    [PSCustomObject]@{ Name = 'upgrades';  Result = Get-WinGetUpgrades }
+)
+foreach ($case in $readCases) {
+    $r = $case.Result
+    $ok = $r -and $r.Success -eq $false -and $r.ExitCode -eq 1 -and
+          $r.Output -match 'Failed to open source: test fixture' -and @($r.Rows).Count -eq 0
+    Check "$($case.Name) restituisce stato, exit code, diagnostica e zero righe" $ok `
+          "(result=$($r | ConvertTo-Json -Compress -Depth 3))"
+}
+
+# ------------------------------------------------------------------
+Write-Host "`n6c) Risultati vuoti e diagnostica simile a una tabella" -ForegroundColor Cyan
+$stubExit = -1978335212 # APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND
+function winget { $global:LASTEXITCODE = $stubExit; $fixture }
+foreach ($verb in 'search', 'list', 'upgrade') {
+    $r = Invoke-WinGetRead -Arguments @($verb)
+    Check "$verb senza corrispondenze: vuoto valido, codice originale preservato" `
+        ($r.Success -and $r.ExitCode -eq $stubExit -and $r.Rows.Count -eq 0)
+}
+$r = Get-WinGetPins
+Check "NO_APPLICATIONS_FOUND non maschera errori di pin list" (-not $r.Success -and $r.Rows.Count -eq 0)
+$stubExit = 1
+$r = Get-WinGetUpgrades
+Check "tabella emessa con exit 1 non produce righe valide" (-not $r.Success -and $r.Rows.Count -eq 0)
+$stubExit = 0
+$fixture = 'Nessun pacchetto trovato con criteri di input corrispondenti.'
+foreach ($verb in 'search', 'list', 'upgrade', 'pin') {
+    $r = Invoke-WinGetRead -Arguments @($verb)
+    Check "$verb con exit 0 e testo localizzato senza tabella: vuoto valido" ($r.Success -and $r.Rows.Count -eq 0)
+}
+
 Write-Host "`n7) Argomenti con apici sbilanciati" -ForegroundColor Cyan
 # La riga di comando si costruisce per concatenazione e la esegue cmd: un Id che contenesse
 # un apice doppio produrrebbe un comando malformato, che cmd eseguirebbe comunque. Gli Id

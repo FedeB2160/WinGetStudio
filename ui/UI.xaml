@@ -1087,7 +1087,7 @@
                              problema mentre nella prosa libera lo e'.
                              Nomi in FgBrush e descrizioni in SubtleFgBrush: la gerarchia la fa il
                              tono, non un bordo.
-                             La nota finale su Claude Code e' volontaria: l'articolo 50 dell'AI Act
+                             La nota finale su Claude Code e Codex e' volontaria: l'articolo 50 dell'AI Act
                              riguarda i sistemi AI e i contenuti generati, non gli strumenti con
                              cui si scrive il codice, e questo programma non contiene nessun
                              sistema AI. Sta qui perche' e' vero. -->
@@ -1159,7 +1159,8 @@
                                 <LineBreak/>
                                 Made by <Hyperlink NavigateUri="https://github.com/FedeB2160"
                                            Foreground="{DynamicResource AccentBrush}">FedeB2160</Hyperlink>,
-                                with the help of <Italic>Claude Code</Italic> (Anthropic).
+                                with the help of <Italic>Claude Code</Italic> (Anthropic) and
+                                <Italic>Codex</Italic> (OpenAI).
                             </TextBlock>
                         </StackPanel>
                     </ScrollViewer>

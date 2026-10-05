@@ -78,12 +78,12 @@ function Load-Installed {
 
     # I pin si leggono nello STESSO job dell'inventario: due winget in parallelo si
     # contendono lo store e uno dei due esce in errore.
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetInstalled', 'Get-WinGetPins' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetInstalled', 'Get-WinGetPins' `
         -Vars @{ wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{
-                Rows = @(Get-WinGetInstalled)
-                Pins = @(Get-WinGetPins)
+                Installed = Get-WinGetInstalled
+                Pins      = Get-WinGetPins
             }
         } `
         -OnDone {
@@ -91,19 +91,36 @@ function Load-Installed {
             $InstalledSpinner.Visibility = [System.Windows.Visibility]::Collapsed
             $Progress.IsIndeterminate    = $false
             $r = @($result)[0]
-            if ($r) { foreach ($p in $r.Rows) { if ($p) { $installedItems.Add($p) } } }
+            if ($r) {
+                if (-not $r.Installed.Success) {
+                    $message = Format-WinGetReadError 'list' $r.Installed
+                    $TxtInstalledEmpty.Text = $message
+                    $TxtInstalledEmpty.Visibility = [System.Windows.Visibility]::Visible
+                    $GridInstalled.Visibility = [System.Windows.Visibility]::Collapsed
+                    Write-Log $message
+                }
+                else {
+                    foreach ($p in $r.Installed.Rows) {
+                        if ($p) {
+                            $p.Pinned = $script:lastPinIds -contains $p.Id
+                            $installedItems.Add($p)
+                        }
+                    }
+                    if ($installedItems.Count -eq 0) {
+                        $TxtInstalledEmpty.Text = 'No installed package found.'
+                        $TxtInstalledEmpty.Visibility = [System.Windows.Visibility]::Visible
+                        Write-Log "No installed package found."
+                    }
+                    else {
+                        $TxtInstalledEmpty.Visibility = [System.Windows.Visibility]::Collapsed
+                        $GridInstalled.Visibility = [System.Windows.Visibility]::Visible
+                        Write-Log "Found $($installedItems.Count) installed packages."
+                    }
+                }
 
-            if ($installedItems.Count -eq 0) {
-                $TxtInstalledEmpty.Text       = "No installed package found."
-                $TxtInstalledEmpty.Visibility = [System.Windows.Visibility]::Visible
-                Write-Log "No installed package found."
+                if ($r.Pins.Success) { Set-PinFlags @($r.Pins.Rows) }
+                else { Write-Log (Format-WinGetReadError 'pin list' $r.Pins) }
             }
-            else {
-                $TxtInstalledEmpty.Visibility = [System.Windows.Visibility]::Collapsed
-                $GridInstalled.Visibility     = [System.Windows.Visibility]::Visible
-                Write-Log "Found $($installedItems.Count) installed packages."
-            }
-            if ($r) { Set-PinFlags @($r.Pins) }
             Set-AppBusy $false
         })
 }
