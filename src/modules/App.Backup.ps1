@@ -11,13 +11,21 @@
 
 # Quanti pacchetti contiene un file di export. Struttura reale del JSON di winget:
 #   Sources[] -> Packages[] -> PackageIdentifier
-# Torna $null se il file non e' un export valido: meglio dirlo prima di lanciare winget.
+# Torna $null se il file non ha quella forma: meglio dirlo prima di lanciare winget. Lo schema
+# completo lo valida winget stesso all'import.
+# -LiteralPath: con -Path un nome con [ ] e' un wildcard, e un export valido risultava non valido.
+# [Management.Automation.PSCustomObject] per esteso: [PSCustomObject] e' l'acceleratore di
+# [psobject] e accetterebbe anche un array (radice "[...]").
+# Packages assente: @($null).Count fa 1, ed era cosi' che {"Sources":[{}]} contava un pacchetto.
 function Get-ImportPackageCount([string]$Path) {
     try {
-        $json = Get-Content $Path -Raw -Encoding UTF8 | ConvertFrom-Json
-        if (-not $json.Sources) { return $null }
+        $json = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($json -isnot [Management.Automation.PSCustomObject] -or $json.Sources -isnot [array]) { return $null }
         $n = 0
-        foreach ($s in $json.Sources) { $n += @($s.Packages).Count }
+        foreach ($s in $json.Sources) {
+            if ($s.Packages -isnot [array]) { return $null }
+            $n += $s.Packages.Count
+        }
         return $n
     }
     catch { return $null }
@@ -88,9 +96,11 @@ function Start-Import {
     $file = $dlg.FileName
 
     $count = Get-ImportPackageCount $file
-    if ($null -eq $count) {
+    # 0 come $null: un export senza pacchetti non ha niente da installare, e winget lo
+    # rifiuterebbe dopo la conferma.
+    if (-not $count) {
         [System.Windows.MessageBox]::Show(
-            "This file is not a winget package list.`n`n$file",
+            "This file is not a winget package list, or it lists no packages.`n`n$file",
             "Cannot import", [System.Windows.MessageBoxButton]::OK,
             [System.Windows.MessageBoxImage]::Error) | Out-Null
         return

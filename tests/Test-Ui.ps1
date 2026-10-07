@@ -1348,6 +1348,36 @@ if ($importSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma di impor
 if ((Get-FunctionSource 'Invoke-PackageImport') -notmatch '--ignore-unavailable') {
     throw "manca --ignore-unavailable: un solo pacchetto non piu' pubblicato farebbe fallire tutto l'import"
 }
+# Il conteggio legge la forma Sources[] -> Packages[] e basta: lo schema completo lo valida
+# winget all'import. Un file vuoto o non valido si ferma PRIMA della conferma.
+$rejectPos = $importSrc.IndexOf('if (-not $count)')
+if ($rejectPos -lt 0 -or $rejectPos -gt $importSrc.IndexOf('Confirm import')) { throw "un file vuoto o non valido arriva alla conferma dell'import" }
+$importFixtures = @(
+    @{ Name = 'one-package';        Json = '{"Sources":[{"Packages":[{"PackageIdentifier":"FedeB2160.WinGetStudio"}]}]}'; Count = 1 }
+    @{ Name = 'two-sources';        Json = '{"Sources":[{"Packages":[{"PackageIdentifier":"A.A"}]},{"Packages":[{"PackageIdentifier":"B.B"},{"PackageIdentifier":"C.C"}]}]}'; Count = 3 }
+    @{ Name = 'empty-packages';     Json = '{"Sources":[{"Packages":[]}]}'; Count = 0 }
+    @{ Name = 'empty-sources';      Json = '{"Sources":[]}'; Count = 0 }
+    @{ Name = 'root-array';         Json = '[{"Sources":[{"Packages":[{"PackageIdentifier":"A.A"}]}]}]'; Count = $null }
+    @{ Name = 'malformed-json';     Json = '{"Sources":['; Count = $null }
+    @{ Name = 'missing-sources';    Json = '{"hello":"world"}'; Count = $null }
+    @{ Name = 'sources-not-array';  Json = '{"Sources":{}}'; Count = $null }
+    @{ Name = 'missing-packages';   Json = '{"Sources":[{}]}'; Count = $null }
+    @{ Name = 'packages-not-array'; Json = '{"Sources":[{"Packages":{"PackageIdentifier":"A.A"}}]}'; Count = $null }
+    @{ Name = 'brackets [x]';       Json = '{"Sources":[{"Packages":[{"PackageIdentifier":"A.A"}]}]}'; Count = 1 }
+)
+$importFailures = New-Object System.Collections.ArrayList
+foreach ($fx in $importFixtures) {
+    $path = Join-Path ([IO.Path]::GetTempPath()) "wgt-import-$PID-$($fx.Name).json"
+    try {
+        [IO.File]::WriteAllText($path, $fx.Json)
+        $actual = Get-ImportPackageCount $path
+        if ($actual -ne $fx.Count) { [void]$importFailures.Add("$($fx.Name) -> '$actual', atteso '$($fx.Count)'") }
+    }
+    finally { [IO.File]::Delete($path) }
+}
+if ($null -ne (Get-ImportPackageCount (Join-Path ([IO.Path]::GetTempPath()) "manca-$PID.json"))) { [void]$importFailures.Add('file inesistente accettato') }
+if ($importFailures.Count) { throw "conteggio dei file di import: $($importFailures -join '; ')" }
+"OK import  forma Sources/Packages, vuoti e malformati riconosciuti, nomi con [ ]"
 
 if (-not $realWinget) {
     "SKIP export  senza -Live o winget non presente"
@@ -1360,15 +1390,7 @@ else {
         if (-not (Test-Path $expFile)) { throw "l'export non ha scritto il file" }
         $n = Get-ImportPackageCount $expFile
         if ($null -eq $n -or $n -le 0) { throw "il file esportato non contiene pacchetti leggibili (conteggio: $n)" }
-
-        # Un file che non e' un export winget deve essere riconosciuto PRIMA di lanciare
-        # winget, altrimenti l'utente vedrebbe un errore incomprensibile.
-        $bad = Join-Path ([IO.Path]::GetTempPath()) "wgt-test-bad-$PID.json"
-        '{ "hello": "world" }' | Set-Content $bad -Encoding UTF8
-        if ($null -ne (Get-ImportPackageCount $bad)) { throw "un JSON senza Sources viene accettato come lista pacchetti" }
-        if ($null -ne (Get-ImportPackageCount (Join-Path ([IO.Path]::GetTempPath()) "manca-$PID.json"))) { throw "un file inesistente viene accettato" }
-        Remove-Item $bad -Force -ErrorAction SilentlyContinue
-        "OK export  export reale di $n pacchetti, file non validi riconosciuti"
+        "OK export  export reale di $n pacchetti"
     }
     finally {
         Remove-Item $expFile -Force -ErrorAction SilentlyContinue
