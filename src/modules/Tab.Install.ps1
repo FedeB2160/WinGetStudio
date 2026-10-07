@@ -106,6 +106,11 @@ function Start-Search([bool]$IncludeStore = $false) {
             }
             $searchItems.Clear()
             foreach ($p in $r.Search.Rows) { if ($p) { $searchItems.Add($p) } }
+            # Store giu' ma la sorgente winget trova qualcosa: exit 0, la tabella c'e' e l'avviso
+            # sta sopra. Senza questa riga i risultati dello Store mancherebbero senza un perche'.
+            if ($searchItems.Count -gt 0) {
+                foreach ($l in @($r.Search.Output -split "`r`n|`n" | Where-Object { $_ -match 'msstore' })) { Write-Log "winget: $($l.Trim())" }
+            }
 
             if ($searchItems.Count -eq 0) {
                 $msg = "No package matches '$($r.Query)'."

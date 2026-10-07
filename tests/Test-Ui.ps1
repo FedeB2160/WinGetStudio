@@ -1172,6 +1172,22 @@ try {
         [void]$readUiFailures.Add("store: '$($TxtSearchEmpty.Text)'")
     }
 
+    # Store che non risponde ma la sorgente winget trova qualcosa: exit 0 e una tabella, con
+    # l'avviso sopra. La griglia si riempie, e l'avviso deve finire nel log.
+    Set-ReadStub @('echo Failed when searching source; results will not be included: msstore',
+                   'echo Name     Id       Version',
+                   'echo -------------------------',
+                   'echo Only One Only.One 1.0',
+                   'exit /b 0')
+    $TxtSearch.Text = 'wgt-store-rows-fixture'
+    $script:searchTimer.Stop()
+    $TxtLog.Clear()
+    Start-Search $true
+    if (-not (Wait-For { $script:searchInFlight -eq 0 } 30)) { throw 'test ricerca Store con righe non terminato' }
+    if ($searchItems.Count -ne 1 -or $TxtLog.Text -notmatch 'msstore') {
+        [void]$readUiFailures.Add("store con righe: $($searchItems.Count) righe, log '$($TxtLog.Text.Trim())'")
+    }
+
     # Job morto (qui il lettore scrive un errore e non restituisce nulla): messaggio a schermo
     # e causa nel log, non una scheda bianca.
     ${function:Get-WinGetUpgrades} = { Write-Error 'job fixture failure' }
