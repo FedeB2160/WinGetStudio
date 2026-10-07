@@ -89,7 +89,7 @@ It replaces `###MODULES###` with the concatenated modules and the `###UI.xaml###
 `build.ps1` signs the exe after compiling, choosing the certificate in this order:
 
 1. `$env:WINGETSTUDIO_CERT_THUMBPRINT` — set this to switch to a company or commercial certificate without editing the build;
-2. otherwise the first valid code-signing certificate with a private key in `Cert:\CurrentUser\My`.
+2. otherwise the certificate in `Cert:\CurrentUser\My` whose thumbprint matches `assets\WinGetStudio-codesign.cer`, valid and with its private key. Any other code-signing certificate is ignored, even one with the same subject.
 
 If it finds none the build **still succeeds**, printing a warning that the exe is unsigned — signing needs a private key that not every machine has.
 
