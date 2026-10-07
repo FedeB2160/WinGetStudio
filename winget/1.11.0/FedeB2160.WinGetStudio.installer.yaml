@@ -5,7 +5,6 @@ PackageIdentifier: FedeB2160.WinGetStudio
 PackageVersion: 1.11.0
 InstallerLocale: en-US
 InstallerType: inno
-ElevationRequirement: elevatesSelf
 UpgradeBehavior: uninstallPrevious
 ProductCode: '{80A0A054-6278-4145-AD5A-2B3C4853019F}_is1'
 AppsAndFeaturesEntries:
@@ -13,6 +12,7 @@ AppsAndFeaturesEntries:
   InstallerType: inno
 - ProductCode: FedeB2160.WinGetStudio_Microsoft.Winget.Source_8wekyb3d8bbwe
   InstallerType: portable
+ElevationRequirement: elevatesSelf
 Installers:
 - Architecture: x86
   InstallerUrl: https://github.com/FedeB2160/WinGetStudio/releases/download/v1.11.0/WinGetStudio_Setup.exe
