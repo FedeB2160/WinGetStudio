@@ -401,6 +401,10 @@ if ($lastEntry.Groups[1].Value -ne $mv.Groups[1].Value) {
     throw "CHANGELOG: ultima voce v$($lastEntry.Groups[1].Value), `$AppVersion $($mv.Groups[1].Value)"
 }
 "OK ver    versione $($mv.Groups[1].Value) nel titolo e nelle proprieta' dell'exe"
+# La firma deve usare la chiave del .cer pubblicato, non il primo certificato di code signing:
+# un secondo certificato con lo stesso nome (rigenerato su un'altra macchina) firmerebbe exe
+# che il .cer del repository non riconosce.
+if ($buildText -notmatch 'WinGetStudio-codesign\.cer') { throw "build.ps1 non lega la firma al certificato pubblicato" }
 
 # 12) L'app si monta davvero? Carica i moduli come fa main.ps1 e chiama Start-App
 # -NoShow: nessuna finestra a schermo, ma finestra costruita, controlli risolti e
@@ -1302,6 +1306,12 @@ if (-not $pinTarget) {
 }
 elseif ($pinTarget.Pinned) {
     "SKIP pin     7zip.7zip e' gia' pinnato: lo stato dell'utente non si tocca"
+}
+# Il flag della riga viene dalla lettura dei pin dell'app: se quella e' fallita la riga dice
+# "non pinnato" anche quando lo e', e il finally toglierebbe il pin dell'utente. Si chiede a
+# winget direttamente, e nel dubbio si salta.
+elseif (($pinsNow = winget pin list 2>&1 | Out-String) -match '(?m)(^|\s)7zip\.7zip(\s|$)' -or $LASTEXITCODE -ne 0) {
+    "SKIP pin     7zip.7zip pinnato secondo winget, o pin list non leggibile: lo stato dell'utente non si tocca"
 }
 else {
     try {

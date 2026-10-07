@@ -114,8 +114,13 @@ if ($env:WINGETSTUDIO_CERT_THUMBPRINT) {
     if (-not $signCert) { throw "Certificato $($env:WINGETSTUDIO_CERT_THUMBPRINT) non trovato negli archivi personali" }
 }
 else {
+    # Solo il certificato del .cer pubblicato, non il primo che capita: un secondo
+    # certificato con lo stesso nome (rigenerato altrove) firmerebbe exe che il .cer del
+    # repository non riconosce. Senza quello giusto si compila senza firma.
+    $published = New-Object Security.Cryptography.X509Certificates.X509Certificate2 (Join-Path $root 'assets\WinGetStudio-codesign.cer')
     $signCert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert -ErrorAction SilentlyContinue |
-                Where-Object { $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey } | Select-Object -First 1
+                Where-Object { $_.Thumbprint -eq $published.Thumbprint -and $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey } |
+                Select-Object -First 1
 }
 
 if (-not $signCert) {
