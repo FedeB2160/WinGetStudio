@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Pins made from the app are blocking pins: winget will not upgrade the package even when asked for it by name, until the pin is removed. Existing pins keep their type.
 - A failed winget read now shows winget's reason instead of "No updates available", "No installed package found" or "No package matches"; a search where the Microsoft Store does not answer says so, and a scan that fails inside the app no longer leaves the tab blank.
 - Development: the UI test suite runs offline by default; `-Live` opts into real winget calls and never touches an existing pin.
 - Development: the build pins ps2exe 1.0.18 and checks the exe version; the UI suite checks that the newest changelog entry matches `$AppVersion`.

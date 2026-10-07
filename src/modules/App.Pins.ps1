@@ -70,8 +70,10 @@ function Set-PackagePin([object[]]$Rows, [bool]$Pin) {
 
     # Lo stato occupato lo prende Start-WinGetQueue, che e' anche il punto in cui si controlla
     # che non ci sia gia' un winget in corso.
+    # --blocking: un pin normale (Pinning) winget lo rispetta solo con upgrade --all; su
+    # upgrade --id, cioe' come aggiorna questa app, lo ignora. Blocking vale su ogni percorso.
     Start-WinGetQueue -Rows $todo -Verb $(if ($Pin) { 'Pin' } else { 'Unpin' }) `
-        -Vars @{ pinVerb = $(if ($Pin) { 'add' } else { 'remove' }) } `
+        -Vars @{ pinVerb = $(if ($Pin) { 'add --blocking' } else { 'remove' }) } `
         -ArgsBuilder {
             param($r)
             "pin $pinVerb --id `"$($r.Id)`" -e --accept-source-agreements"

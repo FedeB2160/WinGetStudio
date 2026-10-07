@@ -1229,6 +1229,11 @@ finally {
     Remove-Item -LiteralPath $wingetReadStub -Force -ErrorAction SilentlyContinue
 }
 
+# I pin dell'app sono Blocking: un pin normale winget lo salta solo con upgrade --all, e questa
+# app aggiorna con upgrade --id, dove lo ignora (UpdateFlow.cpp: includePinned = m_isSinglePackage).
+if ((Get-FunctionSource 'Set-PackagePin') -notmatch "'add --blocking'") { throw "i pin dell'app non sono blocking" }
+"OK pinblk  i pin aggiunti dall'app sono blocking"
+
 # 17) Elenco installati e filtro locale. Il caricamento vero solo con -Live; il filtro si
 # prova sempre, su righe finte: non deve dipendere da cosa e' installato sulla macchina.
 if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
