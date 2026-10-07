@@ -4,6 +4,7 @@
 
 - Development: the UI test suite runs offline by default; `-Live` opts into real winget calls and never touches an existing pin.
 - Development: the build pins ps2exe 1.0.18 and checks the exe version; the UI suite checks that the newest changelog entry matches `$AppVersion`.
+- Development: Windows CI runs both test suites and then the build on every pull request; the unsigned exe is kept seven days as a test artifact.
 
 ## v1.10.1
 

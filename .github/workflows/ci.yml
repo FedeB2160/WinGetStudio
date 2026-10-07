@@ -1,0 +1,56 @@
+name: Windows CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-ci-${{ github.workflow }}-${{ github.ref }}
+  # Solo le PR: un push nuovo sostituisce il vecchio. Su main ogni commit va verificato.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: powershell
+
+jobs:
+  tests:
+    name: PowerShell 5.1 and WPF tests
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Process and parser regressions
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
+      - name: Hidden WPF integration (offline)
+        run: powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
+
+  build:
+    name: Build and verify executable
+    needs: tests
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Bootstrap NuGet for Install-Module
+        run: |
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Install-PackageProvider NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
+      - name: Compile (build.ps1 installs ps2exe 1.0.18 and checks the version metadata)
+        run: .\src\build.ps1
+      - name: Upload unsigned test build
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: WinGetStudio-ci-${{ github.sha }}
+          path: dist/WinGetStudio.exe
+          if-no-files-found: error
+          retention-days: 7
