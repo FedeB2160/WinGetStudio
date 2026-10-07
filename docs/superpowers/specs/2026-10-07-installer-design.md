@@ -72,19 +72,20 @@ The x86 setup writes that key in the 32-bit view (`WOW6432Node`), but the ps2exe
 
 ### 5. winget manifest and migration
 
-- `InstallerType: inno`, `Scope: machine`, `ElevationRequirement: elevatesSelf`, `InstallerUrl` → `WinGetStudio_Setup.exe` with its hash.
+- `InstallerType: inno`, `ElevationRequirement: elevatesSelf`, `InstallerUrl` → `WinGetStudio_Setup.exe` with its hash.
+- **No `Scope`.** On upgrade winget's `InstalledScopeFilter` rejects an installer whose declared scope differs from the installed one. The portable is installed per user, so `Scope: machine` made the upgrade fail with "No applicable installer found" in the Sandbox rehearsal; an undeclared scope passes the filter. The setup is machine-only regardless, through `PrivilegesRequired=admin`.
 - `UpgradeBehavior: uninstallPrevious`.
 - `AppsAndFeaturesEntries`, two items:
   - `ProductCode: '{80A0A054-6278-4145-AD5A-2B3C4853019F}_is1'`, `InstallerType: inno` (new installs);
-  - the ProductCode winget uses for the existing portable install, `InstallerType: portable`. This is the item that lets the comparator accept the upgrade from portable. winget names a portable's `HKCU` uninstall key `<PackageIdentifier>_<SourceIdentifier>`, i.e. `FedeB2160.WinGetStudio_Microsoft.Winget.Source_8wekyb3d8bbwe`; the Sandbox test reads the real key name before the manifest is final.
+  - the ProductCode winget uses for the existing portable install, `InstallerType: portable`. This is the item that lets the comparator accept the upgrade from portable. winget names a portable's `HKCU` uninstall key `<PackageIdentifier>_<SourceIdentifier>`, i.e. `FedeB2160.WinGetStudio_Microsoft.Winget.Source_8wekyb3d8bbwe`; the Sandbox test reads the real key name before the manifest is final. Confirmed in the Sandbox on 2026-10-07: that is the exact key name.
 - A 1.10.x winget user running `winget upgrade` gets the portable removed (exe, alias, `HKCU` entry) and the setup installed, with a UAC prompt. Manually downloaded 1.10.x copies stay portable.
-- **Gate before submitting**: in Windows Sandbox, with winget-pkgs' `Tools\SandboxTest.ps1` (the Sandbox has no winget of its own): install 1.10.x from the published portable manifest, `winget upgrade` with the new manifest, then check no duplicate copy, old alias gone, Start menu entry and Settings entry present, `winget list` shows the new version, `winget upgrade` does not offer it again. If this fails, the winget package stays portable and the installer ships only on GitHub.
+- **Gate before submitting**: in Windows Sandbox, with winget-pkgs' `Tools\SandboxTest.ps1` (the Sandbox has no winget of its own): install 1.10.x from the published portable manifest, `winget upgrade` with the new manifest, then check no duplicate copy, old alias gone, Start menu entry and Settings entry present, `winget list` shows the new version, `winget upgrade` does not offer it again. If this fails, the winget package stays portable and the installer ships only on GitHub. **Passed on 2026-10-07** (winget 1.29.380), from 1.10.2 installed from the winget source to a 1.11.0 inno test setup with a local manifest. The test used a local HTTP server and `winget upgrade --manifest` rather than `SandboxTest.ps1`.
 
 ### 6. Build and CI
 
 - `build.ps1`, after compiling and signing the exe: look for `ISCC.exe` (`${env:ProgramFiles(x86)}\Inno Setup 6\`, then `PATH`), run it with the version and the exe path, producing `dist\WinGetStudio_Setup.exe`. With the published certificate available, pass the signing command; otherwise build unsigned with a warning, like the exe. Extend the version check to the setup's `FileVersion`.
 - No Inno installed: build the exe, warn `setup not built: winget install JRSoftware.InnoSetup`, still succeed — developers are not forced to install it. Releases need both files, which CI and the release procedure enforce.
-- CI `build` job: `choco install innosetup --version=6.7.3 -y` before `build.ps1`; the artifact holds both files and fails when either is missing.
+- CI `build` job: `choco install innosetup --version=6.7.1 -y` (the newest on Chocolatey; local builds use 6.7.3) before `build.ps1`; the artifact holds both files and fails when either is missing.
 
 ### 7. Tests and documentation
 

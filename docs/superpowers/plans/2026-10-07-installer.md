@@ -621,7 +621,7 @@ Prerequisite, done by the user: the Windows feature "Windows Sandbox" is enabled
   - Run the order check from Task 4; it must print `WinGetStudio.exe`.
   - Check both digests against the local SHA-256 values.
 - [ ] **Step 3: winget manifest `winget\1.11.0`.**
-  - If Task 5 succeeded: `InstallerType: inno`, `Scope: machine`, `ElevationRequirement: elevatesSelf`, `UpgradeBehavior: uninstallPrevious`, `InstallerUrl` → setup, its hash.
+  - If Task 5 succeeded: `InstallerType: inno`, **no `Scope`** (see spec §5: winget rejects a scope that differs from the installed per-user portable), `ElevationRequirement: elevatesSelf`, `UpgradeBehavior: uninstallPrevious`, `InstallerUrl` → setup, its hash.
   - `AppsAndFeaturesEntries`:
     - `ProductCode: '{80A0A054-6278-4145-AD5A-2B3C4853019F}_is1'` with `InstallerType: inno`;
     - the confirmed portable key with `InstallerType: portable`.
