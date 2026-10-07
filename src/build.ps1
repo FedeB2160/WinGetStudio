@@ -128,33 +128,35 @@ if (-not $signCert) {
     Write-Host "  Windows mostrera' 'editore sconosciuto'. Vedi la sezione Signing del README." -ForegroundColor Yellow
 }
 else {
-    # -TimestampServer: senza marca temporale la firma diventa invalida alla scadenza del
-    # certificato; con la marca resta valida per sempre, perche' prova che la firma
-    # esisteva quando il certificato era ancora buono. Richiede rete.
-    $sig = Set-AuthenticodeSignature -FilePath $out -Certificate $signCert `
-               -HashAlgorithm SHA256 -TimestampServer 'http://timestamp.digicert.com' `
-               -ErrorAction SilentlyContinue
+    & (Join-Path $PSScriptRoot 'sign.ps1') -Path $out -Thumbprint $signCert.Thumbprint
+}
 
-    # Il timestamp si verifica guardando il TIMESTAMP, non lo Status: con un certificato
-    # self-signed lo Status non sara' mai 'Valid' su una macchina che non lo considera
-    # fidato, e usarlo come test faceva scartare una marca temporale perfettamente
-    # applicata per poi rifirmare senza.
-    if ($sig -and -not $sig.TimeStamperCertificate) {
-        Write-Host "Marca temporale non applicata (server non raggiungibile): la firma scadra' col certificato." -ForegroundColor Yellow
-        $sig = Set-AuthenticodeSignature -FilePath $out -Certificate $signCert -HashAlgorithm SHA256
+# ------------------------------------------------------------------
+# INSTALLER (Inno Setup 6)
+# ------------------------------------------------------------------
+# Lo stesso exe, gia' firmato, impacchettato in WinGetStudio_Setup.exe. Senza Inno la build
+# NON fallisce: chi sviluppa compila l'exe senza installare altro. Il rilascio richiede
+# entrambi i file, e lo fanno valere la CI e la procedura di DEVELOPMENT.md.
+$iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", (Get-Command ISCC.exe -ErrorAction SilentlyContinue).Source) |
+        Where-Object { $_ -and (Test-Path -LiteralPath $_) } | Select-Object -First 1
+if (-not $iscc) {
+    Write-Host "`nATTENZIONE: setup not built (Inno Setup 6 assente): winget install JRSoftware.InnoSetup" -ForegroundColor Yellow
+}
+else {
+    $isccArgs = @("/DAppVersion=$version", "/DSourceExe=$out", "/O$(Split-Path $out)", '/Q')
+    # $q e $f li sostituisce Inno: apice e nome (quotato) del file da firmare.
+    if ($signCert) {
+        $isccArgs += '/DSIGN'
+        $isccArgs += "/Swgsign=powershell.exe -NoProfile -ExecutionPolicy Bypass -File `$q$(Join-Path $PSScriptRoot 'sign.ps1')`$q -Thumbprint $($signCert.Thumbprint) -Path `$f"
     }
-
-    $stamp = if ($sig.TimeStamperCertificate) { ', con marca temporale' } else { '' }
-    if ($sig.Status -eq 'Valid') {
-        Write-Host "Firmato: $($signCert.Subject)$stamp" -ForegroundColor Cyan
+    & $iscc @isccArgs (Join-Path $root 'installer\WinGetStudio.iss')
+    if ($LASTEXITCODE -ne 0) { throw "ISCC fallito (exit $LASTEXITCODE)" }
+    $setup = Join-Path (Split-Path $out) 'WinGetStudio_Setup.exe'
+    $svi = (Get-Item -LiteralPath $setup).VersionInfo
+    if ([version]$svi.FileVersion -ne [version]$version -or [version]$svi.ProductVersion -ne [version]$version) {
+        throw "Versione del setup $($svi.FileVersion)/$($svi.ProductVersion), attesa $version"
     }
-    else {
-        # 'UnknownError' con un self-signed e' NORMALE e non significa firma mancante:
-        # la firma c'e', ma questa macchina non riconosce la radice. Diventa 'Valid'
-        # dove il certificato pubblico e' fra le autorita' attendibili.
-        Write-Host "Firmato: $($signCert.Subject)$stamp" -ForegroundColor Cyan
-        Write-Host "  Catena non fidata su questa macchina (normale con un self-signed): $($sig.Status)" -ForegroundColor Yellow
-    }
+    Write-Host "Setup: $setup" -ForegroundColor Green
 }
 
 Write-Host "`nFatto: $out (versione $version)" -ForegroundColor Green

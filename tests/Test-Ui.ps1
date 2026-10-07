@@ -249,6 +249,27 @@ foreach ($fn in 'Load-Upgrades', 'Load-Installed', 'Start-Search', 'Update-PinFl
 }
 "OK wgpath  4 comandi di lettura sul percorso risolto, 4 job che glielo passano"
 
+# 7e) Lo script dell'installer: identita', scope, collegamenti, rilancio e firma come nella
+# spec. Il nome del setup deve venire DOPO quello del portable nell'ordine con cui GitHub
+# elenca gli asset (per nome, senza maiuscole): le copie fino alla 1.10.x prendono il primo .exe.
+$issPath = Join-Path $root 'installer\WinGetStudio.iss'
+if (-not (Test-Path -LiteralPath $issPath)) { throw "manca installer\WinGetStudio.iss" }
+$iss = Get-Content -LiteralPath $issPath -Raw
+foreach ($needle in 'AppId={{80A0A054-6278-4145-AD5A-2B3C4853019F}', 'PrivilegesRequired=admin',
+                    'DefaultDirName={autopf}\WinGet Studio', 'OutputBaseFilename=WinGetStudio_Setup',
+                    '{autoprograms}\WinGet Studio', 'Flags: unchecked', 'CloseApplications=yes',
+                    'SignedUninstaller=yes', 'Check: ShouldRelaunch', "{param:relaunch|0}") {
+    if (-not $iss.Contains($needle)) { throw "WinGetStudio.iss: manca '$needle'" }
+}
+if ($iss -match 'HKCU\\Software\\WinGetStudio|\[UninstallDelete\]') { throw "la disinstallazione non deve toccare le preferenze" }
+if ([string]::Compare('WinGetStudio.exe', 'WinGetStudio_Setup.exe', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+    throw "il setup verrebbe elencato prima del portable"
+}
+$buildText2 = Get-Content (Join-Path $root 'src\build.ps1') -Raw
+if ($buildText2 -notmatch 'ISCC\.exe' -or $buildText2 -notmatch 'setup not built') { throw "build.ps1 non compila il setup o non avvisa se manca Inno" }
+if ($buildText2 -notmatch 'sign\.ps1') { throw "build.ps1 non firma tramite sign.ps1" }
+"OK setup   script Inno coerente con la spec, setup elencato dopo il portable"
+
 # 7c) Il file che ps2exe ricevera' e' valido? L'exe segue un percorso di caricamento
 # DIVERSO dal .ps1 (codice concatenato invece di dot-source) e un errore la' si
 # vedrebbe solo al doppio clic.

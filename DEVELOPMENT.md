@@ -18,7 +18,9 @@ README.md                       what the app does (first page on GitHub)
 DEVELOPMENT.md                  this file
 CHANGELOG.md                    version history
 src\   main.ps1                 entry point: version, elevation, module loading, Start-App
-       build.ps1                ps2exe compilation and signing
+       build.ps1                ps2exe compilation, signing, then the setup
+       sign.ps1                 signing (exe, setup, uninstaller)
+installer\WinGetStudio.iss      Inno Setup script -> dist\WinGetStudio_Setup.exe
    modules\
        WinGet.Exec.ps1          running winget: Invoke-WinGet, exit code mapping
        WinGet.Parse.ps1         reading winget's fixed-width tables
@@ -84,6 +86,8 @@ Needs the **ps2exe** module (`Install-Module ps2exe -Scope CurrentUser`); the bu
 
 It replaces `###MODULES###` with the concatenated modules and the `###UI.xaml###`, `###Theme.Light.xaml###`, `###Theme.Dark.xaml###` markers with the file contents — modules first, since the XAML markers live inside `App.Bootstrap.ps1` — writes a temporary source to `%TEMP%` and hands that to ps2exe (`-requireAdmin` → UAC manifest, `-noConsole` → WPF window only, `-iconFile` → embedded icon). It fails with an explicit error if a marker is missing, a listed module is absent, or the exe is not rewritten.
 
+After the exe is signed, `build.ps1` compiles `installer\WinGetStudio.iss` with **Inno Setup 6** (`ISCC.exe`, looked up under `Program Files (x86)\Inno Setup 6` and then on the `PATH`), passing it the version and the path of the exe just built, and checks that `dist\WinGetStudio_Setup.exe` carries the same version. Without Inno the build still succeeds and warns `setup not built`: a developer can work on the exe without installing anything else, while a release needs both files (see *Publishing a release*). `winget install JRSoftware.InnoSetup` installs it.
+
 ## Signing
 
 `build.ps1` signs the exe after compiling, choosing the certificate in this order:
@@ -92,6 +96,8 @@ It replaces `###MODULES###` with the concatenated modules and the `###UI.xaml###
 2. otherwise the certificate in `Cert:\CurrentUser\My` whose thumbprint matches `assets\WinGetStudio-codesign.cer`, valid and with its private key. Any other code-signing certificate is ignored, even one with the same subject.
 
 If it finds none the build **still succeeds**, printing a warning that the exe is unsigned — signing needs a private key that not every machine has.
+
+The signing itself lives in `src\sign.ps1 -Path <file> -Thumbprint <thumbprint>`, so the exe, the setup and the setup's uninstaller are signed by one implementation: `build.ps1` calls it for the exe, and hands it to Inno as the `SignTool` (`/S` on the `ISCC` command line) for the other two. Without a certificate the setup comes out unsigned too.
 
 The signature is **timestamped** (DigiCert). Without a timestamp a signature stops being valid the day the certificate expires; with one it stays valid, because it proves the signature existed while the certificate was still good. If the timestamp server cannot be reached the build signs anyway and says so.
 

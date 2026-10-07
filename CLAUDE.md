@@ -10,7 +10,7 @@ WinGet Studio is a WPF front end for `winget`, written in PowerShell 5.1 and com
 # Run from source (UAC prompt first; self-update disabled in this mode)
 powershell -ExecutionPolicy Bypass -File .\src\main.ps1
 
-# Build dist\WinGetStudio.exe (also: double click build.bat). Installs ps2exe 1.0.18 if missing and checks the exe version metadata.
+# Build dist\WinGetStudio.exe (also: double click build.bat). Installs ps2exe 1.0.18 if missing and checks the exe version metadata; builds dist\WinGetStudio_Setup.exe too when Inno Setup 6 is installed.
 powershell -ExecutionPolicy Bypass -File .\src\build.ps1
 
 # Tests — two standalone scripts, no framework, no runner. Offline by default: that is what CI runs

@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Releases also ship an installer, `WinGetStudio_Setup.exe`: Start menu entry, uninstall from Windows Settings, machine-wide install.
+
 ## v1.10.3
 
 Fixes only. Coming from v1.10.2: let the app update itself from **Settings**, or download the new exe and delete the old one — installed with winget, use `winget upgrade FedeB2160.WinGetStudio`.
