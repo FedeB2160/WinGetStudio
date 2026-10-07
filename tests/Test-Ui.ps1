@@ -268,6 +268,10 @@ if ([string]::Compare('WinGetStudio.exe', 'WinGetStudio_Setup.exe', [StringCompa
 $buildText2 = Get-Content (Join-Path $root 'src\build.ps1') -Raw
 if ($buildText2 -notmatch 'ISCC\.exe' -or $buildText2 -notmatch 'setup not built') { throw "build.ps1 non compila il setup o non avvisa se manca Inno" }
 if ($buildText2 -notmatch 'sign\.ps1') { throw "build.ps1 non firma tramite sign.ps1" }
+$ciText = Get-Content (Join-Path $root '.github\workflows\ci.yml') -Raw
+$devText = Get-Content (Join-Path $root 'DEVELOPMENT.md') -Raw -Encoding UTF8
+if ($ciText -notmatch 'dist/WinGetStudio_Setup\.exe' -or $ciText -notmatch 'innosetup') { throw "la CI non compila o non carica il setup" }
+if ($devText -notmatch 'gh release create[^\r\n]*WinGetStudio_Setup\.exe') { throw "la procedura di rilascio non nomina il setup" }
 "OK setup   script Inno coerente con la spec, setup elencato dopo il portable"
 
 # 7c) Il file che ps2exe ricevera' e' valido? L'exe segue un percorso di caricamento

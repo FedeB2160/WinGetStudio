@@ -121,16 +121,23 @@ The update check reads the **latest** release of the repo, so publishing one is 
 1. Bump `$AppVersion` in `src\main.ps1` and rebuild — the build signs the exe.
 2. Update `CHANGELOG.md`, commit, push.
 3. Tag: `git tag v1.10.1 && git push origin v1.10.1`.
-4. On GitHub → **Releases** → *Draft a new release*, pick the tag, paste the changelog entry, and attach `dist\WinGetStudio.exe` as an asset.
-5. Publish. GitHub computes the SHA-256 of the asset by itself, and that is what the app verifies the download against.
+4. On GitHub → **Releases** → *Draft a new release*, pick the tag, paste the changelog entry, and attach **both** `dist\WinGetStudio.exe` and `dist\WinGetStudio_Setup.exe` as assets.
+5. Publish. GitHub computes the SHA-256 of each asset by itself, and that is what the app verifies the download against.
+6. Check the order the API lists the assets in — copies up to 1.10.x take the **first** `.exe`, so it must be the portable:
+
+   ```powershell
+   gh api repos/FedeB2160/WinGetStudio/releases/latest --jq '[.assets[] | select(.name | endswith(".exe"))][0].name'
+   ```
+
+   It must print `WinGetStudio.exe`. GitHub sorts assets by name, which is why the setup is `WinGetStudio_Setup.exe` and not `WinGetStudio-Setup.exe`: `-` sorts before `.`, `_` after it.
 
 **Tag and `$AppVersion` must agree**: the app compares the tag (`v1.10.1`) with its own constant, so a mismatch means it either keeps proposing an update already installed, or never proposes one.
 
 **Builds are not reproducible.** Compiling the same source twice produces two different binaries — ps2exe writes variable metadata into the PE and each signature carries a fresh timestamp — identical in size but not in hash. So a published asset **cannot** be validated by rebuilding and comparing hashes; what is verifiable is the SHA-256 GitHub publishes with the asset (which is what the app checks on download) and the Authenticode signature.
 
-The asset is found as the **first `.exe` in the release**, not by exact name, so renaming the exe does not break older or newer releases.
+Since 1.11.0 the app picks the asset **by exact name** for its install channel: `WinGetStudio.exe` for a portable copy, `WinGetStudio_Setup.exe` for an installed one. A release missing that file offers no update, and a manual check says which file is missing. Copies up to 1.10.x still take the first `.exe`, hence step 6.
 
-`gh release create v1.10.1 --title v1.10.1 --notes-file <file> dist\WinGetStudio.exe` does steps 4-5 from the command line, and is how 1.10.1 was published. `gh` holds more than one account on this machine and the active one is not always the repo owner: `gh auth status` says which it is, `gh auth switch --hostname github.com --user FedeB2160` picks the right one. Without that switch `git push` fails asking for a password, because the credential helper serves the token of whichever account is active.
+`gh release create v1.11.0 --title v1.11.0 --notes-file <file> dist\WinGetStudio.exe dist\WinGetStudio_Setup.exe` does steps 4-5 from the command line. The build only produces the setup when Inno Setup 6 is installed (`winget install JRSoftware.InnoSetup`); a release needs both files. `gh` holds more than one account on this machine and the active one is not always the repo owner: `gh auth status` says which it is, `gh auth switch --hostname github.com --user FedeB2160` picks the right one. Without that switch `git push` fails asking for a password, because the credential helper serves the token of whichever account is active.
 
 ## Working on a plan
 
@@ -180,11 +187,11 @@ The local folder is therefore the source of the text, not of the submission. Aft
 - `Commands` was declared in the locale manifest sent for 1.9.0 but is absent from the published 1.9.0, so it is gone from 1.10.0 too. Nothing depends on it: it only feeds searching a package by the command it provides.
 - Every value with a `:` inside must be quoted, or the YAML parser fails — `ShortDescription` is the one that bites.
 
-**No shortcuts, and why the manifest cannot ask for one.** Installing from winget puts nothing on the desktop or in the Start menu, and no manifest field changes that. The 1.12.0 installer schema does not contain the word `shortcut` anywhere, and the installer types it allows are `msix, msi, appx, exe, zip, inno, nullsoft, wix, burn, pwa, portable, font`. Shortcuts exist only because a package's *installer* creates them; for a `portable` package winget copies the file and makes the PATH alias, and that is the whole of it. The feature has been requested for years — [winget-cli#2299](https://github.com/microsoft/winget-cli/issues/2299) is the one to watch, open since July 2022, with [#4185](https://github.com/microsoft/winget-cli/issues/4185) and [#3314](https://github.com/microsoft/winget-cli/issues/3314) asking for the same thing.
+**Shortcuts and the installer.** Installing from winget puts nothing on the desktop or in the Start menu, and no manifest field changes that. The 1.12.0 installer schema does not contain the word `shortcut` anywhere, and the installer types it allows are `msix, msi, appx, exe, zip, inno, nullsoft, wix, burn, pwa, portable, font`. Shortcuts exist only because a package's *installer* creates them; for a `portable` package winget copies the file and makes the PATH alias, and that is the whole of it. The feature has been requested for years — [winget-cli#2299](https://github.com/microsoft/winget-cli/issues/2299) is the one to watch, open since July 2022, with [#4185](https://github.com/microsoft/winget-cli/issues/4185) and [#3314](https://github.com/microsoft/winget-cli/issues/3314) asking for the same thing.
 
 Two ways round it were considered and both were turned down, so anyone raising the question again can start from here rather than from scratch. Letting the app write the `.lnk` itself on first run works and costs about forty lines, but the shortcut appears only after WinGet Studio has been started once, which is not what installing a program is supposed to feel like; it would also have to write into the all-users Start menu, since the app elevates and `%APPDATA%` may then belong to a different administrator account than the person at the keyboard. Making the app its own installer — `InstallerType: exe` plus a silent switch that copies it into Program Files and registers it — removes that first run, but hands us the uninstall path, the ARP entry, upgrading over a previous version and the failure rollbacks, which is precisely the work an installer compiler does for free and without mistakes. Avoiding Inno Setup would cost more code than using it.
 
-The decision stands until #2299 closes, or until moving to a real installer type becomes a product choice rather than a way of chasing two icons.
+The decision was to stand until #2299 closed, or until moving to a real installer type becomes a product choice rather than a way of chasing two icons. On 2026-10-07 it became one: a Start menu entry, uninstall from Windows Settings and machine-wide deployment for companies are what an installed program gives and a portable exe cannot ([issue #3](https://github.com/FedeB2160/WinGetStudio/issues/3)). From 1.11.0 every release ships `WinGetStudio_Setup.exe`, built with Inno Setup next to the unchanged portable; the design, including why the scope is machine-only and how the winget package migrates, is in [docs/superpowers/specs/2026-10-07-installer-design.md](docs/superpowers/specs/2026-10-07-installer-design.md).
 
 **Installed from winget, the self-update has to stand down.** A `portable` package is a file winget owns: it copies the exe into `%LOCALAPPDATA%\Microsoft\WinGet\Packages\<id>\`, records its SHA-256 in the uninstall entry under `HKCU`, and expects to find exactly that back. The self-update renames the running exe to `.old` and writes the new one in its place, which breaks all three of those assumptions at once: the hash no longer matches, so winget treats the package as modified and refuses to upgrade or uninstall it without `--force`; the `.old` left beside it is a file winget did not install, so it will not clear the directory; and the uninstall entry still names the old version, so `winget install` answers that the package is already there. The end state is an app that no longer starts and cannot be reinstalled either, which is what happened to a 1.9.0 install that pressed Update.
 
@@ -214,7 +221,7 @@ powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Li
 
 `Test-InvokeWinGet.ps1` needs no admin rights, installs nothing, and calls `winget --version` only when winget exists. `Test-Ui.ps1` mounts the real app in a hidden WPF window and **runs offline by default**. `-Live` adds real search, list and export, the GitHub release check, and one pin cycle on `7zip.7zip` — only when it is installed and not already pinned. The pin it creates is removed in a `finally` that first waits for the queue's winget to exit.
 
-The Windows CI (`.github/workflows/ci.yml`, GitHub-hosted `windows-2022`) runs both suites offline on every pull request and push to `main`, then builds the exe and uploads it as an unsigned test artifact for seven days. Actions are pinned to commit SHAs, the token is read-only, and no signing key ever reaches CI.
+The Windows CI (`.github/workflows/ci.yml`, GitHub-hosted `windows-2022`) runs both suites offline on every pull request and push to `main`, then installs Inno Setup 6.7.3, builds the exe and the setup, and uploads both as unsigned test artifacts for seven days. Actions are pinned to commit SHAs, the token is read-only, and no signing key ever reaches CI.
 
 **`Test-Ui.ps1`** checks that every file parses, that no module is missing from (or orphaned by) `$moduleNames`, that `UI.xaml` provides every control the code asks for, that both themes define the same keys, that every `DynamicResource` resolves, that column headers are non-empty, uppercase and centred, that every `&#x....;` glyph exists in both system icon fonts, and that the two grid-freeze regressions have not come back. Four checks are worth knowing about, because they catch what static analysis cannot:
 

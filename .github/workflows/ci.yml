@@ -45,12 +45,16 @@ jobs:
         run: |
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
           Install-PackageProvider NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
+      - name: Install Inno Setup 6.7.3
+        run: choco install innosetup --version=6.7.3 -y --no-progress
       - name: Compile (build.ps1 installs ps2exe 1.0.18 and checks the version metadata)
         run: .\src\build.ps1
-      - name: Upload unsigned test build
+      - name: Upload unsigned test builds
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: WinGetStudio-ci-${{ github.sha }}
-          path: dist/WinGetStudio.exe
+          path: |
+            dist/WinGetStudio.exe
+            dist/WinGetStudio_Setup.exe
           if-no-files-found: error
           retention-days: 7

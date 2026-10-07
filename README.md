@@ -11,7 +11,10 @@ Light and dark theme, no telemetry, no branding, a single `.exe` with nothing to
 
 ## Getting it
 
-Download `WinGetStudio.exe` from the [latest release](https://github.com/FedeB2160/WinGetStudio/releases) and run it. There is no installer and nothing is written outside the registry key holding your preferences.
+From the [latest release](https://github.com/FedeB2160/WinGetStudio/releases), pick one:
+
+- **Installer (recommended):** `WinGetStudio_Setup.exe` installs for all users, adds a Start menu entry (a desktop one is optional) and shows up in Windows Settings to uninstall. Uninstalling keeps your preferences.
+- **Portable:** `WinGetStudio.exe` runs from anywhere and installs nothing; nothing is written outside the registry key holding your preferences.
 
 It is also in the winget catalogue:
 
