@@ -11,7 +11,10 @@ Light and dark theme, no telemetry, no branding, a single `.exe` with nothing to
 
 ## Getting it
 
-Download `WinGetStudio.exe` from the [latest release](https://github.com/FedeB2160/WinGetStudio/releases) and run it. There is no installer and nothing is written outside the registry key holding your preferences.
+From the [latest release](https://github.com/FedeB2160/WinGetStudio/releases), pick one:
+
+- **Installer (recommended):** `WinGetStudio_Setup.exe` installs for all users, adds a Start menu entry (a desktop one is optional) and shows up in Windows Settings to uninstall. Uninstalling keeps your preferences.
+- **Portable:** `WinGetStudio.exe` runs from anywhere and installs nothing; nothing is written outside the registry key holding your preferences.
 
 It is also in the winget catalogue:
 
@@ -19,7 +22,7 @@ It is also in the winget catalogue:
 winget install FedeB2160.WinGetStudio
 ```
 
-That copies the executable and puts an alias on the PATH, so `WinGetStudio` starts it from any terminal. It creates **no desktop or Start menu shortcut**: a portable package cannot, and the request to allow it is still open upstream as [winget-cli#2299](https://github.com/microsoft/winget-cli/issues/2299).
+Since 1.11.0 that runs the installer: the Start menu entry and the uninstall entry in Windows Settings come with it, and `winget upgrade` updates it. If you installed an earlier version with winget, `winget upgrade FedeB2160.WinGetStudio` replaces the portable copy, and its `WinGetStudio` command-line alias, with the installed one.
 
 **Windows will warn about an unknown publisher.** The exe *is* signed, but with a self-signed certificate, and Windows only trusts certificates issued by a recognised authority. You can either accept the warning (*More info* → *Run anyway*), or import `assets/WinGetStudio-codesign.cer` from this repository into *Trusted Root Certification Authorities* to make the signature trusted — see [DEVELOPMENT.md](DEVELOPMENT.md#signing) before doing that, since it affects anything signed with that certificate.
 
@@ -148,7 +151,7 @@ Its own tab, at the very right end of the strip: what the app does function by f
 
 ## Automatic updates
 
-At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the Settings tab, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, the file is verified against the checksum published with the release, and the app then replaces itself and restarts.
+At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the Settings tab, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, the file is verified against the checksum published with the release. A copy installed with the setup then runs the new installer, which closes WinGet Studio, updates it and reopens it; a portable copy replaces itself and restarts; a copy installed with winget is updated with `winget upgrade FedeB2160.WinGetStudio`.
 
 If there is no newer release, no network, or you are running from source, the check says nothing at all. You can always ask explicitly with **Check for updates**, which does report the outcome either way.
 

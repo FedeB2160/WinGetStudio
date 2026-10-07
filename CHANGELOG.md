@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.11.0
+
+WinGet Studio now comes as an installer too. Coming from v1.10.3: the portable exe keeps updating itself as before; to switch to the installed form, run the setup and delete the old exe. Installed with winget, `winget upgrade FedeB2160.WinGetStudio` moves you to the installed form by itself.
+
+### An installer next to the portable exe
+
+Every release ships two files. `WinGetStudio_Setup.exe` installs the app for all users in Program Files, adds a Start menu entry (a desktop shortcut is optional and off by default), and registers it in Windows Settings, where it can be uninstalled like any other program. Uninstalling keeps your preferences. `WinGetStudio.exe` is the same portable executable as before: one file, nothing installed.
+
+Both files are signed with the same certificate, and the installer's uninstaller too.
+
+### Each copy updates the way it was installed
+
+The app now tells apart how it got onto the machine, and updates accordingly. An installed copy downloads the new installer, checks it against the SHA-256 published with the release (and refuses it when there is none, since an installer runs as administrator), then runs it: WinGet Studio closes, updates and reopens on its own. A portable copy replaces itself as before. A copy installed with winget leaves updating to winget.
+
+The release file is now chosen by its exact name rather than as the first executable in the release, so a portable copy never downloads the installer and an installed one never downloads the portable. Copies up to 1.10.3 still pick the first executable, and still get the portable: the two files are named so that it is listed first.
+
+### From winget
+
+The winget package switches from the portable exe to the installer. `winget upgrade` removes the portable copy — the executable, the `WinGetStudio` command-line alias and its uninstall entry — and installs the setup in its place, with a Start menu entry. This was rehearsed in Windows Sandbox before publishing.
+
 ## v1.10.3
 
 Fixes only. Coming from v1.10.2: let the app update itself from **Settings**, or download the new exe and delete the old one — installed with winget, use `winget upgrade FedeB2160.WinGetStudio`.

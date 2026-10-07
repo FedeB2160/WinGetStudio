@@ -249,6 +249,36 @@ foreach ($fn in 'Load-Upgrades', 'Load-Installed', 'Start-Search', 'Update-PinFl
 }
 "OK wgpath  4 comandi di lettura sul percorso risolto, 4 job che glielo passano"
 
+# 7e) Lo script dell'installer: identita', scope, collegamenti, rilancio e firma come nella
+# spec. Il nome del setup deve venire DOPO quello del portable nell'ordine con cui GitHub
+# elenca gli asset (per nome, senza maiuscole): le copie fino alla 1.10.x prendono il primo .exe.
+$issPath = Join-Path $root 'installer\WinGetStudio.iss'
+if (-not (Test-Path -LiteralPath $issPath)) { throw "manca installer\WinGetStudio.iss" }
+$iss = Get-Content -LiteralPath $issPath -Raw
+foreach ($needle in 'AppId={{80A0A054-6278-4145-AD5A-2B3C4853019F}', 'PrivilegesRequired=admin',
+                    'DefaultDirName={autopf}\WinGet Studio', 'OutputBaseFilename=WinGetStudio_Setup',
+                    '{autoprograms}\WinGet Studio', 'Flags: unchecked', 'CloseApplications=yes',
+                    'SignedUninstaller=yes', 'Check: ShouldRelaunch', "{param:relaunch|0}",
+                    # postinstall parte da utente originale NON elevato: l'exe (requireAdministrator)
+                    # fallirebbe con errore 740.
+                    'postinstall skipifsilent runascurrentuser',
+                    # Nome in Impostazioni > App: senza, Inno scrive "WinGet Studio version X".
+                    'UninstallDisplayName=WinGet Studio') {
+    if (-not $iss.Contains($needle)) { throw "WinGetStudio.iss: manca '$needle'" }
+}
+if ($iss -match 'HKCU\\Software\\WinGetStudio|\[UninstallDelete\]') { throw "la disinstallazione non deve toccare le preferenze" }
+if ([string]::Compare('WinGetStudio.exe', 'WinGetStudio_Setup.exe', [StringComparison]::OrdinalIgnoreCase) -ge 0) {
+    throw "il setup verrebbe elencato prima del portable"
+}
+$buildText2 = Get-Content (Join-Path $root 'src\build.ps1') -Raw
+if ($buildText2 -notmatch 'ISCC\.exe' -or $buildText2 -notmatch 'setup not built') { throw "build.ps1 non compila il setup o non avvisa se manca Inno" }
+if ($buildText2 -notmatch 'sign\.ps1') { throw "build.ps1 non firma tramite sign.ps1" }
+$ciText = Get-Content (Join-Path $root '.github\workflows\ci.yml') -Raw
+$devText = Get-Content (Join-Path $root 'DEVELOPMENT.md') -Raw -Encoding UTF8
+if ($ciText -notmatch 'dist/WinGetStudio_Setup\.exe' -or $ciText -notmatch 'innosetup') { throw "la CI non compila o non carica il setup" }
+if ($devText -notmatch 'gh release create[^\r\n]*WinGetStudio_Setup\.exe') { throw "la procedura di rilascio non nomina il setup" }
+"OK setup   script Inno coerente con la spec, setup elencato dopo il portable"
+
 # 7c) Il file che ps2exe ricevera' e' valido? L'exe segue un percorso di caricamento
 # DIVERSO dal .ps1 (codice concatenato invece di dot-source) e un errore la' si
 # vedrebbe solo al doppio clic.
@@ -1446,6 +1476,58 @@ if (Test-NewerVersion '1.6.0' '1.6.0')          { throw "la stessa versione non 
 if (Test-NewerVersion '1.5.0' '1.6.0')          { throw "una versione precedente non e' un aggiornamento" }
 if (Test-NewerVersion 'nightly' '1.6.0')        { throw "un tag non numerico non deve proporre nulla" }
 
+# Canale d'installazione: deciso da percorso dell'exe e InstallLocation della voce _is1,
+# passati come parametri (nessun registro nel test). Maiuscole e "\" finale non contano.
+$il = 'C:\Program Files (x86)\WinGet Studio\'
+$channelCases = @(
+    @{ Exe = $null;                                              Loc = $il;  Want = 'source' }
+    @{ Exe = 'C:\Users\x\AppData\Local\Microsoft\WinGet\Packages\FedeB2160.WinGetStudio_Microsoft.Winget.Source_8wekyb3d8bbwe\WinGetStudio.exe'; Loc = $il; Want = 'winget-portable' }
+    @{ Exe = 'C:\Program Files (x86)\WinGet Studio\WinGetStudio.exe'; Loc = $il;  Want = 'installed' }
+    @{ Exe = 'C:\PROGRAM FILES (X86)\WINGET STUDIO\WinGetStudio.exe'; Loc = 'C:\Program Files (x86)\WinGet Studio'; Want = 'installed' }
+    @{ Exe = 'D:\Tools\WinGetStudio.exe';                        Loc = $il;  Want = 'portable' }
+    @{ Exe = 'D:\Tools\WinGetStudio.exe';                        Loc = $null; Want = 'portable' }
+)
+foreach ($c in $channelCases) {
+    $got = Get-InstallChannel -ExePath $c.Exe -InstallLocation $c.Loc
+    if ($got -ne $c.Want) { throw "Get-InstallChannel '$($c.Exe)' / '$($c.Loc)': '$got', atteso '$($c.Want)'" }
+}
+# L'exe di ps2exe e' AnyCPU, quindi a 64 bit su Windows a 64 bit; il setup Inno e' x86 e
+# scrive la voce _is1 nella vista a 32 bit (WOW6432Node). Senza Registry32 esplicito la
+# copia installata si crede portable e si sostituisce da sola in Program Files.
+if ((Get-FunctionSource 'Get-InstalledLocation') -notmatch 'Registry32') { throw "Get-InstalledLocation non legge la vista a 32 bit del registro" }
+"OK channel i quattro canali d'installazione riconosciuti"
+
+# Asset scelto per NOME: GitHub elenca per nome, e qui il setup arriva per primo apposta.
+function Invoke-RestMethod {
+    [PSCustomObject]@{ tag_name = 'v9.9.9'; assets = @(
+        [PSCustomObject]@{ name = 'WinGetStudio_Setup.exe'; browser_download_url = 'https://github.com/x/setup'; size = 4096; digest = 'sha256:AA' }
+        [PSCustomObject]@{ name = 'WinGetStudio.exe';       browser_download_url = 'https://github.com/x/exe';   size = 2048; digest = 'sha256:BB' }
+    ) }
+}
+try {
+    $relP = Get-LatestRelease 'x/y' 'WinGetStudio.exe'
+    $relS = Get-LatestRelease 'x/y' $SetupAssetName
+    $relM = Get-LatestRelease 'x/y' 'Missing.exe'
+}
+finally { Remove-Item function:Invoke-RestMethod }
+if ($relP.Url -ne 'https://github.com/x/exe' -or $relP.Sha256 -ne 'BB') { throw "portable: asset sbagliato ($($relP.Url))" }
+if ($relS.Url -ne 'https://github.com/x/setup' -or $relS.Sha256 -ne 'AA') { throw "installed: asset sbagliato ($($relS.Url))" }
+if (-not $relM -or $relM.Tag -ne 'v9.9.9' -or $relM.Url) { throw "asset mancante: serve la release senza Url, non `$null" }
+
+# Canale installed: digest obbligatorio PRIMA della conferma, setup avviato con rilancio,
+# file temporaneo col prefisso wgt_ (lo spazza Clear-WinGetTempFiles), e se l'avvio fallisce
+# la finestra NON si chiude.
+$updSrc = Get-FunctionSource 'Start-SelfUpdate'
+$refuse = $updSrc.IndexOf('-not $rel.Sha256')
+if ($refuse -lt 0 -or $refuse -gt $updSrc.IndexOf('MessageBox')) { throw "installed: il digest mancante non e' rifiutato prima della conferma" }
+if ($updSrc -notmatch '/SILENT /CLOSEAPPLICATIONS /relaunch=1') { throw "il setup non viene avviato con /SILENT /CLOSEAPPLICATIONS /relaunch=1" }
+if ($updSrc -notmatch '"wgt_') { throw "il setup scaricato non ha il prefisso wgt_: resterebbe in %TEMP%" }
+if ($updSrc -notmatch '(?s)Start-Process -FilePath \$tmp[^\r\n]*-ErrorAction Stop.*?catch.*?Set-AppBusy \$false.*?return') {
+    throw "se il setup non parte, l'app deve restare aperta e dirlo"
+}
+if ((Get-FunctionSource 'Start-UpdateCheck') -notmatch 'Get-InstallChannel') { throw "Start-UpdateCheck non sceglie l'asset per canale" }
+"OK assets  asset per nome e canale; setup verificato, rilancio, uscita pulita se non parte"
+
 # Il download e' l'unico punto in cui il programma ESEGUE codice preso da internet:
 # la conferma deve precederlo e il checksum deve essere confrontato.
 $updSrc = Get-FunctionSource 'Start-SelfUpdate'
@@ -1482,7 +1564,7 @@ if (-not $rel) {
 else {
     if ($rel.Version -notmatch '^\d+\.\d+') { throw "versione della release non numerica: '$($rel.Version)'" }
     if ($rel.Url -notmatch '^https://github\.com/') { throw "URL di download non su github.com: $($rel.Url)" }
-    if ($rel.Name -notlike '*.exe') { throw "l'asset scelto non e' un .exe: $($rel.Name)" }
+    if ($rel.Name -ne 'WinGetStudio.exe') { throw "l'asset scelto non e' WinGetStudio.exe: $($rel.Name)" }
     "OK rel     release $($rel.Tag) letta da GitHub: $($rel.Name), $([int]($rel.Size/1024)) KB, checksum $(if ($rel.Sha256) { 'presente' } else { 'ASSENTE' })"
 
     # Il controllo manuale deve SEMPRE riferire un esito. Serve eseguirlo davvero: il

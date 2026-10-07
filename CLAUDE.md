@@ -10,7 +10,7 @@ WinGet Studio is a WPF front end for `winget`, written in PowerShell 5.1 and com
 # Run from source (UAC prompt first; self-update disabled in this mode)
 powershell -ExecutionPolicy Bypass -File .\src\main.ps1
 
-# Build dist\WinGetStudio.exe (also: double click build.bat). Installs ps2exe 1.0.18 if missing and checks the exe version metadata.
+# Build dist\WinGetStudio.exe (also: double click build.bat). Installs ps2exe 1.0.18 if missing and checks the exe version metadata; builds dist\WinGetStudio_Setup.exe too when Inno Setup 6 is installed.
 powershell -ExecutionPolicy Bypass -File .\src\build.ps1
 
 # Tests — two standalone scripts, no framework, no runner. Offline by default: that is what CI runs
@@ -20,7 +20,7 @@ powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 
 # winget manifests
-winget validate --manifest .\winget\1.10.3
+winget validate --manifest .\winget\1.11.0
 ```
 
 `Test-Ui.ps1` requires `-STA` (WPF) and mounts the real app in a hidden window. Without `-Live` it touches neither winget nor the network; `-Live` adds real search/list/export and one pin cycle on `7zip.7zip` (skipped when it is not installed or already pinned). There is no single-test selector: each script is one file of sequential assertions — comment out or run the file.
@@ -36,7 +36,7 @@ Consequences that constrain edits:
 - Dot-sourcing creates no scope, so modules see each other's variables exactly as when concatenated. `Start-App` (in `App.Bootstrap.ps1`) is a function, so it assigns controls with `$script:` — a plain `$Grid = ...` would be local and every module would read `$null`.
 - The three `.xaml` files are embedded but a file on disk wins: lookup order `..\ui\<file>`, `<exe folder>\ui\<file>`, `<exe folder>\<file>`.
 
-**Module roles.** `WinGet.Exec.ps1` runs winget; `WinGet.Parse.ps1` reads its fixed-width tables; `App.Ui.ps1` holds `Write-Log` and the global busy state; `App.Jobs.ps1` the background runspaces; then theme, pins, backup, self-update, and `App.Prefs.ps1`, which is the whole of the preference storage: `Get-Pref` and `Set-Pref` over `HKCU:\Software\WinGetStudio`, with booleans as 0/1. `Tab.*.ps1` one per tab; `App.Bootstrap.ps1` last, as the orchestrator (`WgtRow`, XAML loading, `Start-App`).
+**Module roles.** `WinGet.Exec.ps1` runs winget; `WinGet.Parse.ps1` reads its fixed-width tables; `App.Ui.ps1` holds `Write-Log` and the global busy state; `App.Jobs.ps1` the background runspaces; then theme, pins, backup, self-update (four install channels — source, winget-portable, installed, portable — from `Get-InstallChannel`), and `App.Prefs.ps1`, which is the whole of the preference storage: `Get-Pref` and `Set-Pref` over `HKCU:\Software\WinGetStudio`, with booleans as 0/1. `Tab.*.ps1` one per tab; `App.Bootstrap.ps1` last, as the orchestrator (`WgtRow`, XAML loading, `Start-App`).
 
 **Background work.** Runspace code cannot touch controls — every UI write goes through the `UI{}` helper (`$window.Dispatcher.Invoke`). Runspaces do not inherit functions: pass their names to `Start-BackgroundJob -Functions` and the body is recreated inside. Pass state through the job object, never a `GetNewClosure()` capture — a closure gets its own module scope where `$script:` no longer refers to the script.
 
