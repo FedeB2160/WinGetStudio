@@ -148,7 +148,7 @@ Its own tab, at the very right end of the strip: what the app does function by f
 
 ## Automatic updates
 
-At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the Settings tab, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, the file is verified against the checksum published with the release, and the app then replaces itself and restarts.
+At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the Settings tab, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, the file is verified against the checksum published with the release. A copy installed with the setup then runs the new installer, which closes WinGet Studio, updates it and reopens it; a portable copy replaces itself and restarts; a copy installed with winget is updated with `winget upgrade FedeB2160.WinGetStudio`.
 
 If there is no newer release, no network, or you are running from source, the check says nothing at all. You can always ask explicitly with **Check for updates**, which does report the outcome either way.
 

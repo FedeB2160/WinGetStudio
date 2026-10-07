@@ -35,10 +35,10 @@ function Test-IsSelfPackage($row) {
     return $row.Id -like "*$SelfPackageId*"
 }
 
-# Release piu' recente, o $null se non c'e' rete, non ci sono release, o la risposta non
-# ha un asset .exe. Nessun errore a video: un aggiornamento non trovato non e' un guasto.
-# Gira in un runspace, quindi non tocca la UI.
-function Get-LatestRelease([string]$Repo) {
+# Release piu' recente, o $null se non c'e' rete o non ci sono release. Se la release non
+# ha l'asset $AssetName torna comunque, con Url vuoto. Nessun errore a video: un
+# aggiornamento non trovato non e' un guasto. Gira in un runspace, quindi non tocca la UI.
+function Get-LatestRelease([string]$Repo, [string]$AssetName = 'WinGetStudio.exe') {
     try {
         # TLS 1.2 esplicito: PowerShell 5.1 negozia ancora TLS 1.0 per default e GitHub
         # lo rifiuta, quindi senza questa riga la chiamata fallisce sempre.
@@ -50,21 +50,20 @@ function Get-LatestRelease([string]$Repo) {
                 -TimeoutSec 15
         if (-not $r.tag_name) { return $null }
 
-        # Si cerca il primo asset .exe invece di un nome preciso: le release vecchie
-        # portano ancora il nome di prima del rename.
-        $asset = @($r.assets | Where-Object { $_.name -like '*.exe' })[0]
-        if (-not $asset) { return $null }
-
+        # Asset per NOME esatto, mai per posizione: GitHub elenca gli asset per nome, e dalla
+        # 1.11.0 una release ha due .exe. Senza l'asset del proprio canale si torna la release
+        # con Url vuoto, cosi' il controllo manuale puo' dire perche' non propone nulla.
+        $asset = @($r.assets | Where-Object { $_.name -eq $AssetName })[0]
         return [PSCustomObject]@{
-            Tag    = $r.tag_name
+            Tag     = $r.tag_name
             # I tag sono "v1.6.0": la v va tolta per confrontare come versione.
             Version = ($r.tag_name -replace '^[vV]', '')
-            Name   = $asset.name
-            Url    = $asset.browser_download_url
-            Size   = $asset.size
+            Name    = $AssetName
+            Url     = if ($asset) { $asset.browser_download_url } else { $null }
+            Size    = if ($asset) { $asset.size } else { 0 }
             # digest = "sha256:abc..." quando GitHub lo espone; serve a verificare il file
             # scaricato prima di eseguirlo.
-            Sha256 = if ($asset.digest -match '^sha256:(.+)$') { $Matches[1] } else { $null }
+            Sha256  = if ($asset -and $asset.digest -match '^sha256:(.+)$') { $Matches[1] } else { $null }
         }
     }
     catch { return $null }
@@ -135,12 +134,13 @@ function Clear-OldExe {
 #            (anche "sei aggiornato" o "non raggiungibile"), mentre il controllo
 #            automatico all'avvio tace se non c'e' nulla da dire.
 function Start-UpdateCheck([switch]$Manual) {
-    if (-not (Get-RunningExePath)) {
+    $channel = Get-InstallChannel
+    if ($channel -eq 'source') {
         if ($Manual) { $TxtUpdateStatus.Text = 'Updates apply to the compiled exe only; from source use git.' }
         return
     }
     # Non si propone nulla: il pulsante di aggiornamento non deve nemmeno comparire.
-    if (Test-IsWinGetPortable) {
+    if ($channel -eq 'winget-portable') {
         if ($Manual) { $TxtUpdateStatus.Text = "Installed with winget: update with 'winget upgrade $SelfPackageId'." }
         return
     }
@@ -157,10 +157,13 @@ function Start-UpdateCheck([switch]$Manual) {
     # $script: e NON una locale: OnDone gira sul thread UI e non vede le variabili locali
     # di questa funzione. Con "$manual" locale il controllo manuale non riportava nulla.
     $script:manualCheck = [bool]$Manual
+    # Il canale decide quale file scaricare; Start-SelfUpdate lo rilegge da qui.
+    $script:updateChannel = $channel
+    $asset = if ($channel -eq 'installed') { $SetupAssetName } else { 'WinGetStudio.exe' }
 
     [void](Start-BackgroundJob -Functions 'Get-LatestRelease' `
-        -Vars @{ repo = $UpdateRepo } `
-        -Script { Get-LatestRelease $repo } `
+        -Vars @{ repo = $UpdateRepo; asset = $asset } `
+        -Script { Get-LatestRelease $repo $asset } `
         -OnDone {
             param($result)
             $manual = $script:manualCheck
@@ -177,10 +180,16 @@ function Start-UpdateCheck([switch]$Manual) {
                 if ($manual) { $TxtUpdateStatus.Text = "Up to date (latest published is $($rel.Tag))." }
                 return
             }
+            if (-not $rel.Url) {
+                if ($manual) { $TxtUpdateStatus.Text = "$($rel.Tag) is out, but without $($rel.Name): nothing to update with." }
+                return
+            }
 
             $script:pendingUpdate = $rel
             $BtnUpdateApp.Content    = "Update to $($rel.Tag)"
-            $BtnUpdateApp.ToolTip    = "Download $($rel.Name) ($([int]($rel.Size / 1024)) KB) from GitHub and restart"
+            $BtnUpdateApp.ToolTip    = if ($script:updateChannel -eq 'installed') {
+                "Download the installer $($rel.Name) ($([int]($rel.Size / 1024)) KB): WinGet Studio closes, updates and reopens"
+            } else { "Download $($rel.Name) ($([int]($rel.Size / 1024)) KB) from GitHub and restart" }
             $BtnUpdateApp.Visibility = [System.Windows.Visibility]::Visible
             $TxtUpdateStatus.Text    = "$($rel.Tag) is available."
             Write-Log "Version $($rel.Tag) is available (you have v$AppVersion)."
@@ -197,9 +206,16 @@ function Start-SelfUpdate {
     if (-not $rel -or (Test-WinGetBusy) -or (Test-IsWinGetPortable)) { return }
     $exe = Get-RunningExePath
     if (-not $exe) { return }
+    # Il setup si esegue con privilegi di amministratore: senza digest non si scarica nemmeno.
+    $installed = $script:updateChannel -eq 'installed'
+    if ($installed -and -not $rel.Sha256) {
+        Write-Log "Update refused: $($rel.Tag) publishes no checksum for $($rel.Name), and the installer would run as administrator."
+        return
+    }
 
     $answer = [System.Windows.MessageBox]::Show(
-        "Download $($rel.Tag) and restart WinGet Studio?`n`n" +
+        $(if ($installed) { "Download the $($rel.Tag) installer and update WinGet Studio? It closes, updates and reopens.`n`n" }
+          else { "Download $($rel.Tag) and restart WinGet Studio?`n`n" }) +
         "$($rel.Name) - $([int]($rel.Size / 1024)) KB`nFrom: $($rel.Url)`n`n" +
         $(if ($rel.Sha256) { "The download is verified against the SHA-256 published with the release." }
           else { "WARNING: this release publishes no checksum, so the download cannot be verified." }),
@@ -211,7 +227,8 @@ function Start-SelfUpdate {
 
     Set-AppBusy $true
     Write-Log "Downloading $($rel.Name) ..."
-    $tmp = Join-Path ([IO.Path]::GetTempPath()) "WinGetStudio-$($rel.Tag).exe"
+    $tmp = if ($installed) { [IO.Path]::Combine([IO.Path]::GetTempPath(), "wgt_$($rel.Tag)_$($rel.Name)") }
+           else { Join-Path ([IO.Path]::GetTempPath()) "WinGetStudio-$($rel.Tag).exe" }
 
     # OnDone gira sul thread UI e NON vede le variabili locali di questa funzione: con
     # $exe, $tmp e $rel locali arrivavano vuote, e l'aggiornamento moriva su
@@ -220,6 +237,7 @@ function Start-SelfUpdate {
     $script:updExe = $exe
     $script:updTmp = $tmp
     $script:updRel = $rel
+    $script:updInstalled = $installed
 
     [void](Start-BackgroundJob -Vars @{ url = $rel.Url; dest = $tmp; expected = $rel.Sha256 } `
         -Script {
@@ -248,6 +266,24 @@ function Start-SelfUpdate {
                 return
             }
             Write-Log $(if ($d.Verified) { "Download verified (SHA-256 matches)." } else { "Download complete (no checksum to verify against)." })
+
+            if ($script:updInstalled) {
+                # Il setup chiude l'app (Restart Manager), sostituisce i file e la riapre. Gia'
+                # elevati: nessun secondo UAC. Il file resta in %TEMP% e lo spazza
+                # Clear-WinGetTempFiles al prossimo avvio (prefisso wgt_).
+                $log = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'WinGetStudio-update.log')
+                Write-Log "Running $($rel.Name); if the update fails, its log is $log"
+                try {
+                    Start-Process -FilePath $tmp -ArgumentList "/SILENT /CLOSEAPPLICATIONS /relaunch=1 `"/LOG=$log`"" -ErrorAction Stop
+                }
+                catch {
+                    Write-Log "Update FAILED: the installer did not start: $($_.Exception.Message)"
+                    Set-AppBusy $false
+                    return
+                }
+                $window.Close()
+                return
+            }
 
             try {
                 # Il file in esecuzione non si sovrascrive, ma si rinomina: dopo lo

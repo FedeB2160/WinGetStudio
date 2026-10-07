@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Releases also ship an installer, `WinGetStudio_Setup.exe`: Start menu entry, uninstall from Windows Settings, machine-wide install.
+- A copy installed with the setup updates itself through the installer; the installer download is refused when the release publishes no checksum.
 
 ## v1.10.3
 

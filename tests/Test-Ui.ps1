@@ -1484,6 +1484,37 @@ foreach ($c in $channelCases) {
 }
 "OK channel i quattro canali d'installazione riconosciuti"
 
+# Asset scelto per NOME: GitHub elenca per nome, e qui il setup arriva per primo apposta.
+function Invoke-RestMethod {
+    [PSCustomObject]@{ tag_name = 'v9.9.9'; assets = @(
+        [PSCustomObject]@{ name = 'WinGetStudio_Setup.exe'; browser_download_url = 'https://github.com/x/setup'; size = 4096; digest = 'sha256:AA' }
+        [PSCustomObject]@{ name = 'WinGetStudio.exe';       browser_download_url = 'https://github.com/x/exe';   size = 2048; digest = 'sha256:BB' }
+    ) }
+}
+try {
+    $relP = Get-LatestRelease 'x/y' 'WinGetStudio.exe'
+    $relS = Get-LatestRelease 'x/y' $SetupAssetName
+    $relM = Get-LatestRelease 'x/y' 'Missing.exe'
+}
+finally { Remove-Item function:Invoke-RestMethod }
+if ($relP.Url -ne 'https://github.com/x/exe' -or $relP.Sha256 -ne 'BB') { throw "portable: asset sbagliato ($($relP.Url))" }
+if ($relS.Url -ne 'https://github.com/x/setup' -or $relS.Sha256 -ne 'AA') { throw "installed: asset sbagliato ($($relS.Url))" }
+if (-not $relM -or $relM.Tag -ne 'v9.9.9' -or $relM.Url) { throw "asset mancante: serve la release senza Url, non `$null" }
+
+# Canale installed: digest obbligatorio PRIMA della conferma, setup avviato con rilancio,
+# file temporaneo col prefisso wgt_ (lo spazza Clear-WinGetTempFiles), e se l'avvio fallisce
+# la finestra NON si chiude.
+$updSrc = Get-FunctionSource 'Start-SelfUpdate'
+$refuse = $updSrc.IndexOf('-not $rel.Sha256')
+if ($refuse -lt 0 -or $refuse -gt $updSrc.IndexOf('MessageBox')) { throw "installed: il digest mancante non e' rifiutato prima della conferma" }
+if ($updSrc -notmatch '/SILENT /CLOSEAPPLICATIONS /relaunch=1') { throw "il setup non viene avviato con /SILENT /CLOSEAPPLICATIONS /relaunch=1" }
+if ($updSrc -notmatch '"wgt_') { throw "il setup scaricato non ha il prefisso wgt_: resterebbe in %TEMP%" }
+if ($updSrc -notmatch '(?s)Start-Process -FilePath \$tmp[^\r\n]*-ErrorAction Stop.*?catch.*?Set-AppBusy \$false.*?return') {
+    throw "se il setup non parte, l'app deve restare aperta e dirlo"
+}
+if ((Get-FunctionSource 'Start-UpdateCheck') -notmatch 'Get-InstallChannel') { throw "Start-UpdateCheck non sceglie l'asset per canale" }
+"OK assets  asset per nome e canale; setup verificato, rilancio, uscita pulita se non parte"
+
 # Il download e' l'unico punto in cui il programma ESEGUE codice preso da internet:
 # la conferma deve precederlo e il checksum deve essere confrontato.
 $updSrc = Get-FunctionSource 'Start-SelfUpdate'
@@ -1520,7 +1551,7 @@ if (-not $rel) {
 else {
     if ($rel.Version -notmatch '^\d+\.\d+') { throw "versione della release non numerica: '$($rel.Version)'" }
     if ($rel.Url -notmatch '^https://github\.com/') { throw "URL di download non su github.com: $($rel.Url)" }
-    if ($rel.Name -notlike '*.exe') { throw "l'asset scelto non e' un .exe: $($rel.Name)" }
+    if ($rel.Name -ne 'WinGetStudio.exe') { throw "l'asset scelto non e' WinGetStudio.exe: $($rel.Name)" }
     "OK rel     release $($rel.Tag) letta da GitHub: $($rel.Name), $([int]($rel.Size/1024)) KB, checksum $(if ($rel.Sha256) { 'presente' } else { 'ASSENTE' })"
 
     # Il controllo manuale deve SEMPRE riferire un esito. Serve eseguirlo davvero: il
