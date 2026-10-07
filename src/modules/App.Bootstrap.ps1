@@ -216,6 +216,7 @@ function Start-App([switch]$NoShow) {
     Initialize-InstalledTab
     Initialize-Backup
     Initialize-Update
+    Clear-WinGetTempFiles            # residui di Invoke-WinGet tenuti aperti da un installer
 
     # Alla chiusura: ferma i timer e chiudi i job pendenti, cosi' il processo termina
     # davvero (niente thread in background lasciati vivi). ENTRAMBI i timer: se la ragione

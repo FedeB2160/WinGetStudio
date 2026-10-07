@@ -69,6 +69,20 @@ $u = Invoke-WinGet 'powershell.exe' `
 Check "accenti integri nell'output (attesi '$accent', letti '$($u.Output.Trim())')" ($u.Output.Contains($accent))
 Check "nessun mojibake ('$([char]0xC3)' non presente)" (-not $u.Output.Contains([string][char]0xC3))
 
+Write-Host "`n1c) File di output rimasti in %TEMP%" -ForegroundColor Cyan
+# Un figlio staccato (sezione 1, e nella realta' un installer) tiene aperti i file di
+# redirect: la pulizia di Invoke-WinGet fallisce e wgt_*.out/.err restano in %TEMP%. Li
+# rimuove Clear-WinGetTempFiles all'avvio, quando nessuno li tiene piu'.
+Invoke-Expression (Get-FunctionText 'Clear-WinGetTempFiles')
+$tempDir = [IO.Path]::GetTempPath()
+$stale = [IO.Path]::Combine($tempDir, "wgt_$([Guid]::NewGuid().ToString('N')).out")
+$keep  = [IO.Path]::Combine($tempDir, "wgtkeep_$PID.txt")
+[IO.File]::WriteAllText($stale, 'x'); [IO.File]::WriteAllText($keep, 'x')
+Clear-WinGetTempFiles
+Check "un wgt_*.out rimasto viene rimosso" (-not [IO.File]::Exists($stale))
+Check "un file con un altro nome resta dov'e'" ([IO.File]::Exists($keep))
+[IO.File]::Delete($keep)
+
 # ------------------------------------------------------------------
 Write-Host "`n2) Overload di Dispatcher.BeginInvoke" -ForegroundColor Cyan
 # BeginInvoke non ha overload (Delegate, DispatcherPriority): la forma con la stringa
@@ -108,19 +122,25 @@ if (-not ('WgtRow' -as [type])) {
     Add-Type -TypeDefinition 'public class WgtRow {
         public bool Selected, Pinned; public string Name, Version, Available, Id, Status, StatusDetail; }'
 }
-# Stub di winget: il parser fa "& $wingetPath @wgArgs", e col NOME NUDO quella forma cerca
-# ancora un COMANDO, dove una funzione vince sull'eseguibile. Nessuna modifica al codice di
-# produzione serve; con un percorso assoluto lo stub non verrebbe raggiunto.
-$wingetPath = 'winget'
-# Exit code e output dello stub li decide ogni sezione: Invoke-WinGetRead legge $LASTEXITCODE.
-$stubExit = 0
-function winget { $global:LASTEXITCODE = $stubExit; $fixture }
+# Stub di winget: Invoke-WinGetRead avvia un ESEGUIBILE con Process.Start, quindi lo stub e'
+# un .cmd vero, non una funzione. Stampa il file di fixture cosi' com'e' (byte per byte, come
+# fa winget) ed esce col codice scelto da ogni sezione tramite Set-Stub.
+$stubDir = Join-Path ([IO.Path]::GetTempPath()) "wgt-stub-$PID"
+[void][IO.Directory]::CreateDirectory($stubDir)
+$wingetPath = Join-Path $stubDir 'winget.cmd'
+[IO.File]::WriteAllText($wingetPath, "@echo off`r`ntype `"%WGT_STUB_FIXTURE%`"`r`nexit /b %WGT_STUB_EXIT%`r`n")
+$env:WGT_STUB_FIXTURE = Join-Path $stubDir 'fixture.txt'
+# Il fixture si scrive in UTF-8 senza BOM: e' cio' che winget mette sulla pipe.
+function Set-Stub([string]$Text, [int]$Exit = 0) {
+    [IO.File]::WriteAllText($env:WGT_STUB_FIXTURE, $Text, (New-Object Text.UTF8Encoding $false))
+    $env:WGT_STUB_EXIT = "$Exit"
+}
 # Get-WinGetTable e Invoke-WinGetRead servono perche' i lettori le chiamano.
 Invoke-Expression (Get-FunctionText 'Get-WinGetTable')
 Invoke-Expression (Get-FunctionText 'Invoke-WinGetRead')
 Invoke-Expression (Get-FunctionText 'Get-WinGetUpgrades')
 
-$fixture = @'
+Set-Stub @'
 Nome                                  Id                                        Versione       Disponibile    Origine
 ---------------------------------------------------------------------------------------------------------------------
 Claude                                Anthropic.Claude                          1.24012.1.0    1.24012.9      winget
@@ -229,14 +249,14 @@ $readers = [ordered]@{
     installed = { Get-WinGetInstalled }
     upgrades  = { Get-WinGetUpgrades }
 }
-$stubExit = 1; $fixture = 'Failed to open source: test fixture'
+Set-Stub 'Failed to open source: test fixture' 1
 foreach ($name in $readers.Keys) {
     $r = & $readers[$name]
     Check "$name con exit 1: errore, codice e diagnostica, zero righe" `
         ($r.Success -eq $false -and $r.ExitCode -eq 1 -and $r.Output -match 'test fixture' -and @($r.Rows).Count -eq 0)
 }
 # Una tabella stampata con exit non-zero non vale: le righe non si usano.
-$fixture = @'
+Set-Stub -Exit 1 @'
 Name  Id      Version Available
 -------------------------------
 Foo   Foo.Foo 1.0     2.0
@@ -244,29 +264,29 @@ Foo   Foo.Foo 1.0     2.0
 $r = Get-WinGetUpgrades
 Check "tabella con exit 1: nessuna riga" (-not $r.Success -and @($r.Rows).Count -eq 0)
 # 0x8A150014 NO_APPLICATIONS_FOUND: vuoto valido per la ricerca, errore per gli altri.
-$stubExit = -1978335212; $fixture = 'Nessun pacchetto trovato con criteri di input corrispondenti.'
+Set-Stub 'Nessun pacchetto trovato con criteri di input corrispondenti.' -1978335212
 $r = Get-WinGetSearch 'fixture'
-Check "search senza corrispondenze: riuscita, vuota, codice preservato" ($r.Success -and $r.ExitCode -eq $stubExit -and @($r.Rows).Count -eq 0)
+Check "search senza corrispondenze: riuscita, vuota, codice preservato" ($r.Success -and $r.ExitCode -eq -1978335212 -and @($r.Rows).Count -eq 0)
 foreach ($name in 'pins', 'installed', 'upgrades') {
     $r = & $readers[$name]
     Check "$name con NO_APPLICATIONS_FOUND: errore, non lista vuota" (-not $r.Success)
 }
 # Exit 0 e una frase al posto della tabella (es. "Nessun PIN configurato."): vuoto valido.
-$stubExit = 0; $fixture = 'Nessun PIN configurato.'
+Set-Stub 'Nessun PIN configurato.'
 foreach ($name in $readers.Keys) {
     $r = & $readers[$name]
     Check "$name con exit 0 senza tabella: riuscita e vuota" ($r.Success -and @($r.Rows).Count -eq 0)
 }
 
 Write-Host "`n6c) Una tabella di UNA riga resta una riga" -ForegroundColor Cyan
-$fixture = @'
+Set-Stub @'
 Name     Id       Version
 -------------------------
 Only One Only.One 1.0
 '@
 $r = Get-WinGetSearch 'fixture'
 Check "search con una riga (Id trovato '$(@($r.Rows)[0].Id)')" (@($r.Rows).Count -eq 1 -and @($r.Rows)[0].Id -eq 'Only.One')
-$fixture = @'
+Set-Stub @'
 Name     Id       Version Source Pin type
 -----------------------------------------
 Only One Only.One 1.0     winget Blocking
@@ -281,6 +301,22 @@ Check "ultime due righe significative ($($tail -join ' | '))" ($tail.Count -eq 2
 $tail = @(Get-WinGetOutputTail "  -`r  |`rSolo questa`r`n" 2)
 Check "frame \r ridotti all'ultimo segmento ($($tail -join ' | '))" ($tail.Count -eq 1 -and $tail[0] -eq 'Solo questa')
 
+Write-Host "`n6e) Output di winget letto come UTF-8, argomenti senza shell" -ForegroundColor Cyan
+# winget scrive sempre UTF-8 (Core.cpp). La vecchia lettura "& winget | Out-String" decodificava
+# con la code page della console: nell'exe senza console il primo job storpiava le accentate.
+$accented = 'Non ' + [char]0x00E8 + ' stato trovato alcun pacchetto.'
+Set-Stub $accented -1978335212
+$r = Get-WinGetSearch 'fixture'
+Check "lettera accentata intatta ('$(($r.Output -split "`r?`n")[0])')" ($r.Output -match [regex]::Escape($accented))
+# Gli argomenti arrivano come array e si quotano per CreateProcess: lo stub li ristampa cosi'
+# come li riceve. "x&y" quotato non viene eseguito nemmeno da un .cmd.
+$argsStub = Join-Path $stubDir 'args.cmd'
+[IO.File]::WriteAllText($argsStub, "@echo off`r`necho %*`r`n")
+$savedPath = $wingetPath; $wingetPath = $argsStub
+$r = Invoke-WinGetRead -Arguments @('search', 'a b', 'say "hi"', 'x&y')
+$wingetPath = $savedPath
+Check "argomenti quotati ($($r.Output.Trim()))" ($r.Output.Trim() -eq 'search "a b" "say \"hi\"" "x&y"')
+
 Write-Host "`n7) Argomenti con apici sbilanciati" -ForegroundColor Cyan
 # La riga di comando si costruisce per concatenazione e la esegue cmd: un Id che contenesse
 # un apice doppio produrrebbe un comando malformato, che cmd eseguirebbe comunque. Gli Id
@@ -294,6 +330,7 @@ $ok = Invoke-WinGet 'cmd.exe' '/c echo "bilanciato"'
 Check "apici bilanciati eseguiti (output '$($ok.Output.Trim())')" ($ok.Output -match 'bilanciato')
 
 # ------------------------------------------------------------------
+Remove-Item -LiteralPath $stubDir -Recurse -Force -ErrorAction SilentlyContinue
 if ($failures -eq 0) { Write-Host "`nTutti i test passati.`n" -ForegroundColor Green; exit 0 }
 Write-Host "`n$failures test falliti.`n" -ForegroundColor Red
 exit 1
