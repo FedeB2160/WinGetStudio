@@ -6,12 +6,16 @@
 # per distribuire l'exe vecchio credendolo nuovo.
 $ErrorActionPreference = 'Stop'
 
-# Installa ps2exe una sola volta (salta se gia' presente)
-if (-not (Get-Module -ListAvailable -Name ps2exe)) {
-    Write-Host "Installazione modulo ps2exe..." -ForegroundColor Cyan
-    Install-Module ps2exe -Scope CurrentUser -Force
+# ps2exe a una versione FISSA, la stessa della CI: con "qualunque versione installata" un exe
+# di rilascio poteva uscire da un compilatore diverso da quello verificato.
+# TLS 1.2: PowerShell 5.1 parte ancora da TLS 1.0, e la PowerShell Gallery lo rifiuta.
+$ps2exeVersion = '1.0.18'
+if (-not (Get-Module -ListAvailable -Name ps2exe | Where-Object { $_.Version -eq $ps2exeVersion })) {
+    Write-Host "Installazione modulo ps2exe $ps2exeVersion..." -ForegroundColor Cyan
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Install-Module ps2exe -RequiredVersion $ps2exeVersion -Scope CurrentUser -Force
 }
-Import-Module ps2exe
+Import-Module ps2exe -RequiredVersion $ps2exeVersion
 
 $root = Split-Path -Parent $PSScriptRoot   # build.ps1 sta in src\
 $src  = Join-Path $PSScriptRoot 'main.ps1'
@@ -88,6 +92,12 @@ finally { Remove-Item -LiteralPath $src -Force -ErrorAction SilentlyContinue }
 if (-not (Test-Path $out) -or (Get-Item $out).LastWriteTimeUtc -le $before) {
     throw "Compilazione fallita: $out non e' stato aggiornato."
 }
+# Le proprieta' dell'exe devono riportare $AppVersion (scheda Dettagli): prima lo verificava
+# solo la CI, e una build locale poteva uscire sbagliata senza che nessuno lo vedesse.
+$vi = (Get-Item $out).VersionInfo
+if ([version]$vi.FileVersion -ne [version]$version -or [version]$vi.ProductVersion -ne [version]$version) {
+    throw "Versione dell'exe $($vi.FileVersion)/$($vi.ProductVersion), attesa $version"
+}
 
 # ------------------------------------------------------------------
 # FIRMA
@@ -104,8 +114,13 @@ if ($env:WINGETSTUDIO_CERT_THUMBPRINT) {
     if (-not $signCert) { throw "Certificato $($env:WINGETSTUDIO_CERT_THUMBPRINT) non trovato negli archivi personali" }
 }
 else {
+    # Solo il certificato del .cer pubblicato, non il primo che capita: un secondo
+    # certificato con lo stesso nome (rigenerato altrove) firmerebbe exe che il .cer del
+    # repository non riconosce. Senza quello giusto si compila senza firma.
+    $published = New-Object Security.Cryptography.X509Certificates.X509Certificate2 (Join-Path $root 'assets\WinGetStudio-codesign.cer')
     $signCert = Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert -ErrorAction SilentlyContinue |
-                Where-Object { $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey } | Select-Object -First 1
+                Where-Object { $_.Thumbprint -eq $published.Thumbprint -and $_.NotAfter -gt (Get-Date) -and $_.HasPrivateKey } |
+                Select-Object -First 1
 }
 
 if (-not $signCert) {

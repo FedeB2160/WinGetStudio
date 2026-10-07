@@ -10,18 +10,20 @@ WinGet Studio is a WPF front end for `winget`, written in PowerShell 5.1 and com
 # Run from source (UAC prompt first; self-update disabled in this mode)
 powershell -ExecutionPolicy Bypass -File .\src\main.ps1
 
-# Build dist\WinGetStudio.exe (also: double click build.bat). Installs ps2exe if missing.
+# Build dist\WinGetStudio.exe (also: double click build.bat). Installs ps2exe 1.0.18 if missing and checks the exe version metadata.
 powershell -ExecutionPolicy Bypass -File .\src\build.ps1
 
-# Tests — two standalone scripts, no framework, no runner
+# Tests — two standalone scripts, no framework, no runner. Offline by default: that is what CI runs
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
+# Real winget reads/export, the GitHub API and one pin cycle on 7zip.7zip
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 
 # winget manifests
 winget validate --manifest .\winget\1.10.1
 ```
 
-`Test-Ui.ps1` requires `-STA` (WPF), touches winget read-only, and runs one real pin cycle on `7zip.7zip`. There is no single-test selector: each script is one file of sequential assertions — comment out or run the file.
+`Test-Ui.ps1` requires `-STA` (WPF) and mounts the real app in a hidden window. Without `-Live` it touches neither winget nor the network; `-Live` adds real search/list/export and one pin cycle on `7zip.7zip` (skipped when it is not installed or already pinned). There is no single-test selector: each script is one file of sequential assertions — comment out or run the file.
 
 ## Architecture
 
@@ -51,5 +53,6 @@ Glyphs must be written `[char]0xE706`, never `` "`u{E706}" `` — that escape ne
 ## Conventions
 
 - **UI text and documentation in English; in-code comments in Italian.** User-facing strings live in `ui\UI.xaml` and in the `Write-Log` / `LogUI` / `MessageBox` calls under `src\modules\`.
-- Signing: `build.ps1` picks `$env:WINGETSTUDIO_CERT_THUMBPRINT` if set, else the first code-signing certificate in `Cert:\CurrentUser\My`; it still succeeds unsigned. Private keys (`*.pfx`, `*.p12`, `*.snk`) are gitignored — only the public `.cer` is committed.
+- Signing: `build.ps1` picks `$env:WINGETSTUDIO_CERT_THUMBPRINT` if set, else only the certificate in `Cert:\CurrentUser\My` matching `assets\WinGetStudio-codesign.cer`; it still succeeds unsigned. Never generate a replacement certificate to get a build through: without the key `build.ps1` builds unsigned, and a second key with the same subject cannot be told apart by name. Private keys (`*.pfx`, `*.p12`, `*.snk`) are gitignored — only the public `.cer` is committed.
+- `AGENTS.md` (in Italian, by choice) points Codex and similar agents to this file and DEVELOPMENT.md.
 - `graphify-out\` holds a knowledge graph of this repo; `graphify query "..."` answers *why* questions that span code, DEVELOPMENT.md and the changelog. Only `GRAPH_REPORT.md`, `graph.json`, `graph.html` and `manifest.json` are committed. The manifest is what lets a clone run `graphify --update` and re-extract just the files that changed, instead of paying for the whole corpus again.

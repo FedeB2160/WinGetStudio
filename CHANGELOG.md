@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Development: the UI test suite runs offline by default; `-Live` opts into real winget calls and never touches an existing pin.
+- Development: the build pins ps2exe 1.0.18 and checks the exe version; the UI suite checks that the newest changelog entry matches `$AppVersion`.
+- Development: Windows CI runs both test suites and then the build on every pull request; the unsigned exe is kept seven days as a test artifact.
+
 ## v1.10.1
 
 Fixes only, all of them found in 1.10.0. Coming from v1.10.0: download the new exe and delete the old one, or let the app update itself from **Settings** — unless you installed it with winget, in which case read the first entry.

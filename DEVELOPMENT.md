@@ -38,10 +38,11 @@ ui\    UI.xaml                  window: layout and styles
        Theme.Dark.xaml          dark palette
 assets\icon.ico                 app icon (embedded in the exe)
        WinGetStudio-codesign.cer  public signing certificate (no private key)
-tests\ Test-Ui.ps1              headless check of code, XAML, themes and startup
+tests\ Test-Ui.ps1              hidden WPF run of the app; offline unless -Live
        Test-InvokeWinGet.ps1    winget execution and table parsing
 dist\  WinGetStudio.exe         build output (signed, gitignored)
 winget\<version>\               winget-pkgs manifests, one folder per published version
+.github\workflows\ci.yml        Windows CI: both suites offline, then the build
 graphify-out\                   knowledge graph (report, graph.json and graph.html committed)
 ```
 
@@ -88,7 +89,7 @@ It replaces `###MODULES###` with the concatenated modules and the `###UI.xaml###
 `build.ps1` signs the exe after compiling, choosing the certificate in this order:
 
 1. `$env:WINGETSTUDIO_CERT_THUMBPRINT` — set this to switch to a company or commercial certificate without editing the build;
-2. otherwise the first valid code-signing certificate with a private key in `Cert:\CurrentUser\My`.
+2. otherwise the certificate in `Cert:\CurrentUser\My` whose thumbprint matches `assets\WinGetStudio-codesign.cer`, valid and with its private key. Any other code-signing certificate is ignored, even one with the same subject.
 
 If it finds none the build **still succeeds**, printing a warning that the exe is unsigned — signing needs a private key that not every machine has.
 
@@ -133,7 +134,7 @@ The discipline that goes with it:
 
 - One branch for the whole plan, `feature/vX.Y.Z`, with `main` left on what is published.
 - **One commit per task**, not per step. Each carries the code, the tests, the `README.md` and `DEVELOPMENT.md` lines that task invalidates, and one line under `## Unreleased` in the changelog. Documentation and code do not travel separately: a README describing yesterday's button is worse than no README.
-- **Both suites green before every commit.** There is no CI, so this gate is manual and it is the only one there is.
+- **Both suites green before every commit.** The Windows CI repeats them on every pull request, but offline: the live run (`-Live`) stays a manual gate before a release.
 - Push after each commit. If the session dies, the work is already out.
 - At release time the accumulated `## Unreleased` lines are promoted into the narrative entry for the version, rather than written from memory at the end.
 
@@ -190,9 +191,13 @@ The decision stands until #2299 closes, or until moving to a real installer type
 ```powershell
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
+# live: real winget reads/export, the GitHub API, one pin cycle on 7zip.7zip
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 ```
 
-`Test-InvokeWinGet.ps1` needs no admin rights and installs nothing. `Test-Ui.ps1` opens no windows, but it does touch winget for real in read-only ways (search, list, export) and runs one full pin cycle on `7zip.7zip`, removing the pin in a `finally` so a mid-test failure cannot leave a package silently blocked.
+`Test-InvokeWinGet.ps1` needs no admin rights, installs nothing, and calls `winget --version` only when winget exists. `Test-Ui.ps1` mounts the real app in a hidden WPF window and **runs offline by default**. `-Live` adds real search, list and export, the GitHub release check, and one pin cycle on `7zip.7zip` — only when it is installed and not already pinned. The pin it creates is removed in a `finally` that first waits for the queue's winget to exit.
+
+The Windows CI (`.github/workflows/ci.yml`, GitHub-hosted `windows-2022`) runs both suites offline on every pull request and push to `main`, then builds the exe and uploads it as an unsigned test artifact for seven days. Actions are pinned to commit SHAs, the token is read-only, and no signing key ever reaches CI.
 
 **`Test-Ui.ps1`** checks that every file parses, that no module is missing from (or orphaned by) `$moduleNames`, that `UI.xaml` provides every control the code asks for, that both themes define the same keys, that every `DynamicResource` resolves, that column headers are non-empty, uppercase and centred, that every `&#x....;` glyph exists in both system icon fonts, and that the two grid-freeze regressions have not come back. Four checks are worth knowing about, because they catch what static analysis cannot:
 
