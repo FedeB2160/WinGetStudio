@@ -45,8 +45,8 @@ jobs:
         run: |
           [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
           Install-PackageProvider NuGet -MinimumVersion 2.8.5.201 -Force | Out-Null
-      - name: Install Inno Setup 6.7.3
-        run: choco install innosetup --version=6.7.3 -y --no-progress
+      - name: Install Inno Setup 6.7.1
+        run: choco install innosetup --version=6.7.1 -y --no-progress
       - name: Compile (build.ps1 installs ps2exe 1.0.18 and checks the version metadata)
         run: .\src\build.ps1
       - name: Upload unsigned test builds
