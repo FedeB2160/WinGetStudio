@@ -113,17 +113,17 @@ function Load-Upgrades {
     $Progress.Maximum = 100
     Refresh-SelectionState
 
-    # Get-WinGetTable serve perche' gli altri due la chiamano: nel runspace vanno ricreate
+    # Get-WinGetTable e Invoke-WinGetRead servono ai lettori: nel runspace vanno ricreate
     # tutte, altrimenti la scansione muore con "termine non riconosciuto".
     # I pin si leggono nello STESSO job, non in uno successivo: due processi winget
     # insieme si contendono lo store e il comando esce in errore.
     # [void]: Start-BackgroundJob torna il job, che altrimenti finirebbe sulla pipeline.
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetUpgrades', 'Get-WinGetPins' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetUpgrades', 'Get-WinGetPins' `
         -Vars @{ incUnknown = [bool]$ChkUnknown.IsChecked; wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{
-                Rows = @(Get-WinGetUpgrades $incUnknown)
-                Pins = @(Get-WinGetPins)
+                Upgrades = Get-WinGetUpgrades $incUnknown
+                Pins     = Get-WinGetPins
             }
         } `
         -OnDone {
@@ -131,9 +131,10 @@ function Load-Upgrades {
             $Progress.IsIndeterminate = $false
             $TopSpinner.Visibility = [System.Windows.Visibility]::Collapsed
             $r = @($result)[0]
-            if ($r) {
+            $read = if ($r) { $r.Upgrades }
+            if ($read.Success) {
                 $self = $false
-                foreach ($u in $r.Rows) {
+                foreach ($u in $read.Rows) {
                     if (-not $u) { continue }
                     # L'app non si aggiorna da questa lista: winget non puo' sovrascrivere
                     # un eseguibile in esecuzione. Se ne occupa il pulsante nelle
@@ -145,15 +146,20 @@ function Load-Upgrades {
             }
 
             if ($items.Count -eq 0) {
+                # Tre casi, tre messaggi: lista vuota, winget fallito, job morto. Mai "nessun
+                # aggiornamento" quando winget non ha risposto.
+                $TxtEmpty.Text = if ($read.Success) { 'No updates available.' }
+                                 elseif ($read)     { Format-WinGetReadError 'upgrade' $read }
+                                 else               { 'The update scan did not complete: see the log.' }
                 $TxtEmpty.Visibility = [System.Windows.Visibility]::Visible
                 $Grid.Visibility     = [System.Windows.Visibility]::Collapsed
-                Write-Log "No updates available."
+                Write-Log $TxtEmpty.Text
             }
             else {
                 $Grid.Visibility = [System.Windows.Visibility]::Visible
                 Write-Log "Found $($items.Count) updates."
             }
-            if ($r) { Set-PinFlags @($r.Pins) }
+            Set-PinFlagsFromRead $(if ($r) { $r.Pins })
             Set-AppBusy $false
         })
 }

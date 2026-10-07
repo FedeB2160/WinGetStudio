@@ -109,7 +109,13 @@ function LogUI([string]$m) {
         $j.Timer.Stop()
 
         $result = @()
-        try { $result = @($j.PowerShell.EndInvoke($j.Handle)) }
+        try {
+            $result = @($j.PowerShell.EndInvoke($j.Handle))
+            # Un errore che non interrompe lo script (es. "termine non riconosciuto" per una
+            # funzione mancante in -Functions) finisce nello stream Error, non in EndInvoke:
+            # senza questa riga il job tornava vuoto senza lasciare traccia nel log.
+            foreach ($err in $j.PowerShell.Streams.Error) { Write-Log "ERROR in background job: $($err.Exception.Message)" }
+        }
         catch { Write-Log "ERROR in background job: $($_.Exception.Message)" }
         finally {
             $j.PowerShell.Dispose()
@@ -197,7 +203,7 @@ function Start-WinGetQueue {
     }
 
     # [void]: il job non deve finire sulla pipeline del chiamante.
-    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet' -Vars $jobVars -Script {
+    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet', 'Get-WinGetOutputTail' -Vars $jobVars -Script {
         Invoke-Expression "function Get-WinGetArgs { $argsFnBody }"
 
         $done    = 0
@@ -224,9 +230,8 @@ function Start-WinGetQueue {
                         # Ultime DUE righe significative dell'output winget: quando
                         # l'installer fallisce, winget stampa il percorso del suo log
                         # DOPO il messaggio d'errore, quindi l'ultima riga da sola
-                        # riportava solo il path e nascondeva la causa.
-                        $tail = @($r.Output -split "`r`n|`n" | Where-Object { $_.Trim() } | Select-Object -Last 2)
-                        foreach ($l in $tail) { LogUI "      $($l.Trim())" }
+                        # riportava solo il path e nascondeva la causa (Get-WinGetOutputTail).
+                        foreach ($l in (Get-WinGetOutputTail $r.Output 2)) { LogUI "      $l" }
                     }
                 }
             }

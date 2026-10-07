@@ -112,12 +112,41 @@ function Get-WinGetTable([string]$raw, [int]$MaxColumns = 0) {
     return $results
 }
 
+# Esegue un comando di LETTURA (search, list, upgrade senza --id, pin list) e restituisce
+# l'esito insieme ai dati: { Success, Rows, ExitCode, Output }. Prima un errore di winget
+# diventava una lista vuota, e la UI diceva "nessun aggiornamento" a winget rotto.
+# Success = exit 0, e solo allora si parsa la tabella; quando un exit non-zero e' un
+# risultato valido lo decide il chiamante (Get-WinGetSearch).
 # $wingetPath: il percorso risolto UNA VOLTA da Get-WinGetPath, passato nelle -Vars del job.
 # NON "& winget": quella forma risolve il NOME a ogni chiamata, quindi dipende dal PATH e
 # dall'alias di esecuzione app, che sotto un account elevato diverso da quello interattivo
-# possono non esserci. Get-WinGetPath esiste per non dipenderne, e usarlo in una via su
-# cinque era la premessa di un errore incomprensibile.
-#
+# possono non esserci.
+# -Width alto: senza console (exe -noConsole) o con finestra stretta Out-String manderebbe
+# a capo le righe alla larghezza dell'host, spezzando la tabella.
+# Non Invoke-WinGet: quella passa per cmd, e il testo di una ricerca lo scrive l'utente in un
+# processo elevato. Qui gli argomenti restano un array.
+function Invoke-WinGetRead([string[]]$Arguments, [int]$MaxColumns = 0) {
+    $raw = ''
+    try {
+        $raw = & $wingetPath @Arguments 2>&1 | Out-String -Width 4096
+        $exitCode = [int]$LASTEXITCODE
+    }
+    catch {
+        $raw = $_.Exception.Message
+        $exitCode = -1
+    }
+    # Assegnazione diretta di @(...), non "$rows = if (...) { @(...) }": l'if srotolerebbe una
+    # tabella di UNA riga nei suoi campi.
+    $rows = @()
+    if ($exitCode -eq 0) { $rows = @(Get-WinGetTable $raw -MaxColumns $MaxColumns) }
+    return [PSCustomObject]@{
+        Success  = ($exitCode -eq 0)
+        Rows     = [object[]]$rows
+        ExitCode = $exitCode
+        Output   = [string]$raw
+    }
+}
+
 # Ricerca nel catalogo. Colonne: Nome | Id | Versione | [Corrispondenza] | [Origine] —
 # si usano solo le prime tre, le altre compaiono o no a seconda del risultato.
 #
@@ -125,35 +154,40 @@ function Get-WinGetTable([string]$raw, [int]$MaxColumns = 0) {
 #   va in rete e passa a ~5s, troppo per aggiornare l'elenco mentre si digita.
 # --count: senza un tetto una query di 2-3 lettere torna oltre mille righe (misurato:
 #   "ab" -> 1288) e la griglia annega.
+# 0x8A150014 (APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND) e' "nessuna corrispondenza": un
+#   risultato vuoto, non un errore. Solo qui: list e upgrade senza filtri elencano tutto
+#   l'installato e quel codice non lo producono. L'exit si normalizza a 32 bit senza segno
+#   prima del confronto, come in Get-UpdateStatus.
 function Get-WinGetSearch([string]$Query, [bool]$IncludeStore = $false, [int]$Count = 25) {
-    if ([string]::IsNullOrWhiteSpace($Query)) { return @() }
+    if ([string]::IsNullOrWhiteSpace($Query)) {
+        return [PSCustomObject]@{ Success = $true; Rows = [object[]]@(); ExitCode = 0; Output = '' }
+    }
     $wgArgs = @('search', $Query, '--count', "$Count", '--accept-source-agreements')
     if (-not $IncludeStore) { $wgArgs += @('--source', 'winget') }
-    $raw = & $wingetPath @wgArgs 2>&1 | Out-String -Width 4096
+    $read = Invoke-WinGetRead -Arguments $wgArgs
+    if ((([int64]$read.ExitCode) -band 0xFFFFFFFFL) -eq 0x8A150014L) { $read.Success = $true }
+    if (-not $read.Success) { return $read }
 
     $results = New-Object System.Collections.ArrayList
-    foreach ($f in Get-WinGetTable $raw) {
-        [void]$results.Add([WgtRow]@{
-            Selected = $false
-            Name     = $f[0]
-            Id       = $f[1]
-            Version  = $f[2]
-        })
+    foreach ($f in $read.Rows) {
+        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2] })
     }
-    return $results
+    $read.Rows = $results.ToArray()
+    return $read
 }
 
 # ID dei pacchetti con un pin. Colonne: Nome | Id | Versione | Origine | Tipo di pin —
 # serve solo l'ID, il tipo (Pinning / Blocking / Gating) non cambia cosa mostriamo.
-# Senza pin configurati winget stampa una frase e nessuna tabella, quindi esce un array
-# vuoto senza casi speciali.
+# Senza pin winget stampa una frase, nessuna tabella ed exit 0: Rows vuoto e Success vero.
 function Get-WinGetPins {
-    $raw = & $wingetPath pin list --accept-source-agreements 2>&1 | Out-String -Width 4096
-    $ids = New-Object System.Collections.ArrayList
     # -MaxColumns 3 e' obbligatorio: l'ultima intestazione ("Tipo di pin") contiene spazi
     # e senza il limite ogni riga verrebbe scartata come disallineata.
-    foreach ($f in Get-WinGetTable $raw -MaxColumns 3) { [void]$ids.Add($f[1]) }
-    return $ids
+    $read = Invoke-WinGetRead -Arguments @('pin', 'list', '--accept-source-agreements') -MaxColumns 3
+    if (-not $read.Success) { return $read }
+    $ids = New-Object System.Collections.ArrayList
+    foreach ($f in $read.Rows) { [void]$ids.Add($f[1]) }
+    $read.Rows = $ids.ToArray()
+    return $read
 }
 
 # Inventario dei pacchetti installati. Colonne: Nome | Id | Versione | [Origine].
@@ -162,20 +196,16 @@ function Get-WinGetPins {
 # di tipo "ARP\Machine\X64\Nome Prodotto" (con spazi dentro, del tutto legittimi) e
 # Origine vuota.
 function Get-WinGetInstalled {
-    $raw = & $wingetPath list --accept-source-agreements 2>&1 | Out-String -Width 4096
-
+    $read = Invoke-WinGetRead -Arguments @('list', '--accept-source-agreements')
+    if (-not $read.Success) { return $read }
     $results = New-Object System.Collections.ArrayList
-    foreach ($f in Get-WinGetTable $raw) {
+    foreach ($f in $read.Rows) {
         # "> 8.12.30.21" -> "8.12.30.21": il ">" segnala che esiste un aggiornamento, e di
         # quello si occupa la scheda Updates.
-        [void]$results.Add([WgtRow]@{
-            Selected = $false
-            Name     = $f[0]
-            Id       = $f[1]
-            Version  = ($f[2] -replace '^>\s*', '')
-        })
+        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = ($f[2] -replace '^>\s*', '') })
     }
-    return $results
+    $read.Rows = $results.ToArray()
+    return $read
 }
 
 # Elenco degli upgrade disponibili. Colonne: Nome | Id | Versione | Disponibile | [Origine].
@@ -185,20 +215,13 @@ function Get-WinGetUpgrades([bool]$IncludeUnknown = $false) {
     # --accept-source-agreements: evita prompt interattivi al primo uso della sorgente
     $wgArgs = @('upgrade', '--accept-source-agreements')
     if ($IncludeUnknown) { $wgArgs += '--include-unknown' }
-    # -Width alto: senza console (exe -noConsole) o con finestra stretta Out-String
-    # manderebbe a capo le righe alla larghezza dell'host, spezzando la tabella.
-    $raw = & $wingetPath @wgArgs 2>&1 | Out-String -Width 4096
-
+    $read = Invoke-WinGetRead -Arguments $wgArgs
+    if (-not $read.Success) { return $read }
     $results = New-Object System.Collections.ArrayList
-    foreach ($f in Get-WinGetTable $raw) {
+    foreach ($f in $read.Rows) {
         if ($f.Count -lt 4) { continue }   # senza la colonna Disponibile non e' un upgrade
-        [void]$results.Add([WgtRow]@{
-            Selected     = $false
-            Name         = $f[0]
-            Id           = $f[1]
-            Version      = $f[2]
-            Available    = $f[3]
-        })
+        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2]; Available = $f[3] })
     }
-    return $results
+    $read.Rows = $results.ToArray()
+    return $read
 }

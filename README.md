@@ -116,7 +116,7 @@ After an uninstall the list is not rebuilt automatically, so you can read the ou
 
 ### Pinning
 
-A pin tells winget to leave a package alone until you remove the pin — for the one that keeps reappearing and that you do not want touched.
+A pin tells winget to leave a package alone until you remove the pin — for the one that keeps reappearing and that you do not want touched. Pins made here are *blocking*: winget refuses to upgrade the package even when asked for it by name, from this app or from the command line. Pins created elsewhere keep their own type; this app skips them on update anyway.
 
 **Right click a row** in Updates or Installed → *Pin highlighted* or *Remove pin from highlighted*. It works on the highlighted rows, not the ticked ones, and the entries say so. A pinned package shows a pin icon and is skipped by updates, including *Select all*. It can still be uninstalled: a pin blocks upgrades, not removal.
 

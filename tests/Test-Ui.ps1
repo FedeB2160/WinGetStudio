@@ -707,7 +707,9 @@ $descrizioni = @($AboutTable.Children | Where-Object { [System.Windows.Controls.
 if ($descrizioni.Count -ne $nomiFunzioni.Count) {
     throw "la tabella di About ha $($nomiFunzioni.Count) nomi e $($descrizioni.Count) descrizioni"
 }
-if ($uiTextEarly -notmatch 'Claude Code') { throw "manca la nota sullo strumento con cui e' stato scritto" }
+# Crediti degli strumenti (scelta dell'autore): sul markup SENZA commenti, perche' il commento
+# che li spiega li nomina gia' e terrebbe il controllo verde anche togliendo il testo.
+if ($uiMarkup -notmatch 'Claude Code' -or $uiMarkup -notmatch 'Codex') { throw "ABOUT non cita Claude Code e Codex" }
 if ($uiTextEarly -notmatch 'github\.com/FedeB2160"') { throw "ABOUT non dice chi ha fatto il progetto" }
 # Niente trattini lunghi nel testo a schermo: separano peggio dei due punti e lasciano un
 # segno lungo in mezzo alla riga. Sul markup SENZA COMMENTI, perche' nei commenti italiani
@@ -1115,6 +1117,145 @@ if ($uninstallSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma non h
 if ($uninstallSrc -notmatch 'MessageBoxButton\]::YesNo') { throw "la conferma non e' una scelta Yes/No" }
 "OK confirm disinstallazione dietro conferma Yes/No con default No, prima della coda"
 
+# 16b) Una lettura winget fallita resta un errore visibile, non una lista vuota; un job morto
+# non lascia la scheda bianca; i pin gia' noti sopravvivono a una lettura dei pin fallita.
+# Un .cmd temporaneo fa da winget al confine reale del processo: niente winget vero.
+$wingetReadStub = Join-Path ([IO.Path]::GetTempPath()) "wgt-read-stub-$PID.cmd"
+function Set-ReadStub([string[]]$Lines) { [IO.File]::WriteAllLines($wingetReadStub, @('@echo off') + $Lines, [Text.Encoding]::ASCII) }
+$wingetPathBefore      = $wingetPath
+$installedLoadedBefore = $script:installedLoaded
+$searchTextBefore      = $TxtSearch.Text
+$realUpgradesFn        = ${function:Get-WinGetUpgrades}
+$readUiFailures = New-Object System.Collections.ArrayList
+try {
+    Stop-AllJobs
+    $wingetPath = $wingetReadStub
+
+    # Ogni comando esce 1 con una riga di diagnostica su stdout, come fa winget.
+    Set-ReadStub @('echo Failed to open source: test fixture', 'exit /b 1')
+    $TxtLog.Clear()
+    Load-Upgrades
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'test errore upgrade non terminato' }
+    if ($TxtEmpty.Visibility -ne [System.Windows.Visibility]::Visible -or
+        $TxtEmpty.Text -notmatch 'winget upgrade failed \(exit 1\): Failed to open source: test fixture') {
+        [void]$readUiFailures.Add("upgrade: '$($TxtEmpty.Text)'")
+    }
+    if ($TxtLog.Text -match 'No updates available\.') { [void]$readUiFailures.Add('upgrade mostrato come lista vuota') }
+
+    $TxtLog.Clear()
+    Load-Installed
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'test errore inventario non terminato' }
+    if ($TxtInstalledEmpty.Visibility -ne [System.Windows.Visibility]::Visible -or
+        $TxtInstalledEmpty.Text -notmatch 'winget list failed \(exit 1\)') {
+        [void]$readUiFailures.Add("installed: '$($TxtInstalledEmpty.Text)'")
+    }
+    if ($TxtLog.Text -match 'No installed package found\.') { [void]$readUiFailures.Add('inventario mostrato come vuoto') }
+
+    $script:searchTimer.Stop(); $script:searchInFlight = 0
+    $TxtSearch.Text = 'wgt-failure-fixture'
+    $script:searchTimer.Stop()
+    Start-Search $false
+    if (-not (Wait-For { $script:searchInFlight -eq 0 } 30)) { throw 'test errore ricerca non terminato' }
+    if ($TxtSearchEmpty.Text -notmatch "winget search 'wgt-failure-fixture' failed \(exit 1\)") {
+        [void]$readUiFailures.Add("search: '$($TxtSearchEmpty.Text)'")
+    }
+
+    # Store che non risponde: winget avvisa, poi esce "nessuna corrispondenza". L'avviso deve
+    # restare a schermo, altrimenti sembra che il pacchetto non esista.
+    Set-ReadStub @('echo Failed when searching source; results will not be included: msstore',
+                   'echo No package found matching input criteria.', 'exit /b -1978335212')
+    $TxtSearch.Text = 'wgt-store-fixture'
+    $script:searchTimer.Stop()
+    Start-Search $true
+    if (-not (Wait-For { $script:searchInFlight -eq 0 } 30)) { throw 'test ricerca Store non terminato' }
+    if ($TxtSearchEmpty.Text -notmatch "No package matches 'wgt-store-fixture'" -or $TxtSearchEmpty.Text -notmatch 'msstore') {
+        [void]$readUiFailures.Add("store: '$($TxtSearchEmpty.Text)'")
+    }
+
+    # Store che non risponde ma la sorgente winget trova qualcosa: exit 0 e una tabella, con
+    # l'avviso sopra. La griglia si riempie, e l'avviso deve finire nel log.
+    Set-ReadStub @('echo Failed when searching source; results will not be included: msstore',
+                   'echo Name     Id       Version',
+                   'echo -------------------------',
+                   'echo Only One Only.One 1.0',
+                   'exit /b 0')
+    $TxtSearch.Text = 'wgt-store-rows-fixture'
+    $script:searchTimer.Stop()
+    $TxtLog.Clear()
+    Start-Search $true
+    if (-not (Wait-For { $script:searchInFlight -eq 0 } 30)) { throw 'test ricerca Store con righe non terminato' }
+    if ($searchItems.Count -ne 1 -or $TxtLog.Text -notmatch 'msstore') {
+        [void]$readUiFailures.Add("store con righe: $($searchItems.Count) righe, log '$($TxtLog.Text.Trim())'")
+    }
+
+    # Job morto (qui il lettore scrive un errore e non restituisce nulla): messaggio a schermo
+    # e causa nel log, non una scheda bianca.
+    ${function:Get-WinGetUpgrades} = { Write-Error 'job fixture failure' }
+    $TxtLog.Clear()
+    Load-Upgrades
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'test job morto non terminato' }
+    if ($TxtEmpty.Visibility -ne [System.Windows.Visibility]::Visible -or $TxtEmpty.Text -notmatch 'did not complete') {
+        [void]$readUiFailures.Add("job morto: '$($TxtEmpty.Text)'")
+    }
+    if ($TxtLog.Text -notmatch 'ERROR in background job: job fixture failure') { [void]$readUiFailures.Add('errore del job assente dal log') }
+    ${function:Get-WinGetUpgrades} = $realUpgradesFn
+
+    # Pin: una lettura fallita non azzera i flag noti...
+    $pinnedUpdate    = [WgtRow]@{ Name = 'Pinned update fixture';    Id = 'WgtStudio.PinnedUpdateFixture' }
+    $pinnedInstalled = [WgtRow]@{ Name = 'Pinned installed fixture'; Id = 'WgtStudio.PinnedInstalledFixture' }
+    $items.Clear(); $installedItems.Clear()
+    $items.Add($pinnedUpdate); $installedItems.Add($pinnedInstalled)
+    Set-PinFlags @($pinnedUpdate.Id, $pinnedInstalled.Id)
+    Set-ReadStub @('echo Failed to open source: test fixture', 'exit /b 1')
+    $TxtLog.Clear()
+    Update-PinFlags
+    if (-not (Wait-For { $script:jobs.Count -eq 0 } 30)) { throw 'test errore pin non terminato' }
+    if (-not $pinnedUpdate.Pinned -or -not $pinnedInstalled.Pinned) { [void]$readUiFailures.Add('lettura pin fallita ha azzerato i flag') }
+    if ($TxtLog.Text -notmatch 'winget pin list failed \(exit 1\)') { [void]$readUiFailures.Add('errore pin assente dal log') }
+
+    # ...nemmeno sulle righe NUOVE create da due refresh di fila con lettura pin fallita.
+    Set-ReadStub @(
+        'if "%~1"=="pin" exit /b 1',
+        'echo Name               Id                                Version Available',
+        'echo --------------------------------------------------------------------',
+        'echo Pinned update      WgtStudio.PinnedUpdateFixture     1.0     2.0',
+        'echo Pinned installed   WgtStudio.PinnedInstalledFixture  1.0     2.0',
+        'exit /b 0')
+    foreach ($refresh in 1..2) {
+        Load-Upgrades
+        if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'refresh upgrade fixture non terminato' }
+        Load-Installed
+        if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'refresh installed fixture non terminato' }
+        foreach ($rows in @(@($items), @($installedItems))) {
+            if ($rows.Count -ne 2 -or @($rows | Where-Object { -not $_.Pinned }).Count) {
+                [void]$readUiFailures.Add("refresh $refresh perde i pin sulle righe nuove")
+            }
+        }
+    }
+    # Una lettura RIUSCITA e vuota invece li toglie.
+    Set-PinFlags @()
+    if (@(@($items) + @($installedItems) | Where-Object { $_.Pinned }).Count) { [void]$readUiFailures.Add('lettura pin vuota non toglie i flag') }
+
+    if ($readUiFailures.Count) { throw "letture winget gestite male dalla UI: $($readUiFailures -join '; ')" }
+    "OK readerr errori di lettura visibili, Store segnalato, job morto spiegato, pin conservati"
+}
+finally {
+    ${function:Get-WinGetUpgrades} = $realUpgradesFn
+    Stop-AllJobs
+    $wingetPath = $wingetPathBefore
+    $script:installedLoaded = $installedLoadedBefore
+    $TxtSearch.Text = $searchTextBefore
+    $script:searchTimer.Stop()
+    $items.Clear(); $installedItems.Clear()
+    Set-PinFlags @()
+    Remove-Item -LiteralPath $wingetReadStub -Force -ErrorAction SilentlyContinue
+}
+
+# I pin dell'app sono Blocking: un pin normale winget lo salta solo con upgrade --all, e questa
+# app aggiorna con upgrade --id, dove lo ignora (UpdateFlow.cpp: includePinned = m_isSinglePackage).
+if ((Get-FunctionSource 'Set-PackagePin') -notmatch "'add --blocking'") { throw "i pin dell'app non sono blocking" }
+"OK pinblk  i pin aggiunti dall'app sono blocking"
+
 # 17) Elenco installati e filtro locale. Il caricamento vero solo con -Live; il filtro si
 # prova sempre, su righe finte: non deve dipendere da cosa e' installato sulla macchina.
 if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
@@ -1235,6 +1376,36 @@ if ($importSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma di impor
 if ((Get-FunctionSource 'Invoke-PackageImport') -notmatch '--ignore-unavailable') {
     throw "manca --ignore-unavailable: un solo pacchetto non piu' pubblicato farebbe fallire tutto l'import"
 }
+# Il conteggio legge la forma Sources[] -> Packages[] e basta: lo schema completo lo valida
+# winget all'import. Un file vuoto o non valido si ferma PRIMA della conferma.
+$rejectPos = $importSrc.IndexOf('if (-not $count)')
+if ($rejectPos -lt 0 -or $rejectPos -gt $importSrc.IndexOf('Confirm import')) { throw "un file vuoto o non valido arriva alla conferma dell'import" }
+$importFixtures = @(
+    @{ Name = 'one-package';        Json = '{"Sources":[{"Packages":[{"PackageIdentifier":"FedeB2160.WinGetStudio"}]}]}'; Count = 1 }
+    @{ Name = 'two-sources';        Json = '{"Sources":[{"Packages":[{"PackageIdentifier":"A.A"}]},{"Packages":[{"PackageIdentifier":"B.B"},{"PackageIdentifier":"C.C"}]}]}'; Count = 3 }
+    @{ Name = 'empty-packages';     Json = '{"Sources":[{"Packages":[]}]}'; Count = 0 }
+    @{ Name = 'empty-sources';      Json = '{"Sources":[]}'; Count = 0 }
+    @{ Name = 'root-array';         Json = '[{"Sources":[{"Packages":[{"PackageIdentifier":"A.A"}]}]}]'; Count = $null }
+    @{ Name = 'malformed-json';     Json = '{"Sources":['; Count = $null }
+    @{ Name = 'missing-sources';    Json = '{"hello":"world"}'; Count = $null }
+    @{ Name = 'sources-not-array';  Json = '{"Sources":{}}'; Count = $null }
+    @{ Name = 'missing-packages';   Json = '{"Sources":[{}]}'; Count = $null }
+    @{ Name = 'packages-not-array'; Json = '{"Sources":[{"Packages":{"PackageIdentifier":"A.A"}}]}'; Count = $null }
+    @{ Name = 'brackets [x]';       Json = '{"Sources":[{"Packages":[{"PackageIdentifier":"A.A"}]}]}'; Count = 1 }
+)
+$importFailures = New-Object System.Collections.ArrayList
+foreach ($fx in $importFixtures) {
+    $path = Join-Path ([IO.Path]::GetTempPath()) "wgt-import-$PID-$($fx.Name).json"
+    try {
+        [IO.File]::WriteAllText($path, $fx.Json)
+        $actual = Get-ImportPackageCount $path
+        if ($actual -ne $fx.Count) { [void]$importFailures.Add("$($fx.Name) -> '$actual', atteso '$($fx.Count)'") }
+    }
+    finally { [IO.File]::Delete($path) }
+}
+if ($null -ne (Get-ImportPackageCount (Join-Path ([IO.Path]::GetTempPath()) "manca-$PID.json"))) { [void]$importFailures.Add('file inesistente accettato') }
+if ($importFailures.Count) { throw "conteggio dei file di import: $($importFailures -join '; ')" }
+"OK import  forma Sources/Packages, vuoti e malformati riconosciuti, nomi con [ ]"
 
 if (-not $realWinget) {
     "SKIP export  senza -Live o winget non presente"
@@ -1247,15 +1418,7 @@ else {
         if (-not (Test-Path $expFile)) { throw "l'export non ha scritto il file" }
         $n = Get-ImportPackageCount $expFile
         if ($null -eq $n -or $n -le 0) { throw "il file esportato non contiene pacchetti leggibili (conteggio: $n)" }
-
-        # Un file che non e' un export winget deve essere riconosciuto PRIMA di lanciare
-        # winget, altrimenti l'utente vedrebbe un errore incomprensibile.
-        $bad = Join-Path ([IO.Path]::GetTempPath()) "wgt-test-bad-$PID.json"
-        '{ "hello": "world" }' | Set-Content $bad -Encoding UTF8
-        if ($null -ne (Get-ImportPackageCount $bad)) { throw "un JSON senza Sources viene accettato come lista pacchetti" }
-        if ($null -ne (Get-ImportPackageCount (Join-Path ([IO.Path]::GetTempPath()) "manca-$PID.json"))) { throw "un file inesistente viene accettato" }
-        Remove-Item $bad -Force -ErrorAction SilentlyContinue
-        "OK export  export reale di $n pacchetti, file non validi riconosciuti"
+        "OK export  export reale di $n pacchetti"
     }
     finally {
         Remove-Item $expFile -Force -ErrorAction SilentlyContinue
