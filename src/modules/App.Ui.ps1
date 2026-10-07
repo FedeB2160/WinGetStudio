@@ -13,6 +13,15 @@ function Write-Log([string]$msg) {
     $TxtLog.ScrollToEnd()
 }
 
+# Messaggio per una lettura winget fallita, su UNA riga (log e riquadri vuoti): exit e le
+# ultime due righe significative, dove winget mette la causa. Stessa regola della coda.
+function Format-WinGetReadError([string]$Command, $Result) {
+    $message = "winget $Command failed (exit $($Result.ExitCode))"
+    $detail  = @(Get-WinGetOutputTail $Result.Output 2) -join ' '
+    if ($detail) { $message += ": $detail" }
+    return $message
+}
+
 # ------------------------------------------------------------------
 # STATO "OCCUPATO" GLOBALE
 # ------------------------------------------------------------------

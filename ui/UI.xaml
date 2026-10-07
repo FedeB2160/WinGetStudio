@@ -1031,6 +1031,7 @@
                                    Text="No updates available."
                                    FontSize="16" Foreground="{DynamicResource SubtleFgBrush}"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   TextWrapping="Wrap" TextAlignment="Center"
                                    Visibility="Collapsed"/>
 
                         <!-- Action bar: selezione + aggiorna + conteggio selezionati -->

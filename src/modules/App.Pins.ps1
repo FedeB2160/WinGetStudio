@@ -12,14 +12,28 @@
 # Segna quali righe hanno un pin. $PinIds arriva da Get-WinGetPins.
 # Riguarda entrambe le griglie: lo stesso pacchetto puo' essere elencato in Updates e in
 # Installed, e il pin e' lo stesso.
+# L'ultima lista di pin letta con successo: la riapplica Set-PinFlagsFromRead quando una
+# lettura fallisce.
+$script:lastPinIds = @()
 function Set-PinFlags([string[]]$PinIds) {
     $pins = @($PinIds)
+    $script:lastPinIds = $pins
     foreach ($row in @($items) + @($installedItems)) {
         $row.Pinned = ($pins -contains $row.Id)
     }
     # I pinnati non sono selezionabili: i contatori vanno ricalcolati.
     Refresh-SelectionState
     Refresh-InstalledState
+}
+
+# Applica l'esito di Get-WinGetPins: la lista nuova se la lettura e' riuscita, altrimenti
+# l'ultima buona (e l'errore nel log). Le righe appena create da un refresh nascono senza
+# flag: mostrarle "senza pin" sarebbe un'affermazione che winget non ha fatto.
+# $Read $null = job morto: il perche' l'ha gia' scritto Start-BackgroundJob.
+function Set-PinFlagsFromRead($Read) {
+    if ($Read.Success) { Set-PinFlags @($Read.Rows); return }
+    if ($Read) { Write-Log (Format-WinGetReadError 'pin list' $Read) }
+    Set-PinFlags $script:lastPinIds
 }
 
 # Rilegge i pin da winget e riallinea i flag. E' l'ULTIMO passo di un'operazione sui pin,
@@ -30,12 +44,12 @@ function Set-PinFlags([string[]]$PinIds) {
 # Rilegge invece di dare per buono l'esito: un pin aggiunto da riga di comando deve
 # comparire comunque, ed e' winget la fonte di verita'.
 function Update-PinFlags {
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetPins' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetPins' `
         -Vars @{ wingetPath = $wingetPath } `
         -Script { Get-WinGetPins } `
         -OnDone {
             param($result)
-            Set-PinFlags @($result)
+            Set-PinFlagsFromRead (@($result)[0])
             Set-AppBusy $false
         })
 }

@@ -79,10 +79,10 @@ function Start-Search([bool]$IncludeStore = $false) {
     # ORA nel campo e, se l'utente ha continuato a digitare, il risultato vecchio si
     # butta. Senza questo, due ricerche che rientrano fuori ordine lascerebbero in
     # griglia i risultati della query precedente.
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetSearch' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetSearch' `
         -Vars @{ q = $q; store = $IncludeStore; wingetPath = $wingetPath } `
         -Script {
-            [PSCustomObject]@{ Query = $q; Rows = @(Get-WinGetSearch $q $store) }
+            [PSCustomObject]@{ Query = $q; Search = Get-WinGetSearch $q $store }
         } `
         -OnDone {
             param($result)
@@ -99,11 +99,21 @@ function Start-Search([bool]$IncludeStore = $false) {
             # sparire dalla griglia proprio i pacchetti in corso, con il loro esito.
             if ($script:isBusy) { return }
 
+            if (-not $r.Search.Success) {
+                # Solo a schermo, non nel log: mentre si digita ogni pausa aggiungerebbe una riga uguale.
+                Show-SearchMessage (Format-WinGetReadError "search '$($r.Query)'" $r.Search)
+                return
+            }
             $searchItems.Clear()
-            foreach ($p in $r.Rows) { if ($p) { $searchItems.Add($p) } }
+            foreach ($p in $r.Search.Rows) { if ($p) { $searchItems.Add($p) } }
 
             if ($searchItems.Count -eq 0) {
-                Show-SearchMessage "No package matches '$($r.Query)'."
+                $msg = "No package matches '$($r.Query)'."
+                # Uno Store che non risponde fa solo un avviso, poi winget esce "nessuna
+                # corrispondenza": l'avviso e' l'unica traccia che mancano i suoi risultati.
+                $said = @(Get-WinGetOutputTail $r.Search.Output 3)
+                if ($said.Count -gt 1) { $msg += " winget: $($said -join ' ')" }
+                Show-SearchMessage $msg
             }
             else {
                 $TxtSearchEmpty.Visibility = [System.Windows.Visibility]::Collapsed

@@ -71,9 +71,7 @@ function Invoke-PackageExport([string]$file) {
             }
             else {
                 Write-Log "Export FAILED (exit $($r.Code))."
-                foreach ($l in @($r.Output -split "`r`n|`n" | Where-Object { $_.Trim() } | Select-Object -Last 2)) {
-                    Write-Log "   $($l.Trim())"
-                }
+                foreach ($l in (Get-WinGetOutputTail $r.Output 2)) { Write-Log "   $l" }
             }
             Set-AppBusy $false
         })
@@ -145,9 +143,7 @@ function Invoke-PackageImport([string]$file, [int]$count) {
                 'warning' { Write-Log "Import finished with warnings (exit $($r.Code)): a reboot may be required." }
                 default {
                     Write-Log "Import FAILED (exit $($r.Code))."
-                    foreach ($l in @($r.Output -split "`r`n|`n" | Where-Object { $_.Trim() } | Select-Object -Last 3)) {
-                        Write-Log "   $($l.Trim())"
-                    }
+                    foreach ($l in (Get-WinGetOutputTail $r.Output 3)) { Write-Log "   $l" }
                 }
             }
             Write-Log "Press Refresh to rebuild the installed list."

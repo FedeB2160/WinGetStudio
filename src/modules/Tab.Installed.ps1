@@ -78,12 +78,12 @@ function Load-Installed {
 
     # I pin si leggono nello STESSO job dell'inventario: due winget in parallelo si
     # contendono lo store e uno dei due esce in errore.
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Get-WinGetInstalled', 'Get-WinGetPins' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetInstalled', 'Get-WinGetPins' `
         -Vars @{ wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{
-                Rows = @(Get-WinGetInstalled)
-                Pins = @(Get-WinGetPins)
+                Installed = Get-WinGetInstalled
+                Pins      = Get-WinGetPins
             }
         } `
         -OnDone {
@@ -91,19 +91,23 @@ function Load-Installed {
             $InstalledSpinner.Visibility = [System.Windows.Visibility]::Collapsed
             $Progress.IsIndeterminate    = $false
             $r = @($result)[0]
-            if ($r) { foreach ($p in $r.Rows) { if ($p) { $installedItems.Add($p) } } }
+            $read = if ($r) { $r.Installed }
+            if ($read.Success) { foreach ($p in $read.Rows) { if ($p) { $installedItems.Add($p) } } }
 
             if ($installedItems.Count -eq 0) {
-                $TxtInstalledEmpty.Text       = "No installed package found."
+                # Lista vuota, winget fallito, job morto: tre messaggi diversi.
+                $TxtInstalledEmpty.Text = if ($read.Success) { 'No installed package found.' }
+                                          elseif ($read)     { Format-WinGetReadError 'list' $read }
+                                          else               { 'The package list did not load: see the log, then press Refresh.' }
                 $TxtInstalledEmpty.Visibility = [System.Windows.Visibility]::Visible
-                Write-Log "No installed package found."
+                Write-Log $TxtInstalledEmpty.Text
             }
             else {
                 $TxtInstalledEmpty.Visibility = [System.Windows.Visibility]::Collapsed
                 $GridInstalled.Visibility     = [System.Windows.Visibility]::Visible
                 Write-Log "Found $($installedItems.Count) installed packages."
             }
-            if ($r) { Set-PinFlags @($r.Pins) }
+            Set-PinFlagsFromRead $(if ($r) { $r.Pins })
             Set-AppBusy $false
         })
 }

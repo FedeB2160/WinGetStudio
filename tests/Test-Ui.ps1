@@ -1111,6 +1111,124 @@ if ($uninstallSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma non h
 if ($uninstallSrc -notmatch 'MessageBoxButton\]::YesNo') { throw "la conferma non e' una scelta Yes/No" }
 "OK confirm disinstallazione dietro conferma Yes/No con default No, prima della coda"
 
+# 16b) Una lettura winget fallita resta un errore visibile, non una lista vuota; un job morto
+# non lascia la scheda bianca; i pin gia' noti sopravvivono a una lettura dei pin fallita.
+# Un .cmd temporaneo fa da winget al confine reale del processo: niente winget vero.
+$wingetReadStub = Join-Path ([IO.Path]::GetTempPath()) "wgt-read-stub-$PID.cmd"
+function Set-ReadStub([string[]]$Lines) { [IO.File]::WriteAllLines($wingetReadStub, @('@echo off') + $Lines, [Text.Encoding]::ASCII) }
+$wingetPathBefore      = $wingetPath
+$installedLoadedBefore = $script:installedLoaded
+$searchTextBefore      = $TxtSearch.Text
+$realUpgradesFn        = ${function:Get-WinGetUpgrades}
+$readUiFailures = New-Object System.Collections.ArrayList
+try {
+    Stop-AllJobs
+    $wingetPath = $wingetReadStub
+
+    # Ogni comando esce 1 con una riga di diagnostica su stdout, come fa winget.
+    Set-ReadStub @('echo Failed to open source: test fixture', 'exit /b 1')
+    $TxtLog.Clear()
+    Load-Upgrades
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'test errore upgrade non terminato' }
+    if ($TxtEmpty.Visibility -ne [System.Windows.Visibility]::Visible -or
+        $TxtEmpty.Text -notmatch 'winget upgrade failed \(exit 1\): Failed to open source: test fixture') {
+        [void]$readUiFailures.Add("upgrade: '$($TxtEmpty.Text)'")
+    }
+    if ($TxtLog.Text -match 'No updates available\.') { [void]$readUiFailures.Add('upgrade mostrato come lista vuota') }
+
+    $TxtLog.Clear()
+    Load-Installed
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'test errore inventario non terminato' }
+    if ($TxtInstalledEmpty.Visibility -ne [System.Windows.Visibility]::Visible -or
+        $TxtInstalledEmpty.Text -notmatch 'winget list failed \(exit 1\)') {
+        [void]$readUiFailures.Add("installed: '$($TxtInstalledEmpty.Text)'")
+    }
+    if ($TxtLog.Text -match 'No installed package found\.') { [void]$readUiFailures.Add('inventario mostrato come vuoto') }
+
+    $script:searchTimer.Stop(); $script:searchInFlight = 0
+    $TxtSearch.Text = 'wgt-failure-fixture'
+    $script:searchTimer.Stop()
+    Start-Search $false
+    if (-not (Wait-For { $script:searchInFlight -eq 0 } 30)) { throw 'test errore ricerca non terminato' }
+    if ($TxtSearchEmpty.Text -notmatch "winget search 'wgt-failure-fixture' failed \(exit 1\)") {
+        [void]$readUiFailures.Add("search: '$($TxtSearchEmpty.Text)'")
+    }
+
+    # Store che non risponde: winget avvisa, poi esce "nessuna corrispondenza". L'avviso deve
+    # restare a schermo, altrimenti sembra che il pacchetto non esista.
+    Set-ReadStub @('echo Failed when searching source; results will not be included: msstore',
+                   'echo No package found matching input criteria.', 'exit /b -1978335212')
+    $TxtSearch.Text = 'wgt-store-fixture'
+    $script:searchTimer.Stop()
+    Start-Search $true
+    if (-not (Wait-For { $script:searchInFlight -eq 0 } 30)) { throw 'test ricerca Store non terminato' }
+    if ($TxtSearchEmpty.Text -notmatch "No package matches 'wgt-store-fixture'" -or $TxtSearchEmpty.Text -notmatch 'msstore') {
+        [void]$readUiFailures.Add("store: '$($TxtSearchEmpty.Text)'")
+    }
+
+    # Job morto (qui il lettore scrive un errore e non restituisce nulla): messaggio a schermo
+    # e causa nel log, non una scheda bianca.
+    ${function:Get-WinGetUpgrades} = { Write-Error 'job fixture failure' }
+    $TxtLog.Clear()
+    Load-Upgrades
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'test job morto non terminato' }
+    if ($TxtEmpty.Visibility -ne [System.Windows.Visibility]::Visible -or $TxtEmpty.Text -notmatch 'did not complete') {
+        [void]$readUiFailures.Add("job morto: '$($TxtEmpty.Text)'")
+    }
+    if ($TxtLog.Text -notmatch 'ERROR in background job: job fixture failure') { [void]$readUiFailures.Add('errore del job assente dal log') }
+    ${function:Get-WinGetUpgrades} = $realUpgradesFn
+
+    # Pin: una lettura fallita non azzera i flag noti...
+    $pinnedUpdate    = [WgtRow]@{ Name = 'Pinned update fixture';    Id = 'WgtStudio.PinnedUpdateFixture' }
+    $pinnedInstalled = [WgtRow]@{ Name = 'Pinned installed fixture'; Id = 'WgtStudio.PinnedInstalledFixture' }
+    $items.Clear(); $installedItems.Clear()
+    $items.Add($pinnedUpdate); $installedItems.Add($pinnedInstalled)
+    Set-PinFlags @($pinnedUpdate.Id, $pinnedInstalled.Id)
+    Set-ReadStub @('echo Failed to open source: test fixture', 'exit /b 1')
+    $TxtLog.Clear()
+    Update-PinFlags
+    if (-not (Wait-For { $script:jobs.Count -eq 0 } 30)) { throw 'test errore pin non terminato' }
+    if (-not $pinnedUpdate.Pinned -or -not $pinnedInstalled.Pinned) { [void]$readUiFailures.Add('lettura pin fallita ha azzerato i flag') }
+    if ($TxtLog.Text -notmatch 'winget pin list failed \(exit 1\)') { [void]$readUiFailures.Add('errore pin assente dal log') }
+
+    # ...nemmeno sulle righe NUOVE create da due refresh di fila con lettura pin fallita.
+    Set-ReadStub @(
+        'if "%~1"=="pin" exit /b 1',
+        'echo Name               Id                                Version Available',
+        'echo --------------------------------------------------------------------',
+        'echo Pinned update      WgtStudio.PinnedUpdateFixture     1.0     2.0',
+        'echo Pinned installed   WgtStudio.PinnedInstalledFixture  1.0     2.0',
+        'exit /b 0')
+    foreach ($refresh in 1..2) {
+        Load-Upgrades
+        if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'refresh upgrade fixture non terminato' }
+        Load-Installed
+        if (-not (Wait-For { -not $script:isBusy } 30)) { throw 'refresh installed fixture non terminato' }
+        foreach ($rows in @(@($items), @($installedItems))) {
+            if ($rows.Count -ne 2 -or @($rows | Where-Object { -not $_.Pinned }).Count) {
+                [void]$readUiFailures.Add("refresh $refresh perde i pin sulle righe nuove")
+            }
+        }
+    }
+    # Una lettura RIUSCITA e vuota invece li toglie.
+    Set-PinFlags @()
+    if (@(@($items) + @($installedItems) | Where-Object { $_.Pinned }).Count) { [void]$readUiFailures.Add('lettura pin vuota non toglie i flag') }
+
+    if ($readUiFailures.Count) { throw "letture winget gestite male dalla UI: $($readUiFailures -join '; ')" }
+    "OK readerr errori di lettura visibili, Store segnalato, job morto spiegato, pin conservati"
+}
+finally {
+    ${function:Get-WinGetUpgrades} = $realUpgradesFn
+    Stop-AllJobs
+    $wingetPath = $wingetPathBefore
+    $script:installedLoaded = $installedLoadedBefore
+    $TxtSearch.Text = $searchTextBefore
+    $script:searchTimer.Stop()
+    $items.Clear(); $installedItems.Clear()
+    Set-PinFlags @()
+    Remove-Item -LiteralPath $wingetReadStub -Force -ErrorAction SilentlyContinue
+}
+
 # 17) Elenco installati e filtro locale. Il caricamento vero solo con -Live; il filtro si
 # prova sempre, su righe finte: non deve dipendere da cosa e' installato sulla macchina.
 if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
