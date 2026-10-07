@@ -29,8 +29,9 @@
 # l'elenco dei pin risultava sempre vuoto. Con -MaxColumns 3 le colonne oltre la terza
 # non vengono ne' estratte ne' controllate.
 function Get-WinGetTable([string]$raw, [int]$MaxColumns = 0) {
-    # Normalizza in righe; winget usa \r di progresso -> tieni solo l'ultimo segmento
-    $lines = $raw -split "`r`n|`n" | ForEach-Object { ($_ -split "`r")[-1] }
+    # Normalizza in righe; winget usa \r di progresso -> tieni solo l'ultimo segmento.
+    # @(): con una riga sola la pipeline torna una STRINGA, e $lines[$i] darebbe caratteri.
+    $lines = @($raw -split "`r`n|`n" | ForEach-Object { ($_ -split "`r")[-1] })
 
     # Estrae in sicurezza una sottostringa [start, end) gestendo righe corte.
     # $end -lt 0 significa "fino a fine riga" (ultima colonna).
@@ -121,15 +122,36 @@ function Get-WinGetTable([string]$raw, [int]$MaxColumns = 0) {
 # NON "& winget": quella forma risolve il NOME a ogni chiamata, quindi dipende dal PATH e
 # dall'alias di esecuzione app, che sotto un account elevato diverso da quello interattivo
 # possono non esserci.
-# -Width alto: senza console (exe -noConsole) o con finestra stretta Out-String manderebbe
-# a capo le righe alla larghezza dell'host, spezzando la tabella.
+# Process.Start e non "& winget | Out-String": winget scrive sempre UTF-8 (Core.cpp), mentre
+# PowerShell decodifica l'output nativo con la code page della console. Nell'exe -noConsole il
+# primo job dopo l'avvio non ha ancora una console, il setter UTF-8 del prologo fallisce e la
+# prima scansione usciva in cp1252 ("Ã¨"). Qui la decodifica e' UTF-8 sempre, console o no.
 # Non Invoke-WinGet: quella passa per cmd, e il testo di una ricerca lo scrive l'utente in un
-# processo elevato. Qui gli argomenti restano un array.
+# processo elevato. Qui nessuna shell: gli argomenti si quotano per CreateProcess (\" dentro le
+# virgolette, backslash raddoppiati prima di un apice) e winget riceve esattamente l'array.
+# Si legge stderr in parallelo a stdout: leggerli uno dopo l'altro puo' bloccarsi se il
+# buffer dell'altro si riempie.
 function Invoke-WinGetRead([string[]]$Arguments, [int]$MaxColumns = 0) {
     $raw = ''
     try {
-        $raw = & $wingetPath @Arguments 2>&1 | Out-String -Width 4096
-        $exitCode = [int]$LASTEXITCODE
+        $quoted = foreach ($a in $Arguments) {
+            if ($a -match '^[\w.\-:/\\=]+$') { $a }
+            else { '"' + (($a -replace '(\\*)"', '$1$1\"') -replace '(\\+)$', '$1$1') + '"' }
+        }
+        $psi = New-Object Diagnostics.ProcessStartInfo
+        $psi.FileName               = $wingetPath
+        $psi.Arguments              = $quoted -join ' '
+        $psi.UseShellExecute        = $false
+        $psi.CreateNoWindow         = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError  = $true
+        $psi.StandardOutputEncoding = [Text.Encoding]::UTF8
+        $psi.StandardErrorEncoding  = [Text.Encoding]::UTF8
+        $p = [Diagnostics.Process]::Start($psi)
+        $err = $p.StandardError.ReadToEndAsync()
+        $raw = $p.StandardOutput.ReadToEnd() + $err.Result
+        $p.WaitForExit()
+        $exitCode = $p.ExitCode
     }
     catch {
         $raw = $_.Exception.Message

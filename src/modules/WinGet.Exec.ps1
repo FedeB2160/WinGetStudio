@@ -37,6 +37,17 @@ function Get-UpdateStatus([int]$code) {
     # ponytail: lista codici benigni tunabile; se ne emergono altri, aggiungere qui.
 }
 
+# Rimuove i file di output di Invoke-WinGet rimasti in %TEMP%. Invoke-WinGet li cancella da
+# sola, ma un installer che lascia un processo figlio staccato li tiene aperti in quel momento
+# e la cancellazione fallisce: senza questa pulizia all'avvio si accumulavano. Best effort: un
+# file ancora in uso resta per il giro dopo. .NET e non Remove-Item, che su un %TEMP% in forma
+# 8.3 (profilo col punto nel nome) puo' non risolvere il percorso.
+function Clear-WinGetTempFiles {
+    foreach ($f in [IO.Directory]::GetFiles([IO.Path]::GetTempPath(), 'wgt_*')) {
+        try { [IO.File]::Delete($f) } catch { }
+    }
+}
+
 # Ultime righe significative di un output winget, per log e messaggi: la causa di un errore
 # sta in fondo (quando un installer fallisce winget stampa il percorso del suo log DOPO il
 # messaggio, quindi l'ultima riga da sola non basta). Dei segmenti di avanzamento separati

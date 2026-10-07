@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Package names and winget messages with accented letters are no longer garbled on the first scan after launch.
+- Temporary output files left in `%TEMP%` by installers that keep running in the background are removed at the next launch.
+
 ## v1.10.2
 
 Fixes, plus one change to what a pin means. Coming from v1.10.1: download the new exe and delete the old one, or let the app update itself from **Settings** — installed with winget, use `winget upgrade FedeB2160.WinGetStudio`.
