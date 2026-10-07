@@ -393,6 +393,13 @@ if ($mv.Groups[1].Value -notmatch '^\d+\.\d+\.\d+$') { throw "versione non x.y.z
 if ($code -notmatch 'TxtVersion\.Text\s*=.*\$AppVersion') { throw "la versione non finisce nella scheda Settings" }
 $buildText = Get-Content (Join-Path $root 'src\build.ps1') -Raw -Encoding UTF8
 if ($buildText -notmatch '(?m)^\s*version\s*=\s*\$version') { throw "build.ps1 non passa la versione a ps2exe" }
+# L'ultima voce RILASCIATA del changelog deve essere $AppVersion: le righe in lavorazione
+# stanno sotto "## Unreleased", che qui non conta. Versione alzata senza la sua voce (o voce
+# scritta senza alzare la versione) = un rilascio che il self-update confronterebbe male.
+$lastEntry = [regex]::Match((Get-Content (Join-Path $root 'CHANGELOG.md') -Raw -Encoding UTF8), '(?m)^## v(\d+\.\d+\.\d+)')
+if ($lastEntry.Groups[1].Value -ne $mv.Groups[1].Value) {
+    throw "CHANGELOG: ultima voce v$($lastEntry.Groups[1].Value), `$AppVersion $($mv.Groups[1].Value)"
+}
 "OK ver    versione $($mv.Groups[1].Value) nel titolo e nelle proprieta' dell'exe"
 
 # 12) L'app si monta davvero? Carica i moduli come fa main.ps1 e chiama Start-App

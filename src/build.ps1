@@ -6,12 +6,16 @@
 # per distribuire l'exe vecchio credendolo nuovo.
 $ErrorActionPreference = 'Stop'
 
-# Installa ps2exe una sola volta (salta se gia' presente)
-if (-not (Get-Module -ListAvailable -Name ps2exe)) {
-    Write-Host "Installazione modulo ps2exe..." -ForegroundColor Cyan
-    Install-Module ps2exe -Scope CurrentUser -Force
+# ps2exe a una versione FISSA, la stessa della CI: con "qualunque versione installata" un exe
+# di rilascio poteva uscire da un compilatore diverso da quello verificato.
+# TLS 1.2: PowerShell 5.1 parte ancora da TLS 1.0, e la PowerShell Gallery lo rifiuta.
+$ps2exeVersion = '1.0.18'
+if (-not (Get-Module -ListAvailable -Name ps2exe | Where-Object { $_.Version -eq $ps2exeVersion })) {
+    Write-Host "Installazione modulo ps2exe $ps2exeVersion..." -ForegroundColor Cyan
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Install-Module ps2exe -RequiredVersion $ps2exeVersion -Scope CurrentUser -Force
 }
-Import-Module ps2exe
+Import-Module ps2exe -RequiredVersion $ps2exeVersion
 
 $root = Split-Path -Parent $PSScriptRoot   # build.ps1 sta in src\
 $src  = Join-Path $PSScriptRoot 'main.ps1'
@@ -87,6 +91,12 @@ finally { Remove-Item -LiteralPath $src -Force -ErrorAction SilentlyContinue }
 # il messaggio finale direbbe "Fatto" anche con l'exe vecchio ancora sul disco.
 if (-not (Test-Path $out) -or (Get-Item $out).LastWriteTimeUtc -le $before) {
     throw "Compilazione fallita: $out non e' stato aggiornato."
+}
+# Le proprieta' dell'exe devono riportare $AppVersion (scheda Dettagli): prima lo verificava
+# solo la CI, e una build locale poteva uscire sbagliata senza che nessuno lo vedesse.
+$vi = (Get-Item $out).VersionInfo
+if ([version]$vi.FileVersion -ne [version]$version -or [version]$vi.ProductVersion -ne [version]$version) {
+    throw "Versione dell'exe $($vi.FileVersion)/$($vi.ProductVersion), attesa $version"
 }
 
 # ------------------------------------------------------------------

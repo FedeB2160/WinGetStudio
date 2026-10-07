@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Development: the UI test suite runs offline by default; `-Live` opts into real winget calls and never touches an existing pin.
+- Development: the build pins ps2exe 1.0.18 and checks the exe version; the UI suite checks that the newest changelog entry matches `$AppVersion`.
 
 ## v1.10.1
 
