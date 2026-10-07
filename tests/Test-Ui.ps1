@@ -1467,6 +1467,23 @@ if (Test-NewerVersion '1.6.0' '1.6.0')          { throw "la stessa versione non 
 if (Test-NewerVersion '1.5.0' '1.6.0')          { throw "una versione precedente non e' un aggiornamento" }
 if (Test-NewerVersion 'nightly' '1.6.0')        { throw "un tag non numerico non deve proporre nulla" }
 
+# Canale d'installazione: deciso da percorso dell'exe e InstallLocation della voce _is1,
+# passati come parametri (nessun registro nel test). Maiuscole e "\" finale non contano.
+$il = 'C:\Program Files (x86)\WinGet Studio\'
+$channelCases = @(
+    @{ Exe = $null;                                              Loc = $il;  Want = 'source' }
+    @{ Exe = 'C:\Users\x\AppData\Local\Microsoft\WinGet\Packages\FedeB2160.WinGetStudio_Microsoft.Winget.Source_8wekyb3d8bbwe\WinGetStudio.exe'; Loc = $il; Want = 'winget-portable' }
+    @{ Exe = 'C:\Program Files (x86)\WinGet Studio\WinGetStudio.exe'; Loc = $il;  Want = 'installed' }
+    @{ Exe = 'C:\PROGRAM FILES (X86)\WINGET STUDIO\WinGetStudio.exe'; Loc = 'C:\Program Files (x86)\WinGet Studio'; Want = 'installed' }
+    @{ Exe = 'D:\Tools\WinGetStudio.exe';                        Loc = $il;  Want = 'portable' }
+    @{ Exe = 'D:\Tools\WinGetStudio.exe';                        Loc = $null; Want = 'portable' }
+)
+foreach ($c in $channelCases) {
+    $got = Get-InstallChannel -ExePath $c.Exe -InstallLocation $c.Loc
+    if ($got -ne $c.Want) { throw "Get-InstallChannel '$($c.Exe)' / '$($c.Loc)': '$got', atteso '$($c.Want)'" }
+}
+"OK channel i quattro canali d'installazione riconosciuti"
+
 # Il download e' l'unico punto in cui il programma ESEGUE codice preso da internet:
 # la conferma deve precederlo e il checksum deve essere confrontato.
 $updSrc = Get-FunctionSource 'Start-SelfUpdate'

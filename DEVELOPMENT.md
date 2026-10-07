@@ -190,6 +190,17 @@ The decision stands until #2299 closes, or until moving to a real installer type
 
 `Test-IsWinGetPortable` in `App.Update.ps1` is the guard: if the running exe sits under `\Microsoft\WinGet\Packages\`, `Start-UpdateCheck` never shows the update button and says `winget upgrade FedeB2160.WinGetStudio` instead, and `Start-SelfUpdate` returns without touching anything. Path matching, not a registry lookup — the path *is* what winget guarantees about a portable install, and the check has to run on the UI thread at every check. Recovering a machine already in that state means `winget uninstall --force`, then removing the package directory, the `Links` alias and the `HKCU` uninstall key by hand, then installing again from an elevated prompt.
 
+Since the installer (1.11.0) that guard is one case of `Get-InstallChannel`, which tells four kinds of copy apart, each with its own way of updating:
+
+| Channel | How it is recognised | How it updates |
+|---|---|---|
+| `source` | no running exe: `main.ps1` from a checkout | not at all; use git |
+| `winget-portable` | exe under `\Microsoft\WinGet\Packages\` | only `winget upgrade FedeB2160.WinGetStudio` |
+| `installed` | exe folder equals `InstallLocation` of `HKLM\...\Uninstall\{80A0A054-...}_is1`, ignoring case and a trailing `\` | downloads `WinGetStudio_Setup.exe` and runs it silently |
+| `portable` | anything else | downloads `WinGetStudio.exe`, renames itself, restarts |
+
+The `installed` test compares folders rather than asking "is there an uninstall entry": a portable copy on a machine that also has the setup installed is still portable, and must not run the setup over a different folder.
+
 **Once the package is in the repository**, WinGet Studio will appear in its own Updates tab. Upgrading it from there cannot work — the file is in use — so it needs excluding from that list, or routing to the self-update path, which does the rename dance.
 
 ## Tests

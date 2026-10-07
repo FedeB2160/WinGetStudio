@@ -21,6 +21,12 @@ $UpdateRepo = 'FedeB2160/WinGetStudio'
 # nelle impostazioni, che si rinomina e riavvia.
 $SelfPackageId = 'FedeB2160.WinGetStudio'
 
+# Identita' dell'installer (installer\WinGetStudio.iss): la voce di disinstallazione e'
+# HKLM\...\Uninstall\<AppId>_is1. L'app e' x86, quindi Windows rimanda la lettura a
+# WOW6432Node, dove scrive un installer x86: nessun caso speciale.
+$InnoAppId      = '{80A0A054-6278-4145-AD5A-2B3C4853019F}'
+$SetupAssetName = 'WinGetStudio_Setup.exe'
+
 function Test-IsSelfPackage($row) {
     if ($null -eq $row -or -not $row.Id) { return $false }
     # Confronto per CONTENUTO e non per uguaglianza: installato dal catalogo l'ID e'
@@ -92,8 +98,27 @@ function Get-RunningExePath {
 # Risultato: l'app non si avvia piu' e non si reinstalla. In questo caso l'aggiornamento
 # spetta a winget, non a noi.
 function Test-IsWinGetPortable {
-    $exe = Get-RunningExePath
-    return [bool]($exe -and $exe -like '*\Microsoft\WinGet\Packages\*')
+    return (Get-InstallChannel) -eq 'winget-portable'
+}
+
+# Cartella in cui l'installer ha messo l'app, o $null se non e' installata.
+function Get-InstalledLocation {
+    $key = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($InnoAppId)_is1"
+    try { return (Get-ItemProperty -LiteralPath $key -ErrorAction Stop).InstallLocation } catch { return $null }
+}
+
+# Come e' arrivata qui questa copia, quindi come si aggiorna:
+#   source          da .ps1: niente auto-update, si usa git
+#   winget-portable pacchetto portable di winget: si aggiorna solo con winget
+#   installed       installata col setup (a mano o da winget): si aggiorna col setup
+#   portable        exe copiato a mano: si rinomina e si sostituisce
+# Parametri con i valori veri come default: il test passa percorsi finti.
+function Get-InstallChannel([string]$ExePath = (Get-RunningExePath), [string]$InstallLocation = (Get-InstalledLocation)) {
+    if (-not $ExePath) { return 'source' }
+    if ($ExePath -like '*\Microsoft\WinGet\Packages\*') { return 'winget-portable' }
+    if ($InstallLocation -and
+        [IO.Path]::GetDirectoryName($ExePath).TrimEnd('\') -ieq $InstallLocation.TrimEnd('\')) { return 'installed' }
+    return 'portable'
 }
 
 # Rimuove il ".old" lasciato dall'aggiornamento precedente. Best effort: se il file e'
