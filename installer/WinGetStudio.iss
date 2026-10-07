@@ -45,8 +45,10 @@ Name: "{autoprograms}\WinGet Studio"; Filename: "{app}\WinGetStudio.exe"
 Name: "{autodesktop}\WinGet Studio"; Filename: "{app}\WinGetStudio.exe"; Tasks: desktopicon
 
 [Run]
-; Installazione a mano: casella "Launch" a fine wizard.
-Filename: "{app}\WinGetStudio.exe"; Description: "{cm:LaunchProgram,WinGet Studio}"; Flags: nowait postinstall skipifsilent
+; Installazione a mano: casella "Launch" a fine wizard. runascurrentuser: postinstall per
+; default parte come utente originale NON elevato, e l'exe (requireAdministrator) fallirebbe
+; con errore 740.
+Filename: "{app}\WinGetStudio.exe"; Description: "{cm:LaunchProgram,WinGet Studio}"; Flags: nowait postinstall skipifsilent runascurrentuser
 ; Aggiornamento dall'app: la riapre solo se lanciato con /relaunch=1. winget non lo passa.
 Filename: "{app}\WinGetStudio.exe"; Flags: nowait; Check: ShouldRelaunch
 

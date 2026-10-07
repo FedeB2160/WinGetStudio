@@ -19,7 +19,7 @@ The starting point was a spec written with Codex (`docs/superpowers/specs/2026-1
 | --- | --- |
 | Artifacts | `WinGetStudio.exe` (portable, unchanged, kept for good) and `WinGetStudio_Setup.exe` (Inno) in every release |
 | Installer tool | Inno Setup 6 (installed locally; 6.7.3 on winget and Chocolatey) |
-| Scope | Machine only, `PrivilegesRequired=admin`, `{autopf}\WinGet Studio` (Program Files (x86): the ps2exe exe is x86) |
+| Scope | Machine only, `PrivilegesRequired=admin`, `{autopf}\WinGet Studio` (Program Files (x86): the Inno setup is x86) |
 | AppId | `{80A0A054-6278-4145-AD5A-2B3C4853019F}`, never to change |
 | Shortcuts | Start menu always; desktop as an installer task, unchecked by default |
 | Uninstall | Removes program and shortcuts; **keeps** `HKCU\Software\WinGetStudio` |
@@ -56,7 +56,7 @@ Checked in this order:
 | `installed` | exe folder equals `InstallLocation` of `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{AppId}_is1` | through the setup (section 4) |
 | `portable` | anything else | rename and restart, as today |
 
-The app is x86, so Windows redirects the `HKLM\SOFTWARE` read to `WOW6432Node`, where an x86 installer writes. The function takes the exe path and the install location as parameters, defaulting to the real values, so the test can cover the four channels without touching the registry.
+The x86 setup writes that key in the 32-bit view (`WOW6432Node`), but the ps2exe exe is AnyCPU and runs as a 64-bit process, whose `HKLM:\SOFTWARE` reads the 64-bit view. The function therefore opens the `Registry32` view explicitly. The first version relied on a redirection that never happens; the final review caught it. The function takes the exe path and the install location as parameters, defaulting to the real values, so the test can cover the four channels without touching the registry.
 
 ### 4. Update flow
 

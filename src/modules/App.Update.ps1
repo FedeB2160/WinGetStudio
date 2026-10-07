@@ -22,8 +22,7 @@ $UpdateRepo = 'FedeB2160/WinGetStudio'
 $SelfPackageId = 'FedeB2160.WinGetStudio'
 
 # Identita' dell'installer (installer\WinGetStudio.iss): la voce di disinstallazione e'
-# HKLM\...\Uninstall\<AppId>_is1. L'app e' x86, quindi Windows rimanda la lettura a
-# WOW6432Node, dove scrive un installer x86: nessun caso speciale.
+# HKLM\...\Uninstall\<AppId>_is1, nella vista a 32 bit (WOW6432Node) perche' il setup e' x86.
 $InnoAppId      = '{80A0A054-6278-4145-AD5A-2B3C4853019F}'
 $SetupAssetName = 'WinGetStudio_Setup.exe'
 
@@ -101,9 +100,17 @@ function Test-IsWinGetPortable {
 }
 
 # Cartella in cui l'installer ha messo l'app, o $null se non e' installata.
+# Vista Registry32 esplicita: l'exe di ps2exe e' AnyCPU e gira a 64 bit, quindi HKLM:\ leggerebbe
+# la vista a 64 bit, dove la voce del setup x86 non c'e'; la copia installata si crederebbe
+# portable e si sostituirebbe da sola. Registry32 va bene anche da un processo a 32 bit.
 function Get-InstalledLocation {
-    $key = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($InnoAppId)_is1"
-    try { return (Get-ItemProperty -LiteralPath $key -ErrorAction Stop).InstallLocation } catch { return $null }
+    try {
+        $hklm = [Microsoft.Win32.RegistryKey]::OpenBaseKey('LocalMachine', 'Registry32')
+        $k = $hklm.OpenSubKey("SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$($InnoAppId)_is1")
+        if (-not $k) { return $null }
+        try { return $k.GetValue('InstallLocation') } finally { $k.Close(); $hklm.Close() }
+    }
+    catch { return $null }
 }
 
 # Come e' arrivata qui questa copia, quindi come si aggiorna:

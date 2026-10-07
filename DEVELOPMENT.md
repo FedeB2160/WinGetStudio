@@ -203,10 +203,10 @@ Since the installer (1.11.0) that guard is one case of `Get-InstallChannel`, whi
 |---|---|---|
 | `source` | no running exe: `main.ps1` from a checkout | not at all; use git |
 | `winget-portable` | exe under `\Microsoft\WinGet\Packages\` | only `winget upgrade FedeB2160.WinGetStudio` |
-| `installed` | exe folder equals `InstallLocation` of `HKLM\...\Uninstall\{80A0A054-...}_is1`, ignoring case and a trailing `\` | downloads `WinGetStudio_Setup.exe` and runs it silently |
+| `installed` | exe folder equals `InstallLocation` of `HKLM\...\Uninstall\{80A0A054-...}_is1` in the **32-bit** registry view, ignoring case and a trailing `\` | downloads `WinGetStudio_Setup.exe` and runs it silently |
 | `portable` | anything else | downloads `WinGetStudio.exe`, renames itself, restarts |
 
-The `installed` test compares folders rather than asking "is there an uninstall entry": a portable copy on a machine that also has the setup installed is still portable, and must not run the setup over a different folder.
+The `installed` test compares folders rather than asking "is there an uninstall entry": a portable copy on a machine that also has the setup installed is still portable, and must not run the setup over a different folder. The 32-bit view is opened explicitly (`Registry32`): the setup is x86, but the ps2exe exe is AnyCPU and runs 64-bit, so a plain `HKLM:\` read looks in the 64-bit view, never finds the key, and the installed copy would replace itself as if it were portable.
 
 **Once the package is in the repository**, WinGet Studio will appear in its own Updates tab. Upgrading it from there cannot work — the file is in use — so it needs excluding from that list, or routing to the self-update path, which does the rename dance.
 

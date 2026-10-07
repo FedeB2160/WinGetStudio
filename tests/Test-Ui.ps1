@@ -258,7 +258,10 @@ $iss = Get-Content -LiteralPath $issPath -Raw
 foreach ($needle in 'AppId={{80A0A054-6278-4145-AD5A-2B3C4853019F}', 'PrivilegesRequired=admin',
                     'DefaultDirName={autopf}\WinGet Studio', 'OutputBaseFilename=WinGetStudio_Setup',
                     '{autoprograms}\WinGet Studio', 'Flags: unchecked', 'CloseApplications=yes',
-                    'SignedUninstaller=yes', 'Check: ShouldRelaunch', "{param:relaunch|0}") {
+                    'SignedUninstaller=yes', 'Check: ShouldRelaunch', "{param:relaunch|0}",
+                    # postinstall parte da utente originale NON elevato: l'exe (requireAdministrator)
+                    # fallirebbe con errore 740.
+                    'postinstall skipifsilent runascurrentuser') {
     if (-not $iss.Contains($needle)) { throw "WinGetStudio.iss: manca '$needle'" }
 }
 if ($iss -match 'HKCU\\Software\\WinGetStudio|\[UninstallDelete\]') { throw "la disinstallazione non deve toccare le preferenze" }
@@ -1486,6 +1489,10 @@ foreach ($c in $channelCases) {
     $got = Get-InstallChannel -ExePath $c.Exe -InstallLocation $c.Loc
     if ($got -ne $c.Want) { throw "Get-InstallChannel '$($c.Exe)' / '$($c.Loc)': '$got', atteso '$($c.Want)'" }
 }
+# L'exe di ps2exe e' AnyCPU, quindi a 64 bit su Windows a 64 bit; il setup Inno e' x86 e
+# scrive la voce _is1 nella vista a 32 bit (WOW6432Node). Senza Registry32 esplicito la
+# copia installata si crede portable e si sostituisce da sola in Program Files.
+if ((Get-FunctionSource 'Get-InstalledLocation') -notmatch 'Registry32') { throw "Get-InstalledLocation non legge la vista a 32 bit del registro" }
 "OK channel i quattro canali d'installazione riconosciuti"
 
 # Asset scelto per NOME: GitHub elenca per nome, e qui il setup arriva per primo apposta.
