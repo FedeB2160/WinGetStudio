@@ -38,10 +38,11 @@ ui\    UI.xaml                  window: layout and styles
        Theme.Dark.xaml          dark palette
 assets\icon.ico                 app icon (embedded in the exe)
        WinGetStudio-codesign.cer  public signing certificate (no private key)
-tests\ Test-Ui.ps1              headless check of code, XAML, themes and startup
+tests\ Test-Ui.ps1              hidden WPF run of the app; offline unless -Live
        Test-InvokeWinGet.ps1    winget execution and table parsing
 dist\  WinGetStudio.exe         build output (signed, gitignored)
 winget\<version>\               winget-pkgs manifests, one folder per published version
+.github\workflows\ci.yml        Windows CI: both suites offline, then the build
 graphify-out\                   knowledge graph (report, graph.json and graph.html committed)
 ```
 
@@ -88,7 +89,7 @@ It replaces `###MODULES###` with the concatenated modules and the `###UI.xaml###
 `build.ps1` signs the exe after compiling, choosing the certificate in this order:
 
 1. `$env:WINGETSTUDIO_CERT_THUMBPRINT` — set this to switch to a company or commercial certificate without editing the build;
-2. otherwise the first valid code-signing certificate with a private key in `Cert:\CurrentUser\My`.
+2. otherwise the certificate in `Cert:\CurrentUser\My` whose thumbprint matches `assets\WinGetStudio-codesign.cer`, valid and with its private key. Any other code-signing certificate is ignored, even one with the same subject.
 
 If it finds none the build **still succeeds**, printing a warning that the exe is unsigned — signing needs a private key that not every machine has.
 
@@ -133,7 +134,7 @@ The discipline that goes with it:
 
 - One branch for the whole plan, `feature/vX.Y.Z`, with `main` left on what is published.
 - **One commit per task**, not per step. Each carries the code, the tests, the `README.md` and `DEVELOPMENT.md` lines that task invalidates, and one line under `## Unreleased` in the changelog. Documentation and code do not travel separately: a README describing yesterday's button is worse than no README.
-- **Both suites green before every commit.** There is no CI, so this gate is manual and it is the only one there is.
+- **Both suites green before every commit.** The Windows CI repeats them on every pull request, but offline: the live run (`-Live`) stays a manual gate before a release.
 - Push after each commit. If the session dies, the work is already out.
 - At release time the accumulated `## Unreleased` lines are promoted into the narrative entry for the version, rather than written from memory at the end.
 
@@ -190,9 +191,13 @@ The decision stands until #2299 closes, or until moving to a real installer type
 ```powershell
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
+# live: real winget reads/export, the GitHub API, one pin cycle on 7zip.7zip
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 ```
 
-`Test-InvokeWinGet.ps1` needs no admin rights and installs nothing. `Test-Ui.ps1` opens no windows, but it does touch winget for real in read-only ways (search, list, export) and runs one full pin cycle on `7zip.7zip`, removing the pin in a `finally` so a mid-test failure cannot leave a package silently blocked.
+`Test-InvokeWinGet.ps1` needs no admin rights, installs nothing, and calls `winget --version` only when winget exists. `Test-Ui.ps1` mounts the real app in a hidden WPF window and **runs offline by default**. `-Live` adds real search, list and export, the GitHub release check, and one pin cycle on `7zip.7zip` — only when it is installed and not already pinned. The pin it creates is removed in a `finally` that first waits for the queue's winget to exit.
+
+The Windows CI (`.github/workflows/ci.yml`, GitHub-hosted `windows-2022`) runs both suites offline on every pull request and push to `main`, then builds the exe and uploads it as an unsigned test artifact for seven days. Actions are pinned to commit SHAs, the token is read-only, and no signing key ever reaches CI.
 
 **`Test-Ui.ps1`** checks that every file parses, that no module is missing from (or orphaned by) `$moduleNames`, that `UI.xaml` provides every control the code asks for, that both themes define the same keys, that every `DynamicResource` resolves, that column headers are non-empty, uppercase and centred, that every `&#x....;` glyph exists in both system icon fonts, and that the two grid-freeze regressions have not come back. Four checks are worth knowing about, because they catch what static analysis cannot:
 
@@ -250,6 +255,8 @@ Things that look odd until you know why. Most of them are bugs that were paid fo
 
 ### Running winget
 
+- **Reads return a result, not a list.** `Invoke-WinGetRead` runs search/list/upgrade/pin list and returns `Success`, `Rows`, `ExitCode`, `Output`; tables are parsed only on exit 0, so a failing winget can no longer pass for an empty list. The one non-zero exit that is a valid result — `0x8A150014`, no match — is mapped in `Get-WinGetSearch`, the only reader that can get it. Messages use the last two meaningful lines (`Get-WinGetOutputTail`), the queue's rule. A failed pin read re-applies the last good list, because rows a refresh just created start unpinned. A job's error stream is logged: a non-terminating error used to leave the job empty and the log silent.
+- **Pins are blocking.** A default *Pinning* pin only keeps a package out of `upgrade --all`; an explicit `upgrade --id` — the way this app upgrades — ignores it (`UpdateFlow.cpp`: `includePinned = m_isSinglePackage || ...`). So the app adds pins with `--blocking`, which winget enforces on every upgrade path. The row's `Pinned` flag still keeps CLI-made pins out of the queue.
 - winget is launched with its output redirected to a file and the wait bound to the process exit, not to the pipe: child installers that inherit stdout can no longer block the wait indefinitely. `--disable-interactivity` matters because without a console (`-noConsole`) a prompt would hang forever. The process is started with `Process.Start` (with `cmd` doing the redirect) rather than `Start-Process -PassThru`, whose `Process` object loses `ExitCode` when the process exits before the native handle is cached — an empty `ExitCode` casts to `0`, which would paint a failure green.
 - The output file is read back as **UTF-8**: winget writes UTF-8, while `Get-Content` on PowerShell 5.1 assumes the system ANSI codepage, which turned localized messages into mojibake.
 - **Never two winget processes at once.** Reading the pins used to run *after* the busy state was released, so a click on Update in that window ran a second winget and one of the two failed with exit 1. The scans read the pins inside the same job, and after a pin/unpin the busy state is released by the pin re-read, which is the last step. Busy state is global: each tab registers a handler with `Set-AppBusy`.

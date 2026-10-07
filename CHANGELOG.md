@@ -1,5 +1,25 @@
 # Changelog
 
+## v1.10.2
+
+Fixes, plus one change to what a pin means. Coming from v1.10.1: download the new exe and delete the old one, or let the app update itself from **Settings** — installed with winget, use `winget upgrade FedeB2160.WinGetStudio`.
+
+### A winget failure is no longer an empty list
+
+When winget itself failed — a source that would not open, a broken index — the app read its silence as "nothing here": **No updates available**, **No installed package found**, **No package matches**. Each of those now shows winget's own reason instead, in the place the list would be. A search with **MS Store** ticked, while the Store does not answer, says so rather than pretending the package does not exist, and a scan that fails inside the app shows a message instead of an empty tab.
+
+### Pins hold against explicit upgrades
+
+A pin made from the app is now a *blocking* pin. The default kind only keeps a package out of `winget upgrade --all`; upgrading it by name — which is how this app updates a package — went straight through it. A blocking pin is refused on every path, from this app or from the command line, until it is removed. Pins you already have keep their type.
+
+### Import
+
+A package list whose file name contains `[` or `]` was rejected as "not a winget package list"; it is read correctly now. A list with no packages in it is refused before the confirmation, instead of asking to install zero packages.
+
+### Also
+
+**About** credits Codex (OpenAI) alongside Claude Code (Anthropic). The project now has a Windows CI that runs both test suites and the build on every pull request; the UI suite runs offline by default and reaches winget only with `-Live`.
+
 ## v1.10.1
 
 Fixes only, all of them found in 1.10.0. Coming from v1.10.0: download the new exe and delete the old one, or let the app update itself from **Settings** — unless you installed it with winget, in which case read the first entry.

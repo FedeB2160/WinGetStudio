@@ -112,9 +112,12 @@ if (-not ('WgtRow' -as [type])) {
 # ancora un COMANDO, dove una funzione vince sull'eseguibile. Nessuna modifica al codice di
 # produzione serve; con un percorso assoluto lo stub non verrebbe raggiunto.
 $wingetPath = 'winget'
-function winget { $fixture }
-# Get-WinGetTable serve perche' Get-WinGetUpgrades la chiama.
+# Exit code e output dello stub li decide ogni sezione: Invoke-WinGetRead legge $LASTEXITCODE.
+$stubExit = 0
+function winget { $global:LASTEXITCODE = $stubExit; $fixture }
+# Get-WinGetTable e Invoke-WinGetRead servono perche' i lettori le chiamano.
 Invoke-Expression (Get-FunctionText 'Get-WinGetTable')
+Invoke-Expression (Get-FunctionText 'Invoke-WinGetRead')
 Invoke-Expression (Get-FunctionText 'Get-WinGetUpgrades')
 
 $fixture = @'
@@ -132,7 +135,9 @@ Nome    Id              Versione Disponibile Origine
 Discord Discord.Discord 1.0.9249 1.0.9250    winget
 '@
 
-$rows = @(Get-WinGetUpgrades $true)
+$upgradeRead = Get-WinGetUpgrades $true
+$rows = @($upgradeRead.Rows)
+Check "upgrade con fixture riuscita (exit $($upgradeRead.ExitCode))" $upgradeRead.Success
 $ids  = @($rows | ForEach-Object { $_.Id })
 Check "5 pacchetti (4 + 1 a targeting esplicito), trovati $($rows.Count)" ($rows.Count -eq 5) ($ids -join ', ')
 Check "nessuna riga fantasma dall'header della 2a tabella" (@($rows | Where-Object { $_.Id -eq 'Id' -or $_.Name -eq 'Nome' }).Count -eq 0)
@@ -214,6 +219,68 @@ $prNoLimit = @(Get-WinGetTable $pinFixture)
 Check "senza -MaxColumns la tabella si perde (era il bug: $($prNoLimit.Count) righe)" ($prNoLimit.Count -lt 2)
 
 # ------------------------------------------------------------------
+Write-Host "`n6b) I lettori separano l'errore di winget dalla lista vuota" -ForegroundColor Cyan
+Invoke-Expression (Get-FunctionText 'Get-WinGetSearch')
+Invoke-Expression (Get-FunctionText 'Get-WinGetPins')
+Invoke-Expression (Get-FunctionText 'Get-WinGetInstalled')
+$readers = [ordered]@{
+    search    = { Get-WinGetSearch 'fixture' }
+    pins      = { Get-WinGetPins }
+    installed = { Get-WinGetInstalled }
+    upgrades  = { Get-WinGetUpgrades }
+}
+$stubExit = 1; $fixture = 'Failed to open source: test fixture'
+foreach ($name in $readers.Keys) {
+    $r = & $readers[$name]
+    Check "$name con exit 1: errore, codice e diagnostica, zero righe" `
+        ($r.Success -eq $false -and $r.ExitCode -eq 1 -and $r.Output -match 'test fixture' -and @($r.Rows).Count -eq 0)
+}
+# Una tabella stampata con exit non-zero non vale: le righe non si usano.
+$fixture = @'
+Name  Id      Version Available
+-------------------------------
+Foo   Foo.Foo 1.0     2.0
+'@
+$r = Get-WinGetUpgrades
+Check "tabella con exit 1: nessuna riga" (-not $r.Success -and @($r.Rows).Count -eq 0)
+# 0x8A150014 NO_APPLICATIONS_FOUND: vuoto valido per la ricerca, errore per gli altri.
+$stubExit = -1978335212; $fixture = 'Nessun pacchetto trovato con criteri di input corrispondenti.'
+$r = Get-WinGetSearch 'fixture'
+Check "search senza corrispondenze: riuscita, vuota, codice preservato" ($r.Success -and $r.ExitCode -eq $stubExit -and @($r.Rows).Count -eq 0)
+foreach ($name in 'pins', 'installed', 'upgrades') {
+    $r = & $readers[$name]
+    Check "$name con NO_APPLICATIONS_FOUND: errore, non lista vuota" (-not $r.Success)
+}
+# Exit 0 e una frase al posto della tabella (es. "Nessun PIN configurato."): vuoto valido.
+$stubExit = 0; $fixture = 'Nessun PIN configurato.'
+foreach ($name in $readers.Keys) {
+    $r = & $readers[$name]
+    Check "$name con exit 0 senza tabella: riuscita e vuota" ($r.Success -and @($r.Rows).Count -eq 0)
+}
+
+Write-Host "`n6c) Una tabella di UNA riga resta una riga" -ForegroundColor Cyan
+$fixture = @'
+Name     Id       Version
+-------------------------
+Only One Only.One 1.0
+'@
+$r = Get-WinGetSearch 'fixture'
+Check "search con una riga (Id trovato '$(@($r.Rows)[0].Id)')" (@($r.Rows).Count -eq 1 -and @($r.Rows)[0].Id -eq 'Only.One')
+$fixture = @'
+Name     Id       Version Source Pin type
+-----------------------------------------
+Only One Only.One 1.0     winget Blocking
+'@
+$r = Get-WinGetPins
+Check "pin list con una riga (trovato '$(@($r.Rows) -join ',')')" (@($r.Rows).Count -eq 1 -and @($r.Rows)[0] -eq 'Only.One')
+
+Write-Host "`n6d) Coda dell'output per log e messaggi" -ForegroundColor Cyan
+Invoke-Expression (Get-FunctionText 'Get-WinGetOutputTail')
+$tail = @(Get-WinGetOutputTail "  -`r  |`rSorgente aperta`r`n`r`nErrore X`r`nLog: C:\x.log`r`n" 2)
+Check "ultime due righe significative ($($tail -join ' | '))" ($tail.Count -eq 2 -and $tail[0] -eq 'Errore X' -and $tail[1] -eq 'Log: C:\x.log')
+$tail = @(Get-WinGetOutputTail "  -`r  |`rSolo questa`r`n" 2)
+Check "frame \r ridotti all'ultimo segmento ($($tail -join ' | '))" ($tail.Count -eq 1 -and $tail[0] -eq 'Solo questa')
+
 Write-Host "`n7) Argomenti con apici sbilanciati" -ForegroundColor Cyan
 # La riga di comando si costruisce per concatenazione e la esegue cmd: un Id che contenesse
 # un apice doppio produrrebbe un comando malformato, che cmd eseguirebbe comunque. Gli Id

@@ -37,6 +37,14 @@ function Get-UpdateStatus([int]$code) {
     # ponytail: lista codici benigni tunabile; se ne emergono altri, aggiungere qui.
 }
 
+# Ultime righe significative di un output winget, per log e messaggi: la causa di un errore
+# sta in fondo (quando un installer fallisce winget stampa il percorso del suo log DOPO il
+# messaggio, quindi l'ultima riga da sola non basta). Dei segmenti di avanzamento separati
+# da \r resta l'ultimo, come in Get-WinGetTable; le righe vuote si scartano.
+function Get-WinGetOutputTail([string]$Text, [int]$Count = 2) {
+    @($Text -split "`r`n|`n" | ForEach-Object { ($_ -split "`r")[-1].Trim() } | Where-Object { $_ } | Select-Object -Last $Count)
+}
+
 # Esegue winget e attende SOLO l'uscita del processo, catturando l'output SU FILE.
 # PERCHE' NON '& winget ... | Out-String': la pipeline ritorna all'EOF della pipe di
 # stdout, cioe' quando TUTTI i processi che possiedono quel handle lo chiudono. Gli
