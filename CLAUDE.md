@@ -13,15 +13,17 @@ powershell -ExecutionPolicy Bypass -File .\src\main.ps1
 # Build dist\WinGetStudio.exe (also: double click build.bat). Installs ps2exe if missing.
 powershell -ExecutionPolicy Bypass -File .\src\build.ps1
 
-# Tests — two standalone scripts, no framework, no runner
+# Tests — two standalone scripts, no framework, no runner. Offline by default: that is what CI runs
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
+# Real winget reads/export, the GitHub API and one pin cycle on 7zip.7zip
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 
 # winget manifests
 winget validate --manifest .\winget\1.10.1
 ```
 
-`Test-Ui.ps1` requires `-STA` (WPF), touches winget read-only, and runs one real pin cycle on `7zip.7zip`. There is no single-test selector: each script is one file of sequential assertions — comment out or run the file.
+`Test-Ui.ps1` requires `-STA` (WPF) and mounts the real app in a hidden window. Without `-Live` it touches neither winget nor the network; `-Live` adds real search/list/export and one pin cycle on `7zip.7zip` (skipped when it is not installed or already pinned). There is no single-test selector: each script is one file of sequential assertions — comment out or run the file.
 
 ## Architecture
 

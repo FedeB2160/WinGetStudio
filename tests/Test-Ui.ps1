@@ -1,11 +1,17 @@
 <#
-    Test-Ui.ps1 — controllo headless di UI e temi (non apre finestre, non tocca winget).
-    Uso: powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
+    Test-Ui.ps1 — integrazione WPF in una finestra nascosta: XAML, temi, moduli, avvio.
+    Uso: powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 [-Live]
+
+    Senza -Live non tocca winget ne' la rete: e' cio' che gira in CI. Con -Live aggiunge
+    ricerca, inventario ed export reali, la release su GitHub e un ciclo di pin su
+    7zip.7zip, solo se installato e non gia' pinnato.
 
     Serve per accorgersi subito se un ritocco a ui\*.xaml rompe qualcosa: XAML non
     valido, un x:Name rinominato, una chiave di colore presente in un tema e non
     nell'altro, un marcatore ###...### perso, un modulo che non entra nell'exe.
 #>
+param([switch]$Live)
+if ($Live) { Write-Warning "Test UI live: letture ed export winget reali, e un pin temporaneo su 7zip.7zip se installato e non pinnato." }
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 
@@ -406,7 +412,7 @@ foreach ($m in $moduleNames) { . (Join-Path $root "src\modules\$m") }
 # Deve essere il vero percorso, perche' le code (update/install/uninstall/pin) lanciano
 # $wingetPath tramite cmd: con un percorso finto cmd esce 1 con "Impossibile trovare il
 # percorso specificato" e sembrerebbe un errore di winget.
-$realWinget = (Get-Command winget -ErrorAction SilentlyContinue).Source
+$realWinget = if ($Live) { (Get-Command winget -ErrorAction SilentlyContinue).Source } else { $null }
 function Get-WinGetPath { if ($realWinget) { $realWinget } else { 'C:\winget-stub\winget.exe' } }
 $AppVersion = $mv.Groups[1].Value
 Start-App -NoShow
@@ -819,8 +825,8 @@ if ($null -ne $script:queueVerb) { throw "Set-AppBusy `$false non azzera il verb
 #      primo sia davvero partito prima di annullare, altrimenti la richiesta batte la coda e
 #      questo pezzo non verrebbe provato;
 #   4. a coda finita il pulsante torna Update ma resta bloccato, e il perche' e' a schermo.
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    "SKIP queue  winget non presente su questa macchina"
+if (-not $realWinget) {
+    "SKIP queue  senza -Live o winget non presente"
 }
 else {
     # Righe finte spuntate, e poi si chiama la funzione VERA del pulsante Update: cosi' passano
@@ -906,8 +912,8 @@ if ((Get-FunctionSource 'Load-Upgrades') -notmatch 'listStale\s*=\s*\$false') { 
 # 14) La ricerca della scheda Install: debounce, soglia dei 3 caratteri e scarto dei
 # risultati superati. E' l'unica parte della suite che chiama winget davvero, ma solo in
 # lettura e sul solo indice LOCALE (--source winget), quindi non tocca la rete.
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    "SKIP search  winget non presente su questa macchina"
+if (-not $realWinget) {
+    "SKIP search  senza -Live o winget non presente"
 }
 else {
     # Sotto i 3 caratteri non deve partire nulla: solo il messaggio guida.
@@ -1098,14 +1104,16 @@ if ($uninstallSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma non h
 if ($uninstallSrc -notmatch 'MessageBoxButton\]::YesNo') { throw "la conferma non e' una scelta Yes/No" }
 "OK confirm disinstallazione dietro conferma Yes/No con default No, prima della coda"
 
-# 17) Elenco installati e filtro locale. Tocca winget in lettura (winget list).
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    "SKIP list    winget non presente su questa macchina"
+# 17) Elenco installati e filtro locale. Il caricamento vero solo con -Live; il filtro si
+# prova sempre, su righe finte: non deve dipendere da cosa e' installato sulla macchina.
+if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
+$total = 0
+if (-not $realWinget) {
+    "SKIP list    senza -Live o winget non presente"
 }
 else {
     # Il caricamento parte da solo al PRIMO ingresso nella scheda: non si chiama la
     # funzione a mano, si cambia scheda come farebbe l'utente.
-    if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
     $TabInstalled.IsSelected = $true
     if (-not (Wait-For { $installedItems.Count -gt 0 -and -not $script:isBusy } 120)) {
         throw "aprendo la scheda Installed l'elenco non si e' caricato"
@@ -1121,38 +1129,47 @@ else {
     $GridInstalled.SelectedIndex = 0
     Start-Sleep -Milliseconds 300
     if ($script:isBusy) { throw "selezionare una riga ha riavviato il caricamento dell'elenco" }
-
-    # Il filtro nasconde righe senza toglierle dalla collezione.
-    $TxtFilter.Text = '7zip'
-    $shown = @($script:installedView).Count
-    if ($installedItems.Count -ne $total) { throw "il filtro ha rimosso righe dalla collezione invece di nasconderle" }
-    if ($shown -ge $total -or $shown -eq 0) { throw "il filtro '7zip' mostra $shown righe su $total" }
-    foreach ($r in @($script:installedView)) {
-        if ($r.Name -notlike '*7zip*' -and $r.Id -notlike '*7zip*') { throw "il filtro ha lasciato passare '$($r.Name)'" }
-    }
-
-    # PUNTO CRITICO: una riga selezionata e poi nascosta dal filtro resta in coda per la
-    # disinstallazione. Deve essere dichiarato a schermo, non solo nella conferma.
-    $victim = @($installedItems | Where-Object { $_.Name -notlike '*7zip*' -and $_.Id -notlike '*7zip*' })[0]
-    $victim.Selected = $true
-    Refresh-InstalledState
-    if ($TxtInstalledInfo.Text -notmatch 'hidden by the filter') {
-        throw "un pacchetto selezionato ma nascosto dal filtro non viene segnalato: '$($TxtInstalledInfo.Text)'"
-    }
-    $victim.Selected = $false
-    $TxtFilter.Text = ''
-    Refresh-InstalledState
     Stop-AllJobs
-    "OK list    $total pacchetti installati, filtro locale e avviso sui selezionati nascosti"
 }
 
-# 18) Ciclo completo del pin su un pacchetto reale: pin add -> winget lo elenca -> il
-# flag sulla riga si accende -> pin remove -> si spegne. E' l'unico test che MODIFICA lo
-# stato della macchina, quindi il pin viene rimosso in ogni caso dal finally, anche se
-# un'asserzione fallisce a meta'.
+$filterTag   = "WgtStudioFilterFixture$PID"
+$filterMatch = [WgtRow]@{ Name = "$filterTag matching row"; Id = "$filterTag.Match" }
+$filterMiss  = [WgtRow]@{ Name = 'Unrelated fixture row'; Id = 'WgtStudio.UnrelatedFixture' }
+$installedItems.Add($filterMatch)
+$installedItems.Add($filterMiss)
+try {
+    # Il filtro nasconde righe senza toglierle dalla collezione.
+    $TxtFilter.Text = $filterTag
+    $shown = @($script:installedView)
+    if ($shown.Count -ne 1 -or $shown[0].Id -ne $filterMatch.Id) {
+        throw "il filtro fixture mostra $($shown.Count) righe; attesa solo '$($filterMatch.Id)'"
+    }
+    if ($installedItems.Count -ne ($total + 2)) { throw "il filtro ha alterato la collezione sottostante" }
+    # PUNTO CRITICO: una riga selezionata e poi nascosta dal filtro resta in coda per la
+    # disinstallazione. Deve essere dichiarato a schermo, non solo nella conferma.
+    $filterMiss.Selected = $true
+    Refresh-InstalledState
+    if ($TxtInstalledInfo.Text -notmatch 'hidden by the filter') {
+        throw "una riga selezionata ma nascosta non viene segnalata: '$($TxtInstalledInfo.Text)'"
+    }
+    "OK list    filtro su righe fisse, collezione intatta, avviso sui selezionati nascosti"
+}
+finally {
+    $TxtFilter.Text = ''
+    $filterMiss.Selected = $false
+    [void]$installedItems.Remove($filterMatch)
+    [void]$installedItems.Remove($filterMiss)
+    Refresh-InstalledState
+}
+
+# 18) Ciclo completo del pin su un pacchetto reale (solo -Live: serve l'inventario). Un pin
+# che c'era gia' non si tocca: il test salta, e il finally toglie solo il pin creato qui.
 $pinTarget = @($installedItems | Where-Object { $_.Id -eq '7zip.7zip' })[0]
 if (-not $pinTarget) {
-    "SKIP pin     7zip.7zip non installato: nessun bersaglio sicuro per il test"
+    "SKIP pin     7zip.7zip non installato, o senza -Live: nessun bersaglio sicuro"
+}
+elseif ($pinTarget.Pinned) {
+    "SKIP pin     7zip.7zip e' gia' pinnato: lo stato dell'utente non si tocca"
 }
 else {
     try {
@@ -1177,10 +1194,15 @@ else {
         "OK pin     pin add/list/remove su 7zip.7zip, flag della riga allineato a winget"
     }
     finally {
-        # Rete di sicurezza: un pin dimenticato bloccherebbe in silenzio gli
-        # aggiornamenti di quel pacchetto.
-        [void](winget pin remove --id 7zip.7zip -e 2>&1)
         Stop-AllJobs
+        # Stop-AllJobs chiude il runspace, non il winget lanciato dalla coda: si aspetta,
+        # altrimenti il remove gira insieme a lui e uno dei due esce in errore.
+        [void](Wait-For { -not (Get-Process winget -ErrorAction SilentlyContinue) } 120)
+        [void](winget pin remove --id 7zip.7zip -e 2>&1)
+        # Avviso e non throw: un'eccezione nel finally coprirebbe l'errore vero del test.
+        if ((winget pin list 2>&1 | Out-String) -match '(?m)(^|\s)7zip\.7zip(\s|$)') {
+            Write-Warning "7zip.7zip e' rimasto pinnato: winget pin remove --id 7zip.7zip -e"
+        }
     }
 }
 
@@ -1197,8 +1219,8 @@ if ((Get-FunctionSource 'Invoke-PackageImport') -notmatch '--ignore-unavailable'
     throw "manca --ignore-unavailable: un solo pacchetto non piu' pubblicato farebbe fallire tutto l'import"
 }
 
-if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    "SKIP export  winget non presente su questa macchina"
+if (-not $realWinget) {
+    "SKIP export  senza -Live o winget non presente"
 }
 else {
     $expFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-test-export-$PID.json"
@@ -1273,9 +1295,9 @@ ${function:Get-RunningExePath} = $realExePath
 "OK winget  con l'exe dentro %LOCALAPPDATA%\Microsoft\WinGet\Packages l'auto-update sta fermo"
 
 # Chiamata reale all'API pubblica (una richiesta, limite anonimo 60/ora).
-$rel = Get-LatestRelease 'FedeB2160/WinGetStudio'
+$rel = if ($Live) { Get-LatestRelease 'FedeB2160/WinGetStudio' } else { $null }
 if (-not $rel) {
-    "SKIP rel     nessuna release con asset .exe pubblicata (o rete assente)"
+    "SKIP rel     senza -Live, nessuna release con asset .exe pubblicata o rete assente"
 }
 else {
     if ($rel.Version -notmatch '^\d+\.\d+') { throw "versione della release non numerica: '$($rel.Version)'" }

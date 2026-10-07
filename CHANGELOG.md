@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Development: the UI test suite runs offline by default; `-Live` opts into real winget calls and never touches an existing pin.
+
 ## v1.10.1
 
 Fixes only, all of them found in 1.10.0. Coming from v1.10.0: download the new exe and delete the old one, or let the app update itself from **Settings** — unless you installed it with winget, in which case read the first entry.

@@ -38,7 +38,7 @@ ui\    UI.xaml                  window: layout and styles
        Theme.Dark.xaml          dark palette
 assets\icon.ico                 app icon (embedded in the exe)
        WinGetStudio-codesign.cer  public signing certificate (no private key)
-tests\ Test-Ui.ps1              headless check of code, XAML, themes and startup
+tests\ Test-Ui.ps1              hidden WPF run of the app; offline unless -Live
        Test-InvokeWinGet.ps1    winget execution and table parsing
 dist\  WinGetStudio.exe         build output (signed, gitignored)
 winget\<version>\               winget-pkgs manifests, one folder per published version
@@ -190,9 +190,11 @@ The decision stands until #2299 closes, or until moving to a real installer type
 ```powershell
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
+# live: real winget reads/export, the GitHub API, one pin cycle on 7zip.7zip
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 ```
 
-`Test-InvokeWinGet.ps1` needs no admin rights and installs nothing. `Test-Ui.ps1` opens no windows, but it does touch winget for real in read-only ways (search, list, export) and runs one full pin cycle on `7zip.7zip`, removing the pin in a `finally` so a mid-test failure cannot leave a package silently blocked.
+`Test-InvokeWinGet.ps1` needs no admin rights, installs nothing, and calls `winget --version` only when winget exists. `Test-Ui.ps1` mounts the real app in a hidden WPF window and **runs offline by default**. `-Live` adds real search, list and export, the GitHub release check, and one pin cycle on `7zip.7zip` — only when it is installed and not already pinned. The pin it creates is removed in a `finally` that first waits for the queue's winget to exit.
 
 **`Test-Ui.ps1`** checks that every file parses, that no module is missing from (or orphaned by) `$moduleNames`, that `UI.xaml` provides every control the code asks for, that both themes define the same keys, that every `DynamicResource` resolves, that column headers are non-empty, uppercase and centred, that every `&#x....;` glyph exists in both system icon fonts, and that the two grid-freeze regressions have not come back. Four checks are worth knowing about, because they catch what static analysis cannot:
 
