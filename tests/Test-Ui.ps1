@@ -703,7 +703,9 @@ $descrizioni = @($AboutTable.Children | Where-Object { [System.Windows.Controls.
 if ($descrizioni.Count -ne $nomiFunzioni.Count) {
     throw "la tabella di About ha $($nomiFunzioni.Count) nomi e $($descrizioni.Count) descrizioni"
 }
-if ($uiTextEarly -notmatch 'Claude Code') { throw "manca la nota sullo strumento con cui e' stato scritto" }
+# Crediti degli strumenti (scelta dell'autore): sul markup SENZA commenti, perche' il commento
+# che li spiega li nomina gia' e terrebbe il controllo verde anche togliendo il testo.
+if ($uiMarkup -notmatch 'Claude Code' -or $uiMarkup -notmatch 'Codex') { throw "ABOUT non cita Claude Code e Codex" }
 if ($uiTextEarly -notmatch 'github\.com/FedeB2160"') { throw "ABOUT non dice chi ha fatto il progetto" }
 # Niente trattini lunghi nel testo a schermo: separano peggio dei due punti e lasciano un
 # segno lungo in mezzo alla riga. Sul markup SENZA COMMENTI, perche' nei commenti italiani
