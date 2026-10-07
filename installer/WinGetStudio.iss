@@ -24,6 +24,9 @@ DisableProgramGroupPage=yes
 OutputBaseFilename=WinGetStudio_Setup
 SetupIconFile=..\assets\icon.ico
 UninstallDisplayIcon={app}\WinGetStudio.exe
+; Nome in Impostazioni > App, uguale a quello del portable: il default di Inno e'
+; "WinGet Studio version X". winget correla per ProductCode (_is1), non per nome.
+UninstallDisplayName=WinGet Studio
 WizardStyle=modern
 ; Se l'app e' aperta (aggiornamento dall'app stessa) Inno la chiude prima di sostituire l'exe.
 CloseApplications=yes

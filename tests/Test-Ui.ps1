@@ -261,7 +261,9 @@ foreach ($needle in 'AppId={{80A0A054-6278-4145-AD5A-2B3C4853019F}', 'Privileges
                     'SignedUninstaller=yes', 'Check: ShouldRelaunch', "{param:relaunch|0}",
                     # postinstall parte da utente originale NON elevato: l'exe (requireAdministrator)
                     # fallirebbe con errore 740.
-                    'postinstall skipifsilent runascurrentuser') {
+                    'postinstall skipifsilent runascurrentuser',
+                    # Nome in Impostazioni > App: senza, Inno scrive "WinGet Studio version X".
+                    'UninstallDisplayName=WinGet Studio') {
     if (-not $iss.Contains($needle)) { throw "WinGetStudio.iss: manca '$needle'" }
 }
 if ($iss -match 'HKCU\\Software\\WinGetStudio|\[UninstallDelete\]') { throw "la disinstallazione non deve toccare le preferenze" }
