@@ -180,10 +180,14 @@ The local folder is therefore the source of the text, not of the submission. Aft
 
 **Notes on the manifest**
 
-- `InstallerType: portable` — the asset is a bare executable, so winget copies it and puts an alias on the PATH rather than running an installer.
-- `Architecture: x86` — that is what ps2exe produces by default; it runs on x64 through WOW64.
-- `ElevationRequirement: elevatesSelf` — the exe carries a `requireAdministrator` manifest, so *installing* needs no privileges while *running* asks for them.
-- `PortableCommandAlias` is rejected by the validator as an unknown field, so the alias is left to winget, which derives it from the file name. That alias is a symbolic link in `%LOCALAPPDATA%\Microsoft\WinGet\Links`, and creating one needs administrator rights or Developer Mode. Without either, winget still reports the alias as added but the link is not there, so testing a manifest from an ordinary prompt installs the package correctly and leaves `WinGetStudio` unknown to the shell. The sandbox the pull request runs in is elevated, so it does not see this.
+- `InstallerType: inno` since 1.11.0; up to 1.10.3 it was `portable`, a bare executable that winget copied and aliased on the PATH. The switch, rehearsed in Windows Sandbox on 2026-10-07, rests on four fields:
+  - `UpgradeBehavior: uninstallPrevious`, so the portable copy is removed before the setup runs;
+  - `AppsAndFeaturesEntries` with two entries: `{80A0A054-…}_is1` as `inno`, and the portable's uninstall key `FedeB2160.WinGetStudio_Microsoft.Winget.Source_8wekyb3d8bbwe` as `portable`. winget filters out installers whose type does not match what is installed, unless an entry here declares that type;
+  - `ProductCode` as the `_is1` key, which is how winget finds the installed copy afterwards;
+  - **no `Scope`.** On upgrade winget rejects an installer whose declared scope differs from the installed one, and a portable is installed per user, so `Scope: machine` fails with *No applicable installer found*. The setup is machine-only regardless, through `PrivilegesRequired=admin`.
+- `Architecture: x86` — the Inno setup is a 32-bit program. The exe it installs is AnyCPU and runs 64-bit on x64.
+- `ElevationRequirement: elevatesSelf` — the setup asks for elevation itself (`PrivilegesRequired=admin`), so winget needs no elevated prompt to start it.
+- `PortableCommandAlias` (portable manifests, up to 1.10.3) is rejected by the validator as an unknown field, so the alias is left to winget, which derives it from the file name. That alias is a symbolic link in `%LOCALAPPDATA%\Microsoft\WinGet\Links`, and creating one needs administrator rights or Developer Mode. Without either, winget still reports the alias as added but the link is not there, so testing a manifest from an ordinary prompt installs the package correctly and leaves `WinGetStudio` unknown to the shell. The sandbox the pull request runs in is elevated, so it does not see this.
 - `Commands` was declared in the locale manifest sent for 1.9.0 but is absent from the published 1.9.0, so it is gone from 1.10.0 too. Nothing depends on it: it only feeds searching a package by the command it provides.
 - Every value with a `:` inside must be quoted, or the YAML parser fails — `ShortDescription` is the one that bites.
 

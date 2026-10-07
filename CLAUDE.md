@@ -20,7 +20,7 @@ powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 
 # winget manifests
-winget validate --manifest .\winget\1.10.3
+winget validate --manifest .\winget\1.11.0
 ```
 
 `Test-Ui.ps1` requires `-STA` (WPF) and mounts the real app in a hidden window. Without `-Live` it touches neither winget nor the network; `-Live` adds real search/list/export and one pin cycle on `7zip.7zip` (skipped when it is not installed or already pinned). There is no single-test selector: each script is one file of sequential assertions — comment out or run the file.
