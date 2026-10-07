@@ -1,9 +1,16 @@
 # Changelog
 
-## Unreleased
+## v1.10.3
 
-- Package names and winget messages with accented letters are no longer garbled on the first scan after launch.
-- Temporary output files left in `%TEMP%` by installers that keep running in the background are removed at the next launch.
+Fixes only. Coming from v1.10.2: let the app update itself from **Settings**, or download the new exe and delete the old one — installed with winget, use `winget upgrade FedeB2160.WinGetStudio`.
+
+### Accented letters on the first scan
+
+The first list shown after launch — usually Updates — garbled every accented letter: `è` came out as `Ã¨`, in package names and, since 1.10.2, in winget's error messages too. winget always writes UTF-8, but the app let Windows decode it with the console's code page, and right after launch the app has no console yet, so the first scan was read as the old ANSI code page. Every scan after the first was correct, which is why it looked random. The app now reads winget's output as UTF-8 itself, with or without a console.
+
+### Leftover files in %TEMP%
+
+Every update, install or uninstall writes winget's output to two small files in `%TEMP%` and deletes them at the end. An installer that leaves a process running in the background keeps those files open at that moment, so they stayed behind and piled up. The app now removes them the next time it starts.
 
 ## v1.10.2
 
