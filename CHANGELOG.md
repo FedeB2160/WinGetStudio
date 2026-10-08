@@ -3,6 +3,7 @@
 ## Unreleased
 
 - When WinGet Studio itself shows up in the Updates list, the log now says to update it from the **Settings** tab; it still named the gear button removed in v1.10.0.
+- A new app icon: a cardboard package with `>_` stamped on its side and a download badge. It is drawn for every size Windows uses, from 16 to 256 px, instead of one 256 px image scaled down, so it stays sharp in the title bar, the taskbar and Explorer.
 
 ## v1.11.0
 

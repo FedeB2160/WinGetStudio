@@ -441,6 +441,16 @@ if ($lastEntry.Groups[1].Value -ne $mv.Groups[1].Value) {
 # che il .cer del repository non riconosce.
 if ($buildText -notmatch 'WinGetStudio-codesign\.cer') { throw "build.ps1 non lega la firma al certificato pubblicato" }
 
+# 11b) L'icona ha un frame per ogni dimensione che Windows chiede? Con il solo 256 (cosi'
+# fino a v1.11.0) Windows lo rimpicciolisce e a 16-48 px esce sfocata. La disegna src\icon.ps1.
+$ico = [IO.File]::ReadAllBytes((Join-Path $root 'assets\icon.ico'))
+$icoFrames = @(for ($i = 0; $i -lt [BitConverter]::ToUInt16($ico, 4); $i++) {
+    $d = $ico[6 + 16 * $i]; if ($d -eq 0) { 256 } else { [int]$d }   # nel formato .ico 0 vuol dire 256
+})
+$missing = @(16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256 | Where-Object { $_ -notin $icoFrames })
+if ($missing) { throw "assets\icon.ico senza le dimensioni $($missing -join ', '): rilanciare src\icon.ps1" }
+"OK icon   $($icoFrames.Count) dimensioni in assets\icon.ico"
+
 # 12) L'app si monta davvero? Carica i moduli come fa main.ps1 e chiama Start-App
 # -NoShow: nessuna finestra a schermo, ma finestra costruita, controlli risolti e
 # schede agganciate. E' l'unico controllo che vede gli errori di SCOPE: se un controllo
