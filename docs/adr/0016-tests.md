@@ -73,8 +73,11 @@ key ever reaches CI** (ADR 0012).
 **To watch**
 - No selector: to run part of a suite, comment out or run the file.
 - Offline CI cannot see a change in winget's output; the `-Live` run before a release is what does.
-- The full update path of the `installed` channel cannot be tested until a newer release exists
-  (ADR 0013); the installer's interactive behaviour is tested by hand in Sandbox or a VM (ADR 0014).
+- The full update path of the `installed` channel needs a published release newer than the copy under
+  test, so no suite covers it. It is tested by hand in Windows Sandbox: install a setup built with a
+  lower `$AppVersion`, let the app find the latest release, download and verify the setup, close,
+  update and reopen. Done on 2026-10-08, from a 1.10.9 test build to the published v1.11.0 (ADR 0013).
+  The installer's interactive behaviour is tested by hand the same way (ADR 0014).
 
 ## Alternatives considered
 

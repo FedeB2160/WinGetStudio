@@ -87,6 +87,11 @@ equality: from the catalogue the Id is `FedeB2160.WinGetStudio`, from a local ma
 - One button updates a portable or installed copy; nothing else to install or run.
 - A download is verified before it runs, and an installer is never run unverified.
 - A winget-owned copy is left to winget, so the package stays consistent.
+- The `installed` path was verified end to end in Windows Sandbox on 2026-10-08:
+  - a 1.10.9 test setup found v1.11.0;
+  - it downloaded `WinGetStudio_Setup.exe` to `%TEMP%\wgt_v1.11.0_WinGetStudio_Setup.exe` and verified it;
+  - it ran the setup with `/SILENT /CLOSEAPPLICATIONS /relaunch=1`;
+  - it came back as 1.11.0, with the uninstall entry at 1.11.0 and no `wgt_` file left behind.
 
 **To watch**
 - **Tag and `$AppVersion` must agree**, or the app keeps proposing an update already installed or
