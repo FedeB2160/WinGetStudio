@@ -276,6 +276,11 @@ if ($buildText2 -notmatch 'sign\.ps1') { throw "build.ps1 non firma tramite sign
 $ciText = Get-Content (Join-Path $root '.github\workflows\ci.yml') -Raw
 $devText = Get-Content (Join-Path $root 'DEVELOPMENT.md') -Raw -Encoding UTF8
 if ($ciText -notmatch 'dist/WinGetStudio_Setup\.exe' -or $ciText -notmatch 'innosetup') { throw "la CI non compila o non carica il setup" }
+# if-no-files-found scatta solo se non c'e' NESSUN file: senza un controllo esplicito, una build
+# senza ISCC (che avvisa e prosegue) lascerebbe la CI verde con il solo exe.
+if ($ciText -notmatch "(?s)Test-Path[^\r\n]*\`$f.*?'dist\\WinGetStudio_Setup\.exe'|(?s)'dist\\WinGetStudio_Setup\.exe'.*?Test-Path[^\r\n]*\`$f") {
+    throw "la CI non fallisce quando il setup manca"
+}
 if ($devText -notmatch 'gh release create[^\r\n]*WinGetStudio_Setup\.exe') { throw "la procedura di rilascio non nomina il setup" }
 "OK setup   script Inno coerente con la spec, setup elencato dopo il portable"
 
