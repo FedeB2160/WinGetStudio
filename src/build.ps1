@@ -103,8 +103,8 @@ if ([version]$vi.FileVersion -ne [version]$version -or [version]$vi.ProductVersi
 # FIRMA
 # ------------------------------------------------------------------
 # Quale certificato: prima $env:WINGETSTUDIO_CERT_THUMBPRINT (cosi' si passa a un
-# certificato aziendale o commerciale senza toccare questo file), altrimenti il primo
-# certificato di code signing valido nell'archivio personale.
+# certificato aziendale o commerciale senza toccare questo file), altrimenti SOLO il
+# certificato di assets\WinGetStudio-codesign.cer, se nell'archivio personale c'e' la sua chiave.
 # La build NON si ferma se non ne trova: l'exe esce non firmato con un avviso, perche'
 # la firma dipende da una chiave privata che non tutte le postazioni hanno.
 $signCert = $null
@@ -125,7 +125,7 @@ else {
 
 if (-not $signCert) {
     Write-Host "`nATTENZIONE: nessun certificato di code signing trovato, exe NON firmato." -ForegroundColor Yellow
-    Write-Host "  Windows mostrera' 'editore sconosciuto'. Vedi la sezione Signing del README." -ForegroundColor Yellow
+    Write-Host "  Windows mostrera' 'editore sconosciuto'. Vedi la sezione Signing di DEVELOPMENT.md." -ForegroundColor Yellow
 }
 else {
     & (Join-Path $PSScriptRoot 'sign.ps1') -Path $out -Thumbprint $signCert.Thumbprint
