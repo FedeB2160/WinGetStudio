@@ -49,6 +49,13 @@ jobs:
         run: choco install innosetup --version=6.7.1 -y --no-progress
       - name: Compile (build.ps1 installs ps2exe 1.0.18 and checks the version metadata)
         run: .\src\build.ps1
+      # if-no-files-found fails only when NO file matches: build.ps1 without ISCC warns and
+      # carries on, so a missing setup would otherwise pass with the exe alone.
+      - name: Both executables built
+        run: |
+          foreach ($f in 'dist\WinGetStudio.exe', 'dist\WinGetStudio_Setup.exe') {
+            if (-not (Test-Path -LiteralPath $f)) { throw "$f was not built" }
+          }
       - name: Upload unsigned test builds
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
