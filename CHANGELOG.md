@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- When WinGet Studio itself shows up in the Updates list, the log now says to update it from the **Settings** tab; it still named the gear button removed in v1.10.0.
+
 ## v1.11.0
 
 WinGet Studio now comes as an installer too. Coming from v1.10.3: the portable exe keeps updating itself as before; to switch to the installed form, run the setup and delete the old exe. Installed with winget, `winget upgrade FedeB2160.WinGetStudio` moves you to the installed form by itself.

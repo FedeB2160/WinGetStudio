@@ -40,7 +40,7 @@ Consequences that constrain edits:
 
 **Background work.** Runspace code cannot touch controls — every UI write goes through the `UI{}` helper (`$window.Dispatcher.Invoke`). Runspaces do not inherit functions: pass their names to `Start-BackgroundJob -Functions` and the body is recreated inside. Pass state through the job object, never a `GetNewClosure()` capture — a closure gets its own module scope where `$script:` no longer refers to the script.
 
-**Only ever one winget process at a time.** Two concurrent invocations make one fail with exit 1. Scans read pins inside the same job; after a pin/unpin the busy state is released by the pin re-read, which is the last step. Busy state is global — each tab registers a handler with `Set-AppBusy`.
+**Only ever one winget process at a time.** Two concurrent invocations make one fail with exit 1. Scans read pins inside the same job; after a pin/unpin the busy state is released by the pin re-read, which is the last step. Busy state is global — each tab registers a handler with `Register-BusyHandler`, and `Set-AppBusy` calls them all; anything about to start winget asks `Test-WinGetBusy`, which also counts searches in flight.
 
 **Grid rows are `WgtRow`**, a class compiled with `Add-Type` implementing `INotifyPropertyChanged`, not `PSCustomObject` — `NoteProperty` values do not notify WPF and forced a `$Grid.Items.Refresh()` that reset the scroll position.
 
@@ -48,11 +48,13 @@ Consequences that constrain edits:
 
 Glyphs must be written `[char]0xE706`, never `` "`u{E706}" `` — that escape needs PowerShell 6 and ps2exe targets 5.1.
 
-**[DEVELOPMENT.md](DEVELOPMENT.md) carries the full rationale** — parser quirks, WPF traps, layout choices, signing, release and winget-pkgs publishing. Read the relevant section before changing parsing, the job machinery or the themes: most of those oddities are bugs already paid for once.
+**The why lives in [docs/adr/](docs/adr/)** — one Architecture Decision Record per decision: parser quirks, the job machinery, WPF traps, themes, layout, signing, self-update, installer, winget package, tests. Read the relevant ADR before changing any of those: most of the oddities are bugs already paid for once. **[DEVELOPMENT.md](DEVELOPMENT.md) holds the procedures** — build, signing, release, winget-pkgs, tests — and an index of the ADRs.
 
 ## Conventions
 
 - **UI text and documentation in English; in-code comments in Italian.** User-facing strings live in `ui\UI.xaml` and in the `Write-Log` / `LogUI` / `MessageBox` calls under `src\modules\`.
 - Signing: `build.ps1` picks `$env:WINGETSTUDIO_CERT_THUMBPRINT` if set, else only the certificate in `Cert:\CurrentUser\My` matching `assets\WinGetStudio-codesign.cer`; it still succeeds unsigned. Never generate a replacement certificate to get a build through: without the key `build.ps1` builds unsigned, and a second key with the same subject cannot be told apart by name. Private keys (`*.pfx`, `*.p12`, `*.snk`) are gitignored — only the public `.cer` is committed.
-- `AGENTS.md` (in Italian, by choice) points Codex and similar agents to this file and DEVELOPMENT.md.
-- `graphify-out\` holds a knowledge graph of this repo; `graphify query "..."` answers *why* questions that span code, DEVELOPMENT.md and the changelog. Only `GRAPH_REPORT.md`, `graph.json`, `graph.html` and `manifest.json` are committed. The manifest is what lets a clone run `graphify --update` and re-extract just the files that changed, instead of paying for the whole corpus again.
+- A decision that shapes the architecture gets a new numbered ADR in `docs\adr\`, from `docs\adr\TEMPLATE.md`; a superseded or withdrawn ADR is kept and its number never reused.
+- A spec in `docs\superpowers\specs\` is deleted once implemented, after its decisions have been moved into an ADR.
+- `AGENTS.md` (in Italian, by choice) points Codex and similar agents to this file, DEVELOPMENT.md and docs\adr.
+- `graphify-out\` holds a knowledge graph of this repo; `graphify query "..."` answers *why* questions that span code, the ADRs, DEVELOPMENT.md and the changelog. Only `GRAPH_REPORT.md`, `graph.json`, `graph.html` and `manifest.json` are committed. The manifest is what lets a clone run `graphify --update` and re-extract just the files that changed, instead of paying for the whole corpus again.

@@ -1,6 +1,6 @@
 # Development
 
-Everything a change to this codebase needs: layout, build, tests, and the decisions that are not obvious from the code. For what the app does and how to use it, see [README.md](README.md).
+Everything a change to this codebase needs to get done: layout, build, signing, release, tests. *Why* things are built the way they are is recorded in the Architecture Decision Records under [docs/adr/](docs/adr/) — see [Decisions](#decisions). For what the app does and how to use it, see [README.md](README.md).
 
 The **UI and the documentation are in English**; the in-code comments are in Italian. User-facing strings live in `ui\UI.xaml` (labels, column headers) and in the `Write-Log` / `LogUI` / `MessageBox` calls under `src\modules\`.
 
@@ -43,28 +43,22 @@ assets\icon.ico                 app icon (embedded in the exe)
 tests\ Test-Ui.ps1              hidden WPF run of the app; offline unless -Live
        Test-InvokeWinGet.ps1    winget execution and table parsing
 dist\  WinGetStudio.exe         build output (signed, gitignored)
+       WinGetStudio_Setup.exe   installer, when Inno Setup 6 is installed
+docs\adr\                       Architecture Decision Records (the why)
 winget\<version>\               winget-pkgs manifests, one folder per published version
 .github\workflows\ci.yml        Windows CI: both suites offline, then the build
-graphify-out\                   knowledge graph (report, graph.json and graph.html committed)
+graphify-out\                   knowledge graph (report, graph.json, graph.html and manifest.json committed)
 ```
 
-`src\main.ps1` holds no logic: it elevates, loads the modules and calls `Start-App`. It exists as a separate file because ps2exe takes a single input file and the self-elevation has to run before anything else.
-
-### How the modules reach the exe
-
-ps2exe compiles **one** file, so `build.ps1` concatenates the modules in place of the `###MODULES###` marker in `main.ps1`. That marker is a **PowerShell comment line**: run as a `.ps1` it stays harmless and the modules are dot-sourced from disk instead, so you can edit one module and relaunch without recompiling. The module list is *not* duplicated in `build.ps1` — it is read from the `$moduleNames` array in `main.ps1` with a regex, so a new module cannot silently be left out of the exe.
-
-Dot-sourcing creates no scope of its own, so the modules see each other's variables exactly as they do when concatenated. `Start-App` assigns the controls with `$script:` for the same reason: a plain `$Grid = ...` inside a function would be local, and every module reading `$Grid` would get `$null`.
-
-The three `.xaml` files are **not** a runtime requirement either: `build.ps1` injects them the same way, and the exe stays a single file you can copy to another machine on its own. If a `.xaml` file *is* present on disk it wins over the embedded copy. Lookup order: `..\ui\<file>`, `<exe folder>\ui\<file>`, `<exe folder>\<file>`.
+`src\main.ps1` holds no logic, and the exe is built from the modules as a single file (→ [ADR 0001](docs/adr/0001-one-exe-built-from-modules.md)). Add a new module to the `$moduleNames` array in `main.ps1`, or it is not in the exe; `Test-Ui.ps1` fails on a module missing from, or orphaned by, that array.
 
 ## Version
 
 The version lives in **one** place, the `$AppVersion` constant at the top of `src\main.ps1`. From there it reaches:
-- the **settings screen** (`Installed version`);
-- the **exe properties** (right click → Properties → Details): `build.ps1` reads the constant with a regex and passes it to ps2exe, so the two can never disagree. A missing or renamed constant fails the build instead of producing an unversioned exe.
+- the **Settings tab** (`Installed version`);
+- the **exe properties** (right click → Properties → Details) and the setup's: `build.ps1` reads the constant with a regex and passes it on. A missing or renamed constant fails the build instead of producing an unversioned exe.
 
-Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still found, that it is `x.y.z`, that it reaches the settings screen and that `build.ps1` still forwards it.
+Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still found, that it is `x.y.z`, that it reaches the Settings tab, that `build.ps1` still forwards it, and that the last `## v` entry of the changelog matches it. The git tag must match it too (→ [ADR 0013](docs/adr/0013-self-update.md)).
 
 ## Running from source
 
@@ -72,7 +66,7 @@ Bump it there and rebuild — `Test-Ui.ps1` checks that the constant is still fo
 powershell -ExecutionPolicy Bypass -File .\src\main.ps1
 ```
 
-The UAC prompt appears first, then the window. Self-update is disabled in this mode (there is no exe to replace).
+The UAC prompt appears first, then the window. Self-update is disabled in this mode (there is no exe to replace). Modules and XAML are read from disk, so an edit needs only a relaunch.
 
 ## Compiling
 
@@ -82,11 +76,11 @@ Double click **`build.bat`**, or:
 powershell -ExecutionPolicy Bypass -File .\src\build.ps1
 ```
 
-Needs the **ps2exe** module (`Install-Module ps2exe -Scope CurrentUser`); the build installs it if missing.
+Needs the **ps2exe** module at version **1.0.18**, the same as CI; the build installs it if missing.
 
-It replaces `###MODULES###` with the concatenated modules and the `###UI.xaml###`, `###Theme.Light.xaml###`, `###Theme.Dark.xaml###` markers with the file contents — modules first, since the XAML markers live inside `App.Bootstrap.ps1` — writes a temporary source to `%TEMP%` and hands that to ps2exe (`-requireAdmin` → UAC manifest, `-noConsole` → WPF window only, `-iconFile` → embedded icon). It fails with an explicit error if a marker is missing, a listed module is absent, or the exe is not rewritten.
+It replaces `###MODULES###` with the concatenated modules and the `###UI.xaml###`, `###Theme.Light.xaml###`, `###Theme.Dark.xaml###` markers with the file contents, writes a temporary source to `%TEMP%` and hands that to ps2exe (`-requireAdmin` → UAC manifest, `-noConsole` → WPF window only, `-iconFile` → embedded icon). It fails with an explicit error if a marker is missing, a listed module is absent, the exe is not rewritten, or the exe's version metadata is not `$AppVersion` (→ [ADR 0001](docs/adr/0001-one-exe-built-from-modules.md)).
 
-After the exe is signed, `build.ps1` compiles `installer\WinGetStudio.iss` with **Inno Setup 6** (`ISCC.exe`, looked up under `Program Files (x86)\Inno Setup 6` and then on the `PATH`), passing it the version and the path of the exe just built, and checks that `dist\WinGetStudio_Setup.exe` carries the same version. Without Inno the build still succeeds and warns `setup not built`: a developer can work on the exe without installing anything else, while a release needs both files (see *Publishing a release*). `winget install JRSoftware.InnoSetup` installs it.
+Then it signs the exe (see *Signing*) and compiles `installer\WinGetStudio.iss` with **Inno Setup 6** (`ISCC.exe`, looked up under `Program Files (x86)\Inno Setup 6` and then on the `PATH`), passing it the version and the path of the exe just built, and checks that `dist\WinGetStudio_Setup.exe` carries the same version. Without Inno the build still succeeds and warns `setup not built`; a release needs both files. `winget install JRSoftware.InnoSetup` installs it (→ [ADR 0014](docs/adr/0014-installer-alongside-the-portable-exe.md)).
 
 ## Signing
 
@@ -95,32 +89,21 @@ After the exe is signed, `build.ps1` compiles `installer\WinGetStudio.iss` with 
 1. `$env:WINGETSTUDIO_CERT_THUMBPRINT` — set this to switch to a company or commercial certificate without editing the build;
 2. otherwise the certificate in `Cert:\CurrentUser\My` whose thumbprint matches `assets\WinGetStudio-codesign.cer`, valid and with its private key. Any other code-signing certificate is ignored, even one with the same subject.
 
-If it finds none the build **still succeeds**, printing a warning that the exe is unsigned — signing needs a private key that not every machine has.
+If it finds none the build **still succeeds**, printing a warning that the exe is unsigned. **Never generate a replacement certificate to get a build through.**
 
-The signing itself lives in `src\sign.ps1 -Path <file> -Thumbprint <thumbprint>`, so the exe, the setup and the setup's uninstaller are signed by one implementation: `build.ps1` calls it for the exe, and hands it to Inno as the `SignTool` (`/S` on the `ISCC` command line) for the other two. Without a certificate the setup comes out unsigned too.
+The signing itself is `src\sign.ps1 -Path <file> -Thumbprint <thumbprint>`: `build.ps1` calls it for the exe and hands it to Inno as the `SignTool` (`/S` on the `ISCC` command line) for the setup and its uninstaller. Without a certificate the setup comes out unsigned too. The signature is timestamped (DigiCert); if the timestamp server cannot be reached the build signs anyway and says so.
 
-The signature is **timestamped** (DigiCert). Without a timestamp a signature stops being valid the day the certificate expires; with one it stays valid, because it proves the signature existed while the certificate was still good. If the timestamp server cannot be reached the build signs anyway and says so.
+The certificate is self-signed, `CN=WinGet Studio`, valid to 2031: `Get-AuthenticodeSignature` reports `UnknownError` and SmartScreen says "unknown publisher". **This is expected and does not mean the signature is missing.** To make it trusted, import `assets\WinGetStudio-codesign.cer` (no private key in it) into *Trusted Root Certification Authorities*: per user with `Import-Certificate -CertStoreLocation Cert:\CurrentUser\Root`, or machine-wide by GPO in a domain. Understand what you are doing first: anything signed with that certificate becomes trusted for whoever imports it.
 
-### The current certificate is self-signed
-
-`CN=WinGet Studio`, valid to 2031. What that does and does not buy:
-
-- **Does**: proves the exe has not been altered since the build, and shows a publisher name instead of nothing.
-- **Does not**: make Windows trust it. `Get-AuthenticodeSignature` reports `UnknownError` and SmartScreen still says "unknown publisher", because the root is not among the trusted authorities. **This is expected and does not mean the signature is missing.**
-
-To make it trusted, import the public certificate — `assets\WinGetStudio-codesign.cer`, no private key in it — into *Trusted Root Certification Authorities*: per user with `Import-Certificate -CertStoreLocation Cert:\CurrentUser\Root`, or machine-wide by GPO in a domain. Understand what you are doing first: anything signed with that certificate becomes trusted for whoever imports it.
-
-For a signature trusted everywhere without importing anything, a commercial OV or EV certificate is needed (in a managed domain, one from the internal PKI would do as well). Both plug into the build through the environment variable above.
-
-**Private keys never belong in the repo** — `.gitignore` blocks `*.pfx`, `*.p12` and `*.snk`. Only the public `.cer` is committed, and that one is meant to be shared.
+**Private keys never belong in the repo** — `.gitignore` blocks `*.pfx`, `*.p12` and `*.snk`. What the signature does and does not prove, and why builds are not reproducible: → [ADR 0012](docs/adr/0012-signing.md).
 
 ## Publishing a release
 
 The update check reads the **latest** release of the repo, so publishing one is what makes an update reachable.
 
-1. Bump `$AppVersion` in `src\main.ps1` and rebuild — the build signs the exe.
+1. Bump `$AppVersion` in `src\main.ps1` and rebuild — on the machine that holds the signing key, with Inno Setup installed, so both files come out signed.
 2. Update `CHANGELOG.md`, commit, push.
-3. Tag: `git tag v1.10.1 && git push origin v1.10.1`.
+3. Tag: `git tag v1.10.1 && git push origin v1.10.1`. **Tag and `$AppVersion` must agree.**
 4. On GitHub → **Releases** → *Draft a new release*, pick the tag, paste the changelog entry, and attach **both** `dist\WinGetStudio.exe` and `dist\WinGetStudio_Setup.exe` as assets.
 5. Publish. GitHub computes the SHA-256 of each asset by itself, and that is what the app verifies the download against.
 6. Check the order the API lists the assets in — copies up to 1.10.x take the **first** `.exe`, so it must be the portable:
@@ -129,15 +112,11 @@ The update check reads the **latest** release of the repo, so publishing one is 
    gh api repos/FedeB2160/WinGetStudio/releases/latest --jq '[.assets[] | select(.name | endswith(".exe"))][0].name'
    ```
 
-   It must print `WinGetStudio.exe`. GitHub sorts assets by name, which is why the setup is `WinGetStudio_Setup.exe` and not `WinGetStudio-Setup.exe`: `-` sorts before `.`, `_` after it.
+   It must print `WinGetStudio.exe` (→ [ADR 0014](docs/adr/0014-installer-alongside-the-portable-exe.md) for why the setup is named `WinGetStudio_Setup.exe`).
 
-**Tag and `$AppVersion` must agree**: the app compares the tag (`v1.10.1`) with its own constant, so a mismatch means it either keeps proposing an update already installed, or never proposes one.
+`gh release create v1.11.0 --title v1.11.0 --notes-file <file> dist\WinGetStudio.exe dist\WinGetStudio_Setup.exe` does steps 4-5 from the command line. `gh` holds more than one account on this machine and the active one is not always the repo owner: `gh auth status` says which it is, `gh auth switch --hostname github.com --user FedeB2160` picks the right one. Without that switch `git push` fails asking for a password, because the credential helper serves the token of whichever account is active.
 
-**Builds are not reproducible.** Compiling the same source twice produces two different binaries — ps2exe writes variable metadata into the PE and each signature carries a fresh timestamp — identical in size but not in hash. So a published asset **cannot** be validated by rebuilding and comparing hashes; what is verifiable is the SHA-256 GitHub publishes with the asset (which is what the app checks on download) and the Authenticode signature.
-
-Since 1.11.0 the app picks the asset **by exact name** for its install channel: `WinGetStudio.exe` for a portable copy, `WinGetStudio_Setup.exe` for an installed one. A release missing that file offers no update, and a manual check says which file is missing. Copies up to 1.10.x still take the first `.exe`, hence step 6.
-
-`gh release create v1.11.0 --title v1.11.0 --notes-file <file> dist\WinGetStudio.exe dist\WinGetStudio_Setup.exe` does steps 4-5 from the command line. The build only produces the setup when Inno Setup 6 is installed (`winget install JRSoftware.InnoSetup`); a release needs both files. `gh` holds more than one account on this machine and the active one is not always the repo owner: `gh auth status` says which it is, `gh auth switch --hostname github.com --user FedeB2160` picks the right one. Without that switch `git push` fails asking for a password, because the credential helper serves the token of whichever account is active.
+A published asset cannot be checked by rebuilding and comparing hashes; check the SHA-256 GitHub publishes and the Authenticode signature instead (→ [ADR 0012](docs/adr/0012-signing.md)).
 
 ## Working on a plan
 
@@ -151,19 +130,21 @@ The discipline that goes with it:
 - Push after each commit. If the session dies, the work is already out.
 - At release time the accumulated `## Unreleased` lines are promoted into the narrative entry for the version, rather than written from memory at the end.
 
-**The plan file is deleted when the plan is done** — every task executed, both suites green, and the result checked against what the plan established. It is a working document: git history keeps every version of it, and what deserves to outlive it has already been written into the changelog (what changed), this file (why it was done that way) and the README (what the user sees). A plan left in the repo after it has been executed starts to age and, eventually, to lie.
+**The plan file is deleted when the plan is done** — every task executed, both suites green, and the result checked against what the plan established. It is a working document: git history keeps every version of it, and what deserves to outlive it has already been written into the changelog (what changed), an ADR (why it was done that way) and the README (what the user sees). A plan left in the repo after it has been executed starts to age and, eventually, to lie. The same holds for a design spec in `docs\superpowers\specs\`: once implemented, its decisions move into an ADR and the spec is deleted.
 
 ## Publishing to winget-pkgs
 
-Manifests live in `winget\<version>\` — three files, as the community repository requires. They are kept here so they can be reviewed and versioned with the code; the pull request is a copy of that folder.
+Manifests live in `winget\<version>\` — three files, as the community repository requires. They are kept here so they can be reviewed and versioned with the code; the pull request is a copy of that folder. What the manifest fields mean and why the package moved from `portable` to `inno`: → [ADR 0015](docs/adr/0015-winget-package-portable-then-inno.md).
 
 Validate before opening anything (this is the same validator the moderators run):
 
 ```powershell
-winget validate --manifest .\winget\1.10.0
+winget validate --manifest .\winget\1.11.0
 ```
 
-To install from them locally first, winget needs a feature enabled from an elevated prompt — `winget settings --enable LocalManifestFiles` — then `winget install --manifest .\winget\1.10.0`. Not strictly needed: the winget-pkgs CI installs and uninstalls the package in a sandbox on every pull request.
+To install from them locally first, winget needs a feature enabled from an elevated prompt — `winget settings --enable LocalManifestFiles` — then `winget install --manifest .\winget\1.11.0`. Not strictly needed: the winget-pkgs CI installs and uninstalls the package in a sandbox on every pull request. Test a migration, or anything touching the installed copy, in Windows Sandbox or a VM, never on the everyday install.
+
+Every value with a `:` inside must be quoted, or the YAML parser fails — `ShortDescription` is the one that bites.
 
 **Opening the pull request**
 
@@ -172,47 +153,7 @@ To install from them locally first, winget needs a feature enabled from an eleva
 3. Commit, push, open the PR against `master`. The title convention is `New version: FedeB2160.WinGetStudio version 1.10.1`.
 4. Automated validation runs first (schema, URL reachable, hash, sandbox install). A human moderator then reviews it; the first submission of a new package takes longer than later updates.
 
-`wingetcreate update FedeB2160.WinGetStudio --version 1.10.1 --urls <url> --submit` does all of this in one command for subsequent versions, once the package exists in the repository.
-
-It does **not** submit `winget\<version>\`, though. It downloads the manifest of the last published version, bumps the version, the URL, the hash and the date, and submits that. Everything version-specific in the local folder is lost, comments included, and `ReleaseNotes` is dropped because the previous version's notes no longer apply. The validator then compares the result against the published version and fails with `Missing property ReleaseNotes`, so the block has to be added back on the fork branch after the pull request exists. It also invents a `Documentations` entry pointing at the repository wiki, which has no pages.
-
-The local folder is therefore the source of the text, not of the submission. After the pull request is open, copy back what was actually submitted so the two agree.
-
-**Notes on the manifest**
-
-- `InstallerType: inno` since 1.11.0; up to 1.10.3 it was `portable`, a bare executable that winget copied and aliased on the PATH. The switch, rehearsed in Windows Sandbox on 2026-10-07, rests on four fields:
-  - `UpgradeBehavior: uninstallPrevious`, so the portable copy is removed before the setup runs;
-  - `AppsAndFeaturesEntries` with two entries: `{80A0A054-…}_is1` as `inno`, and the portable's uninstall key `FedeB2160.WinGetStudio_Microsoft.Winget.Source_8wekyb3d8bbwe` as `portable`. winget filters out installers whose type does not match what is installed, unless an entry here declares that type;
-  - `ProductCode` as the `_is1` key, which is how winget finds the installed copy afterwards;
-  - **no `Scope`.** On upgrade winget rejects an installer whose declared scope differs from the installed one, and a portable is installed per user, so `Scope: machine` fails with *No applicable installer found*. The setup is machine-only regardless, through `PrivilegesRequired=admin`.
-- `Architecture: x86` — the Inno setup is a 32-bit program. The exe it installs is AnyCPU and runs 64-bit on x64.
-- `ElevationRequirement: elevatesSelf` — the setup asks for elevation itself (`PrivilegesRequired=admin`), so winget needs no elevated prompt to start it.
-- `PortableCommandAlias` (portable manifests, up to 1.10.3) is rejected by the validator as an unknown field, so the alias is left to winget, which derives it from the file name. That alias is a symbolic link in `%LOCALAPPDATA%\Microsoft\WinGet\Links`, and creating one needs administrator rights or Developer Mode. Without either, winget still reports the alias as added but the link is not there, so testing a manifest from an ordinary prompt installs the package correctly and leaves `WinGetStudio` unknown to the shell. The sandbox the pull request runs in is elevated, so it does not see this.
-- `Commands` was declared in the locale manifest sent for 1.9.0 but is absent from the published 1.9.0, so it is gone from 1.10.0 too. Nothing depends on it: it only feeds searching a package by the command it provides.
-- Every value with a `:` inside must be quoted, or the YAML parser fails — `ShortDescription` is the one that bites.
-
-**Shortcuts and the installer.** Installing from winget puts nothing on the desktop or in the Start menu, and no manifest field changes that. The 1.12.0 installer schema does not contain the word `shortcut` anywhere, and the installer types it allows are `msix, msi, appx, exe, zip, inno, nullsoft, wix, burn, pwa, portable, font`. Shortcuts exist only because a package's *installer* creates them; for a `portable` package winget copies the file and makes the PATH alias, and that is the whole of it. The feature has been requested for years — [winget-cli#2299](https://github.com/microsoft/winget-cli/issues/2299) is the one to watch, open since July 2022, with [#4185](https://github.com/microsoft/winget-cli/issues/4185) and [#3314](https://github.com/microsoft/winget-cli/issues/3314) asking for the same thing.
-
-Two ways round it were considered and both were turned down, so anyone raising the question again can start from here rather than from scratch. Letting the app write the `.lnk` itself on first run works and costs about forty lines, but the shortcut appears only after WinGet Studio has been started once, which is not what installing a program is supposed to feel like; it would also have to write into the all-users Start menu, since the app elevates and `%APPDATA%` may then belong to a different administrator account than the person at the keyboard. Making the app its own installer — `InstallerType: exe` plus a silent switch that copies it into Program Files and registers it — removes that first run, but hands us the uninstall path, the ARP entry, upgrading over a previous version and the failure rollbacks, which is precisely the work an installer compiler does for free and without mistakes. Avoiding Inno Setup would cost more code than using it.
-
-The decision was to stand until #2299 closed, or until moving to a real installer type becomes a product choice rather than a way of chasing two icons. On 2026-10-07 it became one: a Start menu entry, uninstall from Windows Settings and machine-wide deployment for companies are what an installed program gives and a portable exe cannot ([issue #3](https://github.com/FedeB2160/WinGetStudio/issues/3)). From 1.11.0 every release ships `WinGetStudio_Setup.exe`, built with Inno Setup next to the unchanged portable; the design, including why the scope is machine-only and how the winget package migrates, is in [docs/superpowers/specs/2026-10-07-installer-design.md](docs/superpowers/specs/2026-10-07-installer-design.md).
-
-**Installed from winget, the self-update has to stand down.** A `portable` package is a file winget owns: it copies the exe into `%LOCALAPPDATA%\Microsoft\WinGet\Packages\<id>\`, records its SHA-256 in the uninstall entry under `HKCU`, and expects to find exactly that back. The self-update renames the running exe to `.old` and writes the new one in its place, which breaks all three of those assumptions at once: the hash no longer matches, so winget treats the package as modified and refuses to upgrade or uninstall it without `--force`; the `.old` left beside it is a file winget did not install, so it will not clear the directory; and the uninstall entry still names the old version, so `winget install` answers that the package is already there. The end state is an app that no longer starts and cannot be reinstalled either, which is what happened to a 1.9.0 install that pressed Update.
-
-`Test-IsWinGetPortable` in `App.Update.ps1` is the guard: if the running exe sits under `\Microsoft\WinGet\Packages\`, `Start-UpdateCheck` never shows the update button and says `winget upgrade FedeB2160.WinGetStudio` instead, and `Start-SelfUpdate` returns without touching anything. Path matching, not a registry lookup — the path *is* what winget guarantees about a portable install, and the check has to run on the UI thread at every check. Recovering a machine already in that state means `winget uninstall --force`, then removing the package directory, the `Links` alias and the `HKCU` uninstall key by hand, then installing again from an elevated prompt.
-
-Since the installer (1.11.0) that guard is one case of `Get-InstallChannel`, which tells four kinds of copy apart, each with its own way of updating:
-
-| Channel | How it is recognised | How it updates |
-|---|---|---|
-| `source` | no running exe: `main.ps1` from a checkout | not at all; use git |
-| `winget-portable` | exe under `\Microsoft\WinGet\Packages\` | only `winget upgrade FedeB2160.WinGetStudio` |
-| `installed` | exe folder equals `InstallLocation` of `HKLM\...\Uninstall\{80A0A054-...}_is1` in the **32-bit** registry view, ignoring case and a trailing `\` | downloads `WinGetStudio_Setup.exe` and runs it silently |
-| `portable` | anything else | downloads `WinGetStudio.exe`, renames itself, restarts |
-
-The `installed` test compares folders rather than asking "is there an uninstall entry": a portable copy on a machine that also has the setup installed is still portable, and must not run the setup over a different folder. The 32-bit view is opened explicitly (`Registry32`): the setup is x86, but the ps2exe exe is AnyCPU and runs 64-bit, so a plain `HKLM:\` read looks in the 64-bit view, never finds the key, and the installed copy would replace itself as if it were portable.
-
-**Once the package is in the repository**, WinGet Studio will appear in its own Updates tab. Upgrading it from there cannot work — the file is in use — so it needs excluding from that list, or routing to the self-update path, which does the rename dance.
+`wingetcreate update FedeB2160.WinGetStudio --version 1.10.1 --urls <url> --submit` does all of this in one command for subsequent versions, but it submits the last published manifest with version, URL, hash and date bumped, **not** `winget\<version>\`: add `ReleaseNotes` back on the fork branch, drop the invented `Documentations` entry, and afterwards copy back into `winget\<version>\` what was actually submitted (→ [ADR 0015](docs/adr/0015-winget-package-portable-then-inno.md)).
 
 ## Tests
 
@@ -223,30 +164,25 @@ powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 ```
 
-`Test-InvokeWinGet.ps1` needs no admin rights, installs nothing, and calls `winget --version` only when winget exists. `Test-Ui.ps1` mounts the real app in a hidden WPF window and **runs offline by default**. `-Live` adds real search, list and export, the GitHub release check, and one pin cycle on `7zip.7zip` — only when it is installed and not already pinned. The pin it creates is removed in a `finally` that first waits for the queue's winget to exit.
+Two standalone scripts of sequential assertions, no framework and no single-test selector: comment out or run the file.
 
-The Windows CI (`.github/workflows/ci.yml`, GitHub-hosted `windows-2022`) runs both suites offline on every pull request and push to `main`, then installs Inno Setup 6.7.1 (the newest on Chocolatey; releases are built locally with 6.7.3), builds the exe and the setup, and uploads both as unsigned test artifacts for seven days. Actions are pinned to commit SHAs, the token is read-only, and no signing key ever reaches CI.
+- **`Test-InvokeWinGet.ps1`** — winget execution (wait bound to the process, exit code available, output read back as UTF-8, temp sweep) and table parsing on four fixtures, through the real functions. Needs no admin rights, installs nothing, calls `winget --version` only when winget exists.
+- **`Test-Ui.ps1`** — needs `-STA`; mounts the real app in a hidden WPF window (`Start-App -NoShow`) and **runs offline by default**. It checks parsing, the module list and the concatenated exe source, controls, themes and contrast, layout, confirmations, the install channels and the release-asset choice. `-Live` adds real search (including search-as-you-type), list and export, the GitHub release check, and one pin cycle on `7zip.7zip` — only when it is installed and not already pinned; the pin is removed in a `finally`.
 
-**`Test-Ui.ps1`** checks that every file parses, that no module is missing from (or orphaned by) `$moduleNames`, that `UI.xaml` provides every control the code asks for, that both themes define the same keys, that every `DynamicResource` resolves, that column headers are non-empty, uppercase and centred, that every `&#x....;` glyph exists in both system icon fonts, and that the two grid-freeze regressions have not come back. Four checks are worth knowing about, because they catch what static analysis cannot:
-
-- it re-does the module injection and verifies the **concatenated** source parses and keeps every function — the exe loads code a different way from the `.ps1`, and a failure there would otherwise only show up on a double click;
-- it calls `Start-App -NoShow`, which builds the window without displaying it, then verifies the modules actually *see* the controls and that `Start-BackgroundJob` completes, returns its result and unhooks itself — these catch scope and closure bugs that every static check happily passes;
-- it drives the **real** search-as-you-type against winget, including the case where a slower earlier query returns after a newer one;
-- it asserts that the confirmations for uninstall and for the self-update come *before* anything is queued or downloaded, are Yes/No, and default to No.
-
-**`Test-InvokeWinGet.ps1`** exercises winget execution (wait bound to the process, exit code available, output read back as UTF-8) and parses four fixtures through the real code: the two-table `upgrade` output, a 3-column `search` result, a 4-column `list` where the fourth column is *Source* and the version carries a `>` prefix, and a `pin list` whose last header contains spaces.
+The Windows CI (`.github/workflows/ci.yml`, GitHub-hosted `windows-2022`) runs both suites offline on every pull request and push to `main`, then installs Inno Setup 6.7.1, builds the exe and the setup, fails if either is missing, and uploads both as unsigned test artifacts for seven days. What each check guards against, and why CI never sees a signing key: → [ADR 0016](docs/adr/0016-tests.md).
 
 ## Knowledge graph
 
 `graphify-out\` holds a knowledge graph of this repository: 225 nodes and 392 edges over the code (extracted from the AST) plus the concepts and rationale from the documentation, grouped into 29 communities.
 
-Three files are **committed**, because they are the durable value:
+Four files are **committed**, because they are the durable value:
 
 - `GRAPH_REPORT.md` — the readable report: communities, god nodes, surprising connections, suggested questions, and the audit trail of what was extracted versus inferred;
 - `graph.json` — the graph itself, which is what answers queries without rebuilding anything;
-- `graph.html` — the interactive graph, self-contained: clone the repo, open the file, no tooling required.
+- `graph.html` — the interactive graph, self-contained: clone the repo, open the file, no tooling required;
+- `manifest.json` — file mtimes and hashes, which let a clone run `graphify --update` and re-extract only the files that changed instead of the whole corpus.
 
-Everything else is gitignored, being either regenerable or specific to one machine: the Obsidian vault (257 notes, one per node), `cache\` (extraction cache), `manifest.json` (file mtimes and hashes for incremental runs), `cost.json` (token counter), `.graphify_python` and `.graphify_root` (paths on this PC), and `2026-08-03\` (a leftover snapshot from an earlier run — safe to delete).
+Everything else is gitignored, being either regenerable or specific to one machine: the Obsidian vault (257 notes, one per node), `cache\` (extraction cache), `cost.json` (token counter), `.graphify_python` and `.graphify_root` (paths on this PC), and `2026-08-03\` (a leftover snapshot from an earlier run — safe to delete).
 
 Note that `graph.html` is ~190 KB and is rewritten in full on every rebuild, so each refresh lands as a large diff. That is the price of having the graph browsable straight from the repo; if the history ever gets uncomfortable, ignoring it again costs one line and one command to regenerate.
 
@@ -269,74 +205,27 @@ To ask the graph something instead of grepping:
 graphify query "how does the self-update replace the running exe?"
 ```
 
-The graph is worth having here because the *why* behind this codebase is spread across code comments, this file and the changelog. Asking the graph crosses those boundaries: the pinning feature, for instance, connects to the parser guard for spaced headers, to the "one winget process at a time" rule, and to the test that removes the pin in a `finally` — three files and two documents that no single grep would bring together.
+The graph is worth having here because the *why* behind this codebase is spread across code comments, the ADRs and the changelog. Asking the graph crosses those boundaries: the pinning feature, for instance, connects to the parser guard for spaced headers, to the "one winget process at a time" rule, and to the test that removes the pin in a `finally` — several files and documents that no single grep would bring together.
 
-## Design notes
+## Decisions
 
-Things that look odd until you know why. Most of them are bugs that were paid for once.
+Each decision that shapes the architecture has an Architecture Decision Record in [docs/adr/](docs/adr/). Read the relevant one before changing that area: most of the oddities in this codebase are bugs already paid for once.
 
-### Parsing winget
+- [ADR 0001](docs/adr/0001-one-exe-built-from-modules.md) — One exe built from modules: ps2exe's single input, the markers, `$moduleNames` and `$AppVersion` as single sources.
+- [ADR 0002](docs/adr/0002-always-elevated.md) — Always elevated, with what that costs for per-user packages (issue #12).
+- [ADR 0003](docs/adr/0003-only-one-winget-process-at-a-time.md) — Only one winget process at a time: global busy state, `Test-WinGetBusy`, one queue choke point, cooperative cancel.
+- [ADR 0004](docs/adr/0004-how-winget-is-run.md) — How winget is run: output to file, `Process.Start`, UTF-8, one resolved path, quote guard, temp sweep.
+- [ADR 0005](docs/adr/0005-reads-return-a-result-not-a-list.md) — Reads return a result, not a list, so a failing winget never passes for an empty one.
+- [ADR 0006](docs/adr/0006-parsing-winget-tables-by-column-position.md) — Parsing winget's localized tables by column position, one table at a time.
+- [ADR 0007](docs/adr/0007-pins-are-blocking.md) — Pins are blocking, because a default pin does not stop `upgrade --id`.
+- [ADR 0008](docs/adr/0008-background-work-in-runspaces.md) — Background work in runspaces: `UI{}`, `-Functions`, `-Vars`, state through the job object.
+- [ADR 0009](docs/adr/0009-grid-rows-are-wgtrow.md) — Grid rows are `WgtRow`, so a change repaints one cell without resetting the scroll.
+- [ADR 0010](docs/adr/0010-themes.md) — Themes: `DynamicResource` only, same keys in both files, re-templated controls, measured contrast.
+- [ADR 0011](docs/adr/0011-window-layout.md) — Window layout: Settings and About as tabs, progress and log outside the tabs, tooltip and grid traps.
+- [ADR 0012](docs/adr/0012-signing.md) — Signing with the self-signed published key only, timestamped, one script for three files.
+- [ADR 0013](docs/adr/0013-self-update.md) — Self-update from the latest GitHub release, per install channel, verified by SHA-256.
+- [ADR 0014](docs/adr/0014-installer-alongside-the-portable-exe.md) — An Inno Setup installer alongside the unchanged portable exe.
+- [ADR 0015](docs/adr/0015-winget-package-portable-then-inno.md) — The winget package: portable up to 1.10.3, inno from 1.11.0, and how users migrate.
+- [ADR 0016](docs/adr/0016-tests.md) — Tests: two standalone scripts, offline by default, the real app mounted hidden, CI without a key.
 
-- The tables are parsed by **column position, one table at a time** (`Get-WinGetTable`): winget prints a second table for packages needing explicit targeting, with its own column widths. Columns are re-anchored at every separator row, and a data row is told apart from localized prose by its grid alignment — not by counting runs of two or more spaces, a heuristic that also dropped rows whose columns are exactly full.
-- `Get-WinGetTable` returns the **raw fields per row** and each caller maps them, because the meaning of the columns changes with the command: the 4th is *Available* in `upgrade`, *Match* in `search`, *Source* in `list`. The count varies even within one command — `search vlc` has a Match column, `search ab --count 5` does not. Only the first three (Name, Id, Version) are the same everywhere. Tables are accepted from **3** columns up: `winget list --source winget` prints exactly three, and the old threshold of four discarded it silently.
-- **`-MaxColumns` exists because of a localized header with spaces.** `winget pin list` ends with "Tipo di pin" ("Pin type"); column detection counts header tokens, so it saw three phantom columns whose offsets fall mid-text in the data rows, judged every row misaligned and dropped them all — the pin list came back empty while winget had created the pin.
-
-### Running winget
-
-- **Reads return a result, not a list.** `Invoke-WinGetRead` runs search/list/upgrade/pin list and returns `Success`, `Rows`, `ExitCode`, `Output`; tables are parsed only on exit 0, so a failing winget can no longer pass for an empty list. The one non-zero exit that is a valid result — `0x8A150014`, no match — is mapped in `Get-WinGetSearch`, the only reader that can get it. Messages use the last two meaningful lines (`Get-WinGetOutputTail`), the queue's rule. A failed pin read re-applies the last good list, because rows a refresh just created start unpinned. A job's error stream is logged: a non-terminating error used to leave the job empty and the log silent.
-- **Pins are blocking.** A default *Pinning* pin only keeps a package out of `upgrade --all`; an explicit `upgrade --id` — the way this app upgrades — ignores it (`UpdateFlow.cpp`: `includePinned = m_isSinglePackage || ...`). So the app adds pins with `--blocking`, which winget enforces on every upgrade path. The row's `Pinned` flag still keeps CLI-made pins out of the queue.
-- winget is launched with its output redirected to a file and the wait bound to the process exit, not to the pipe: child installers that inherit stdout can no longer block the wait indefinitely. `--disable-interactivity` matters because without a console (`-noConsole`) a prompt would hang forever. The process is started with `Process.Start` (with `cmd` doing the redirect) rather than `Start-Process -PassThru`, whose `Process` object loses `ExitCode` when the process exits before the native handle is cached — an empty `ExitCode` casts to `0`, which would paint a failure green.
-- The output file is read back as **UTF-8**: winget writes UTF-8, while `Get-Content` on PowerShell 5.1 assumes the system ANSI codepage, which turned localized messages into mojibake.
-- **Reads decode UTF-8 themselves, without a console.** winget always writes UTF-8 to a pipe — measured on the raw bytes with the console at cp850, at cp65001 and with no console at all; its `SetConsoleOutputCP(CP_UTF8)` only affects what a console shows. `& winget | Out-String` decodes with the console's code page instead, and in the `-noConsole` exe the first background job runs before any console exists: the prologue's UTF-8 setter throws, so the first scan after launch came out in cp1252 (`Ã¨`). `Invoke-WinGetRead` therefore starts winget with `Process.Start` and `StandardOutputEncoding = UTF8`, quoting the arguments itself for `CreateProcess` — no shell, so typed search text cannot become a command.
-- **Leftover output files are swept at startup.** An installer that leaves a detached child behind keeps `Invoke-WinGet`'s redirect files open when it tries to delete them, so `wgt_*.out`/`.err` accumulated in `%TEMP%`. `Clear-WinGetTempFiles` removes them at the next launch, with `[IO.File]::Delete`: the FileSystem provider can fail to resolve a `%TEMP%` in 8.3 form (`C:\Users\FB5FE~1.BOR\…`), and `-LiteralPath` does not help.
-- **Never two winget processes at once.** Reading the pins used to run *after* the busy state was released, so a click on Update in that window ran a second winget and one of the two failed with exit 1. The scans read the pins inside the same job, and after a pin/unpin the busy state is released by the pin re-read, which is the last step. Busy state is global: each tab registers a handler with `Set-AppBusy`.
-- **Cancelling a queue is cooperative.** `Start-WinGetQueue` shares a synchronized hashtable with its runspace and checks `Requested` at the top of each iteration, so the package in flight always finishes: killing an installer halfway leaves the machine in a state nobody can describe. A hashtable and not a `$script:` variable because the runspace has its own scope — a hashtable is a reference type, so both threads see the same object, the same reason `$rows` works. A fresh one per queue, so a request that arrives between two queues does not carry over.
-- **`$script:queueVerb` publishes which queue is running**, because the busy state is global and a tab otherwise has no way to tell its own operation from another tab's. It is what lets the Updates button offer *Cancel* only for the update queue, and `Set-AppBusy $false` clears it *before* calling the handlers so each one sees the final state. The button's label is assigned on every call, not inside one branch: its appearance is a function of (busy, which queue) and must not depend on how it got there. The mechanism is generic — wiring it to Install or Uninstall is a few lines each — and only the Updates queue uses it today.
-- **Every winget invocation goes through the path resolved once at startup**, `$wingetPath`, passed into each runspace through `-Vars`. `& winget` resolves the *name* on every call and depends on PATH and on the app execution alias, which under an elevated account other than the interactive one may not be there. Four read commands used to do that while the five write paths did not, which is the setup for a baffling failure: forget one `-Vars` entry and the variable is `$null` inside the runspace, the read comes back empty, and it looks like winget found nothing. The suite checks both halves.
-- **Unbalanced quotes are refused, not run.** The command line handed to `cmd` is built by concatenation and each caller interpolates the package Id between quotes. An Id containing a double quote would produce a command that means something else, and cmd would run it — in an elevated process, with a name written by whoever authored the installer, since ARP display names end up as Ids. An odd number of quotes throws instead. It does **not** cover `%VAR%` expansion, which is a different problem; the guard should not be believed complete.
-- **A search is the exception that nearly broke that rule.** It must not raise the busy state or typing would stall, so it counts itself in `$script:searchInFlight` — and everything that is about to run winget asks **`Test-WinGetBusy`**, which covers both. Asking `$script:isBusy` alone was the hole: typing three characters in Install and switching straight to Installed ran `winget search` and `winget list` at the same time. `Start-WinGetQueue` is the single choke point for the four queue operations — it takes the busy state itself, so no caller can forget to, and it refuses rather than starting a second process. The paths that call winget without going through the queue guard themselves: both scans, and export and import twice each, because the file dialog gives a pending search time to come back. `Start-SelfUpdate` guards too: it ends by replacing the executable and closing the window. `Start-UpdateCheck` deliberately does not — it only talks to GitHub.
-
-### PowerShell and WPF traps
-
-- Background jobs pass what they need through the **job object**, not through a `GetNewClosure()` capture. A closure gets its own module scope, and inside it `$script:` no longer refers to the script — `$script:jobs` came back `$null` and the cleanup died on `.Remove()`, leaving the job polling forever. The tick finds its job from the sender instead.
-- A `CollectionView` is enumerable, so **returning one from a function** makes PowerShell unroll it into its items and the caller gets no `Filter` property. The Installed tab holds its view in a variable.
-- Table rows are instances of the `WgtRow` class (`INotifyPropertyChanged`, compiled with `Add-Type` at startup), not `PSCustomObject`: `NoteProperty` values do not notify WPF, which forced a `$Grid.Items.Refresh()` on every state change — and that regenerates the view and sends the scroll back to the top.
-- Glyphs must be written `[char]0xE706`, **not** `` "`u{E706}" ``: that escape only exists from PowerShell 6 on, and ps2exe compiles against 5.1, where it would stay the literal `u{E706}`.
-- The **last child of a `DockPanel` fills the remaining space ignoring its own `Dock`** — the settings close button ended up centred until `LastChildFill="False"`.
-- **Esc** is caught with `PreviewKeyDown` on the window: after a click inside the settings panel the focus belongs to a control, and a handler on the panel would never see the key.
-- The header template must bind `HorizontalAlignment` to `HorizontalContentAlignment`, otherwise centring a column header has no effect at all.
-- **A `ToolTip` on a container falls through to everything inside it, along the logical tree.** `ToolTipService` looks for the nearest tooltip by walking up from the element under the mouse, and it walks the *logical* parent as well as the visual one. The content of a tab is a visual child of the `TabControl`'s `ContentPresenter` but a **logical** child of its `TabItem`, so a tooltip on the `TabItem` was found by every control in the page that had none of its own: hovering *Check for updates* in Settings opened "Theme, tab strip, version and updates". Walking only the visual tree says this cannot happen, which is why it survived a static check; the proof came from a real window, printing the open `ToolTip` and its `PlacementTarget` while the cursor sat on the button. The text now lives in the tab's `AutomationProperties.HelpText` (where a screen reader wants it anyway) and the tooltip is carried by the `Border` inside the `TabItem` template, which covers the whole tab and is an ancestor of nothing in the page. `Test-Ui.ps1` walks the logical tree of every tab and fails if any control resolves to a `TabItem`.
-- **An empty string is a tooltip.** `ToolTipService` shows whatever is not `null`, so `ToolTip="{Binding StatusDetail}"` on the always-present `Grid` of the Result cell opened an empty grey box over every row with no result, because starting a queue resets `StatusDetail` to `''`. The binding sits on the status glyph instead, which is `Collapsed` until there is something to say, and a collapsed element does not take the mouse.
-
-### Controls that had to be re-templated
-
-The system theme (Aero2) hardcodes light colours in places no external setter can reach, so in dark mode these had to be rebuilt from scratch:
-
-- **CheckBox** — the tick is filled with `#FF212121` declared as a `StaticResource` inside the theme dictionary, so in dark mode it was black on black.
-- **DataGridColumnHeader** — `DataGridHeaderBorder` ignores `Background`. Re-templating it throws away the two `Thumb` elements `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` that DataGrid hooks for column resizing, and the columns silently become fixed **with no error at all**; they have to be added back under those exact names. `Test-Ui.ps1` verifies they are there.
-- **ContextMenu / MenuItem** — light background, black text, blue highlight.
-- **ComboBox** — the most involved: WPF requires a `ToggleButton` bound to `IsDropDownOpen` and a `Popup` named `PART_Popup`. Here the ToggleButton is transparent and sits *over* the border, so it catches clicks across the whole control without nesting one template inside another.
-- **ScrollBar** — same hardcoded light colours, and the last control in the window still painted by Windows rather than by the theme: in dark mode every scrollbar stayed white. The replacement is track plus thumb with no arrow buttons, which is what Windows 11 draws anyway. Two things it must keep: the `Track` named `PART_Track`, which ScrollBar uses to place the thumb (rename it and the bar stops working, with no error), and the two transparent `RepeatButton`s inside the track, which are what makes clicking the empty part of the track page up or down. The `Orientation` trigger swaps the axes for the horizontal bar; if paging on that one ever goes the wrong way, name the two repeat buttons and swap their commands to `PageLeftCommand` / `PageRightCommand` there.
-
-Colours are referenced with `{DynamicResource ...}` everywhere: `StaticResource` resolves once and would not follow a theme change. `Test-Ui.ps1` fails if a key exists in only one of the two theme files.
-
-**A control needs either a surface step or a visible border, and the light theme had neither.** `BgBrush` was `#FFFFFF` and `CtrlBgBrush` `#FDFDFD` — a 0.6% luminance step, which is to say none — so the only thing defining a button, a text box, the log or a tab was a `#CCCCCC` hairline at 1.61:1, and the disabled state's `Opacity 0.5` took that down to ~1.31 and erased it. The page is grey now (`#F3F3F3`) with white controls on it, which is how Windows 11 does it, and the border that marks an **interactive** control is its own key: `CtrlBorderBrush`, `#8A8A8A` in light (3.11:1 on the page, 3.45:1 on the control, so over the 3:1 WCAG 1.4.11 asks of anything that identifies a component). `BorderBrush2` keeps the old light value for **grid lines only** — at the same strength as the control borders the grid turns into a spreadsheet. In dark, `CtrlBorderBrush` is `#666666`: 2.84:1, under the 3:1 floor on purpose, because on a dark ground the surface step does the work and a 3:1 outline is heavier than anything Windows 11 draws — but still three times the `#3D3D3D` it replaces. `Test-Ui.ps1` measures the surface step and both border pairs in each theme, and fails if the disabled trigger goes back to using `Opacity`.
-
-**A colour hardcoded in `UI.xaml` is a colour that only works in one theme.** The *Update to vX.Y.Z* button carried `Foreground="White"`, which reads fine on the light theme's accent (`#0078D4`, 4.53:1) and measures **2.01:1** on the dark theme's (`#4CC2FF`) — unreadable, on the one button that only appears when there is something important to say. The foreground is a theme key now (`AccentFgBrush`), and `Test-Ui.ps1` measures every foreground/background pair in both themes against the WCAG floors: 4.5:1 for text, 3:1 for graphical elements such as the status glyphs and the progress fill. The light theme's warning colour failed the same check at 2.86:1 and was darkened. Adding a colour means adding it to both theme files and, if anything sits on top of it, adding the pair to that check.
-
-### Layout choices
-
-- The progress bar and the log live **outside** the `TabControl` so they stay visible from every tab — including from Settings, which is why Settings is a tab pinned to the right of the strip and not an overlay. It used to be a `Border` with `Grid.RowSpan="4"` covering the whole window, which hid exactly the part that reports how an operation is going, and needed a chain of `ZIndex`, focus and Esc handling to behave like a screen. As a tab it needs none of that, and it is **not** a second Window: the theme brushes live in the main window's `MergedDictionaries`, so a separate Window would have to be wired to those dictionaries and re-wired on every theme change, plus owner, modality and placement.
-- **`TabPanel` cannot right-align a single item**, so the tab strip is a `DockPanel` used as `IsItemsHost`: the three functional tabs take the default `Dock="Left"` and stay in declaration order, `TabSettings` declares `Dock="Right"`, and `LastChildFill="False"` stops it from stretching across the strip — the same trap, with the same fix, as any other `DockPanel` whose last child must respect its own `Dock`. The `Margin="0,0,0,-1"` seam between the active tab and the content border sits on the panel, not on the items, so the swap does not touch it.
-- The tabs are in alphabetical order (**Install | Installed | Updates**) but **Updates is the view the app opens on**, via `IsSelected="True"`: the startup scan fills that list, and opening on a tab nobody is looking at would hide the update count. Navigation order and default view are separate concerns.
-- **The tab headers are one `HeaderTemplate`**, not four hand-built headers: the glyph comes from each tab's `Tag` through `RelativeSource AncestorType=TabItem`, and `Header` stays the plain string, which is both the accessible name and what the tab-order checks rely on. What the strip shows — icon, name, or both — is two `Visibility` values in the window's own `Resources`, read with `DynamicResource`, so rewriting them repaints the strip without rebuilding anything. `Set-Theme` does not disturb them: it clears `MergedDictionaries`, not the window's own resources. Because of those two non-colour keys, the check that every `DynamicResource` exists in both themes only looks at keys containing `Brush`.
-  - The gap between icon and word is a **symmetric** margin on the icon (`4,0,4,0`), which is the only form that centres correctly in every mode. On the word it leaves the word off-centre in *Text* mode; asymmetric on the icon it leaves the glyph off-centre in *Icon* mode, because a margin outlives the element it was meant to separate from. A trigger cannot fix it — a `DataTrigger`'s `Binding` does not accept a `DynamicResource` — and neither can a `Thickness` held as a resource and rewritten from PowerShell: layout then fails with `InvalidCastException` on the first measure pass. Symmetric needs none of that.
-  - The header panel carries `MinHeight=16`. Without it the strip **shrank by 2px** in *Icon* mode: the glyph's line box is shorter than the text's, and with the word collapsed only the glyph was left to set the height. 16 is what the text occupies on its own, so the strip is 29px in all three modes.
-  - **Declaration order and position do not match on the right.** In a `DockPanel` the *first* child with `Dock=Right` takes the right edge and the next sits to its left, so `TabAbout` is declared before `TabSettings` precisely because it is the one further right — and the negative right margin that keeps the last tab flush with the frame lives on About.
-  - In *Icon* mode a tab has no text, so each `TabItem` carries `AutomationProperties.Name`: without it the tab would announce nothing.
-- The lazy load of the Installed tab compares `SelectedItem` with **the `TabInstalled` object**, not with its header string: the Settings tab's header is not even a string (glyph plus word), and a rename must not silently switch the automatic load off.
-- The search spinner sits at the **end** of its row: docked right it took 20px off the search box every time a search ran, and gave them back afterwards.
-- During an operation the grids go **read-only, not disabled**: a disabled `DataGrid` stops responding to wheel, scrollbar and keyboard, so the list looked frozen.
-
-
-
+The rule: **a decision that shapes the architecture gets a new numbered ADR**, written from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md); a superseded or withdrawn ADR is kept and its number never reused. **A spec in `docs\superpowers\specs\` is deleted once it is implemented**, after its decisions have been moved into an ADR.

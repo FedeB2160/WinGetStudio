@@ -142,7 +142,7 @@ function Load-Upgrades {
                     if (Test-IsSelfPackage $u) { $self = $true; continue }
                     $items.Add($u)
                 }
-                if ($self) { Write-Log "An update for WinGet Studio itself is available: use the gear button." }
+                if ($self) { Write-Log "An update for WinGet Studio itself is available: update it from the Settings tab." }
             }
 
             if ($items.Count -eq 0) {

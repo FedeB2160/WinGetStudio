@@ -1,28 +1,28 @@
 {
   "src/build.ps1": {
-    "mtime": 1787563343.6622212,
-    "ast_hash": "e61e9b0492fcaff0002344ead1305b74",
-    "semantic_hash": "e61e9b0492fcaff0002344ead1305b74"
+    "mtime": 1791451201.489163,
+    "ast_hash": "e95720f27d4ea0538c97db0a07b7834f",
+    "semantic_hash": "e95720f27d4ea0538c97db0a07b7834f"
   },
   "src/main.ps1": {
-    "mtime": 1787563343.6632192,
-    "ast_hash": "02ea6bb421fa57fceec1376ebc3eae89",
-    "semantic_hash": "02ea6bb421fa57fceec1376ebc3eae89"
+    "mtime": 1791390518.3884747,
+    "ast_hash": "3c4bee12e5b3d85b75fc26368ae57746",
+    "semantic_hash": "3c4bee12e5b3d85b75fc26368ae57746"
   },
   "src/modules/App.Bootstrap.ps1": {
-    "mtime": 1787563343.6651978,
-    "ast_hash": "cdf73769ebdc004cdaadb593b6f6f6da",
-    "semantic_hash": "cdf73769ebdc004cdaadb593b6f6f6da"
+    "mtime": 1791378063.1422267,
+    "ast_hash": "3fce8b53861f714e095eeda086066169",
+    "semantic_hash": "3fce8b53861f714e095eeda086066169"
   },
   "src/modules/App.Jobs.ps1": {
-    "mtime": 1787563343.6651978,
-    "ast_hash": "7545b4274c5e7148627ebab883d00499",
-    "semantic_hash": "7545b4274c5e7148627ebab883d00499"
+    "mtime": 1791372665.6127646,
+    "ast_hash": "4b75c61b54b5a5a863166f96ffcca2a3",
+    "semantic_hash": "4b75c61b54b5a5a863166f96ffcca2a3"
   },
   "src/modules/App.Pins.ps1": {
-    "mtime": 1787563343.6662097,
-    "ast_hash": "9bf25242b730d59fe912bd10d0cc8fcc",
-    "semantic_hash": "9bf25242b730d59fe912bd10d0cc8fcc"
+    "mtime": 1791372665.6127646,
+    "ast_hash": "67877b86c86b722dd4164fa07a417898",
+    "semantic_hash": "67877b86c86b722dd4164fa07a417898"
   },
   "src/modules/App.Theme.ps1": {
     "mtime": 1787563343.6672034,
@@ -30,44 +30,44 @@
     "semantic_hash": "5db7968b380bcba72ec9e66bdfb7342a"
   },
   "src/modules/App.Ui.ps1": {
-    "mtime": 1787563343.668617,
-    "ast_hash": "3d17d399d1917611a1cdffe07ee5abff",
-    "semantic_hash": "3d17d399d1917611a1cdffe07ee5abff"
+    "mtime": 1791372665.6137652,
+    "ast_hash": "56801932d19f01985c7c26c4e62f0a0a",
+    "semantic_hash": "56801932d19f01985c7c26c4e62f0a0a"
   },
   "src/modules/Tab.Install.ps1": {
-    "mtime": 1787563343.6709626,
-    "ast_hash": "2682e4b12481ce8576b967c72567497d",
-    "semantic_hash": "2682e4b12481ce8576b967c72567497d"
+    "mtime": 1791372665.6147642,
+    "ast_hash": "db9c533521beb2968c38aef0c7b4eec6",
+    "semantic_hash": "db9c533521beb2968c38aef0c7b4eec6"
   },
   "src/modules/Tab.Installed.ps1": {
-    "mtime": 1787563343.6719615,
-    "ast_hash": "96e3864b2800509555d411e1ed66c883",
-    "semantic_hash": "96e3864b2800509555d411e1ed66c883"
+    "mtime": 1791372665.6147642,
+    "ast_hash": "7d748df84b1566cd00c2ceda9b808bfa",
+    "semantic_hash": "7d748df84b1566cd00c2ceda9b808bfa"
   },
   "src/modules/Tab.Updates.ps1": {
-    "mtime": 1787563343.6729612,
-    "ast_hash": "ff74ad1de529cc8c7b82c704c02a0cc4",
-    "semantic_hash": "ff74ad1de529cc8c7b82c704c02a0cc4"
+    "mtime": 1791451201.4901052,
+    "ast_hash": "b236cab24ef9c055da9f97ccfe572db9",
+    "semantic_hash": "b236cab24ef9c055da9f97ccfe572db9"
   },
   "src/modules/WinGet.Exec.ps1": {
-    "mtime": 1787563343.6739614,
-    "ast_hash": "a56080e70361acec921de919a8d347df",
-    "semantic_hash": "a56080e70361acec921de919a8d347df"
+    "mtime": 1791378063.1432514,
+    "ast_hash": "7cd7e93b0dd2852bc89dd8a555e468e5",
+    "semantic_hash": "7cd7e93b0dd2852bc89dd8a555e468e5"
   },
   "src/modules/WinGet.Parse.ps1": {
-    "mtime": 1787563343.6749616,
-    "ast_hash": "7b335a726f4bffaa2fda894da80baad9",
-    "semantic_hash": "7b335a726f4bffaa2fda894da80baad9"
+    "mtime": 1791378063.1442225,
+    "ast_hash": "18562e3bb521b9b69636ed1658d82be0",
+    "semantic_hash": "18562e3bb521b9b69636ed1658d82be0"
   },
   "tests/Test-InvokeWinGet.ps1": {
-    "mtime": 1787563343.6749616,
-    "ast_hash": "67e5995b734b4079cf650630cf2a9cd5",
-    "semantic_hash": "67e5995b734b4079cf650630cf2a9cd5"
+    "mtime": 1791378063.145221,
+    "ast_hash": "93e2d0b29ca027de094e2bfdb2aa403a",
+    "semantic_hash": "93e2d0b29ca027de094e2bfdb2aa403a"
   },
   "tests/Test-Ui.ps1": {
-    "mtime": 1787563343.6769617,
-    "ast_hash": "49567a1c5293b33c3c5103f3542e0a40",
-    "semantic_hash": "49567a1c5293b33c3c5103f3542e0a40"
+    "mtime": 1791442681.870756,
+    "ast_hash": "8702ec3e1525f1ad1ec5996b59d2fa92",
+    "semantic_hash": "8702ec3e1525f1ad1ec5996b59d2fa92"
   },
   "ui/Theme.Dark.xaml": {
     "mtime": 1787563343.6769617,
@@ -80,34 +80,34 @@
     "semantic_hash": "ee37016fd0dc622810dd5af16d6515e8"
   },
   "ui/UI.xaml": {
-    "mtime": 1787563343.6789665,
-    "ast_hash": "1b1188e5863fcfe8431e0f7e9f811433",
-    "semantic_hash": "1b1188e5863fcfe8431e0f7e9f811433"
+    "mtime": 1791372665.6207705,
+    "ast_hash": "4a66958d4e9ba6e359165f521c3d097f",
+    "semantic_hash": "4a66958d4e9ba6e359165f521c3d097f"
   },
   "README.md": {
-    "mtime": 1787563343.6592183,
-    "ast_hash": "283b9a94041f06dd5ae76e5daddbe040",
-    "semantic_hash": "283b9a94041f06dd5ae76e5daddbe040"
+    "mtime": 1791390518.382466,
+    "ast_hash": "868d32dddcce71f7b890c8b21e09095a",
+    "semantic_hash": "868d32dddcce71f7b890c8b21e09095a"
   },
   "src/modules/App.Backup.ps1": {
-    "mtime": 1787563343.6632192,
-    "ast_hash": "03ab89568e98e0130b4ee53f76b36dc3",
-    "semantic_hash": "03ab89568e98e0130b4ee53f76b36dc3"
+    "mtime": 1791372665.611765,
+    "ast_hash": "e063ec0ea54e48a0bc1861f74bf17d62",
+    "semantic_hash": "e063ec0ea54e48a0bc1861f74bf17d62"
   },
   "src/modules/App.Update.ps1": {
-    "mtime": 1787563343.6699538,
-    "ast_hash": "af881fe79348429f1ccfa6d47274dab0",
-    "semantic_hash": "af881fe79348429f1ccfa6d47274dab0"
+    "mtime": 1791390518.389474,
+    "ast_hash": "2797aa02e69bb83b39bebc4cd27bc481",
+    "semantic_hash": "2797aa02e69bb83b39bebc4cd27bc481"
   },
   "CHANGELOG.md": {
     "mtime": 1787563343.6562204,
     "ast_hash": "1beb4aac147e44fc8e40106b29aaeb89",
-    "semantic_hash": "1beb4aac147e44fc8e40106b29aaeb89"
+    "semantic_hash": ""
   },
   "DEVELOPMENT.md": {
-    "mtime": 1787566889.7489064,
-    "ast_hash": "ea8ad6484f8efaec5ab62016762615c9",
-    "semantic_hash": "ea8ad6484f8efaec5ab62016762615c9"
+    "mtime": 1791451308.4532247,
+    "ast_hash": "8fc2c3a032057bd948ff4cae5ea41d6b",
+    "semantic_hash": "8fc2c3a032057bd948ff4cae5ea41d6b"
   },
   "winget/1.9.0/FedeB2160.WinGetStudio.installer.yaml": {
     "mtime": 1785846107.1844254,
@@ -130,9 +130,9 @@
     "semantic_hash": "64f2bf0afdf50f30139ff27248cd2077"
   },
   "CLAUDE.md": {
-    "mtime": 1787563343.6572194,
-    "ast_hash": "49c5b4b24fec0fe65a862008627e1be2",
-    "semantic_hash": "49c5b4b24fec0fe65a862008627e1be2"
+    "mtime": 1791451231.1060383,
+    "ast_hash": "0eb695b21f0efed4b900ba0190d44d74",
+    "semantic_hash": "0eb695b21f0efed4b900ba0190d44d74"
   },
   "winget/1.10.0/FedeB2160.WinGetStudio.installer.yaml": {
     "mtime": 1787565138.3533306,
@@ -148,5 +148,130 @@
     "mtime": 1787565138.2851326,
     "ast_hash": "475e2e5530f719c13a5358b379ed835d",
     "semantic_hash": "475e2e5530f719c13a5358b379ed835d"
+  },
+  "src/sign.ps1": {
+    "mtime": 1791390518.3905697,
+    "ast_hash": "3a021e6e14c62ff89a1bb68729fa3fad",
+    "semantic_hash": "3a021e6e14c62ff89a1bb68729fa3fad"
+  },
+  ".github/workflows/ci.yml": {
+    "mtime": 1791442692.267912,
+    "ast_hash": "00aa3e4e240e664cbafcc162afa5b7f4",
+    "semantic_hash": "00aa3e4e240e664cbafcc162afa5b7f4"
+  },
+  "AGENTS.md": {
+    "mtime": 1791451226.249341,
+    "ast_hash": "35f23810da95e5ce5e77e9d42d520b18",
+    "semantic_hash": "35f23810da95e5ce5e77e9d42d520b18"
+  },
+  "docs/adr/0001-one-exe-built-from-modules.md": {
+    "mtime": 1791450778.0721881,
+    "ast_hash": "faed3137304ed3744a2cd3a62baf2908",
+    "semantic_hash": "faed3137304ed3744a2cd3a62baf2908"
+  },
+  "docs/adr/0002-always-elevated.md": {
+    "mtime": 1791450797.3587165,
+    "ast_hash": "86c484230d596a2d6896f16d54f90c6a",
+    "semantic_hash": "86c484230d596a2d6896f16d54f90c6a"
+  },
+  "docs/adr/0003-only-one-winget-process-at-a-time.md": {
+    "mtime": 1791450797.4267592,
+    "ast_hash": "f97782aef21ed05f1797bf65d00d98c0",
+    "semantic_hash": "f97782aef21ed05f1797bf65d00d98c0"
+  },
+  "docs/adr/0004-how-winget-is-run.md": {
+    "mtime": 1791450841.0303402,
+    "ast_hash": "2ff8836f9f5258239cab5eb397676399",
+    "semantic_hash": "2ff8836f9f5258239cab5eb397676399"
+  },
+  "docs/adr/0005-reads-return-a-result-not-a-list.md": {
+    "mtime": 1791450841.109144,
+    "ast_hash": "83036a65b207120c5cad577a1a82be76",
+    "semantic_hash": "83036a65b207120c5cad577a1a82be76"
+  },
+  "docs/adr/0006-parsing-winget-tables-by-column-position.md": {
+    "mtime": 1791450866.1900043,
+    "ast_hash": "b8fecc6bade7681875eb07f804b41447",
+    "semantic_hash": "b8fecc6bade7681875eb07f804b41447"
+  },
+  "docs/adr/0007-pins-are-blocking.md": {
+    "mtime": 1791450866.2560086,
+    "ast_hash": "35eec063f50ace6486fe72620fa71db1",
+    "semantic_hash": "35eec063f50ace6486fe72620fa71db1"
+  },
+  "docs/adr/0008-background-work-in-runspaces.md": {
+    "mtime": 1791450866.3155885,
+    "ast_hash": "6287d142ad8757c086fb1726a2b6211f",
+    "semantic_hash": "6287d142ad8757c086fb1726a2b6211f"
+  },
+  "docs/adr/0009-grid-rows-are-wgtrow.md": {
+    "mtime": 1791450895.4358926,
+    "ast_hash": "16bdc739540989f1fc7cf3062ae33000",
+    "semantic_hash": "16bdc739540989f1fc7cf3062ae33000"
+  },
+  "docs/adr/0010-themes.md": {
+    "mtime": 1791451187.4529076,
+    "ast_hash": "883661158f5c7849df917ae65e48f8a4",
+    "semantic_hash": "883661158f5c7849df917ae65e48f8a4"
+  },
+  "docs/adr/0011-window-layout.md": {
+    "mtime": 1791451187.451894,
+    "ast_hash": "212b481351510a63d348d43afdb1f8a6",
+    "semantic_hash": "212b481351510a63d348d43afdb1f8a6"
+  },
+  "docs/adr/0012-signing.md": {
+    "mtime": 1791450998.655821,
+    "ast_hash": "acfe8b584bd497e05f7d3965653087bd",
+    "semantic_hash": "acfe8b584bd497e05f7d3965653087bd"
+  },
+  "docs/adr/0013-self-update.md": {
+    "mtime": 1791456141.079789,
+    "ast_hash": "07adf7b5bc4cceb020ddda74ef816e9e",
+    "semantic_hash": "07adf7b5bc4cceb020ddda74ef816e9e"
+  },
+  "docs/adr/0014-installer-alongside-the-portable-exe.md": {
+    "mtime": 1791451029.7136807,
+    "ast_hash": "8f18e3f08b554c2a4fea0ba489fe7acb",
+    "semantic_hash": "8f18e3f08b554c2a4fea0ba489fe7acb"
+  },
+  "docs/adr/0015-winget-package-portable-then-inno.md": {
+    "mtime": 1791451057.2318065,
+    "ast_hash": "3c2e1161b3bc3794b80663d7d160f4f1",
+    "semantic_hash": "3c2e1161b3bc3794b80663d7d160f4f1"
+  },
+  "docs/adr/0016-tests.md": {
+    "mtime": 1791456134.894266,
+    "ast_hash": "a6d42fb5c69c213d73c54f88fe44963e",
+    "semantic_hash": "a6d42fb5c69c213d73c54f88fe44963e"
+  },
+  "docs/adr/TEMPLATE.md": {
+    "mtime": 1791450757.2895539,
+    "ast_hash": "0f0374588af145760a903d4223887a0b",
+    "semantic_hash": "0f0374588af145760a903d4223887a0b"
+  },
+  "winget/1.10.1/FedeB2160.WinGetStudio.installer.yaml": {
+    "mtime": 1787644308.1268773,
+    "ast_hash": "3c1e6a1a9c8297903bb18f1685479ffc",
+    "semantic_hash": "3c1e6a1a9c8297903bb18f1685479ffc"
+  },
+  "winget/1.10.2/FedeB2160.WinGetStudio.installer.yaml": {
+    "mtime": 1791372665.621768,
+    "ast_hash": "33db229b6bfba84b80d1d4d7018a731a",
+    "semantic_hash": "33db229b6bfba84b80d1d4d7018a731a"
+  },
+  "winget/1.10.3/FedeB2160.WinGetStudio.installer.yaml": {
+    "mtime": 1791380901.4924786,
+    "ast_hash": "92fdb2701d332d7a8cc47e8eb2db6b85",
+    "semantic_hash": "92fdb2701d332d7a8cc47e8eb2db6b85"
+  },
+  "winget/1.11.0/FedeB2160.WinGetStudio.installer.yaml": {
+    "mtime": 1791390739.6583712,
+    "ast_hash": "5538b06b668a5683a631b82b9afe4631",
+    "semantic_hash": "5538b06b668a5683a631b82b9afe4631"
+  },
+  "winget/1.11.0/FedeB2160.WinGetStudio.locale.en-US.yaml": {
+    "mtime": 1791390518.394472,
+    "ast_hash": "1ee9fd399d5573086c5b2d346c9b3e6a",
+    "semantic_hash": "1ee9fd399d5573086c5b2d346c9b3e6a"
   }
 }
