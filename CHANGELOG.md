@@ -2,8 +2,17 @@
 
 ## Unreleased
 
+## v1.11.1
+
+A new icon and one fix. Coming from v1.11.0: let the app update itself from **Settings**, or run the new setup; installed with winget, use `winget upgrade FedeB2160.WinGetStudio`.
+
+### A new icon
+
+A cardboard package with `>_` stamped on its side and a blue download badge: the package is what winget manages, the prompt is the command line it comes from. The old icon was a single 256 px image that Windows shrank for every other size, so it was blurred in the title bar, the taskbar and Explorer. The new one is drawn for each of the 14 sizes Windows asks for, from 16 to 256 px, with less detail as it gets smaller, and stays sharp at all of them.
+
+### Fixes
+
 - When WinGet Studio itself shows up in the Updates list, the log now says to update it from the **Settings** tab; it still named the gear button removed in v1.10.0.
-- A new app icon: a cardboard package with `>_` stamped on its side and a download badge. It is drawn for every size Windows uses, from 16 to 256 px, instead of one 256 px image scaled down, so it stays sharp in the title bar, the taskbar and Explorer.
 
 ## v1.11.0
 
