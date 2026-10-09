@@ -65,9 +65,9 @@
     "semantic_hash": "93e2d0b29ca027de094e2bfdb2aa403a"
   },
   "tests/Test-Ui.ps1": {
-    "mtime": 1791458769.217165,
-    "ast_hash": "8702ec3e1525f1ad1ec5996b59d2fa92",
-    "semantic_hash": "8702ec3e1525f1ad1ec5996b59d2fa92"
+    "mtime": 1791461710.2337902,
+    "ast_hash": "e950990a049944c9c3b9c14d95aa03a8",
+    "semantic_hash": "e950990a049944c9c3b9c14d95aa03a8"
   },
   "ui/Theme.Dark.xaml": {
     "mtime": 1787563343.6769617,
@@ -85,9 +85,9 @@
     "semantic_hash": "4a66958d4e9ba6e359165f521c3d097f"
   },
   "README.md": {
-    "mtime": 1791390518.382466,
-    "ast_hash": "868d32dddcce71f7b890c8b21e09095a",
-    "semantic_hash": "868d32dddcce71f7b890c8b21e09095a"
+    "mtime": 1791534691.113703,
+    "ast_hash": "b87d202982906f84c8fdc0cb9b1ca0b0",
+    "semantic_hash": "b87d202982906f84c8fdc0cb9b1ca0b0"
   },
   "src/modules/App.Backup.ps1": {
     "mtime": 1791372665.611765,
@@ -100,14 +100,14 @@
     "semantic_hash": "2797aa02e69bb83b39bebc4cd27bc481"
   },
   "CHANGELOG.md": {
-    "mtime": 1791458769.1886163,
-    "ast_hash": "abf2be31c709aac6f265f1b94d3b8853",
-    "semantic_hash": "abf2be31c709aac6f265f1b94d3b8853"
+    "mtime": 1791461774.296363,
+    "ast_hash": "32efc4c41661a3d1ca4f9919de58298a",
+    "semantic_hash": "32efc4c41661a3d1ca4f9919de58298a"
   },
   "DEVELOPMENT.md": {
-    "mtime": 1791451308.4532247,
-    "ast_hash": "8fc2c3a032057bd948ff4cae5ea41d6b",
-    "semantic_hash": "8fc2c3a032057bd948ff4cae5ea41d6b"
+    "mtime": 1791461769.4492865,
+    "ast_hash": "140c9ff53d3949c9139b9317478bd8e5",
+    "semantic_hash": "140c9ff53d3949c9139b9317478bd8e5"
   },
   "winget/1.9.0/FedeB2160.WinGetStudio.installer.yaml": {
     "mtime": 1785846107.1844254,
@@ -308,5 +308,15 @@
     "mtime": 1791390518.3954747,
     "ast_hash": "b5170fe712e491844ccfcc863fd3eae9",
     "semantic_hash": "b5170fe712e491844ccfcc863fd3eae9"
+  },
+  "src/icon.ps1": {
+    "mtime": 1791461743.3290622,
+    "ast_hash": "820bdb732989caef4d0fa0cd57822e0d",
+    "semantic_hash": "820bdb732989caef4d0fa0cd57822e0d"
+  },
+  "docs/adr/0017-app-icon-drawn-in-code.md": {
+    "mtime": 1791461758.6102295,
+    "ast_hash": "50f2c125b71d1f42f5bde6d63a508d6d",
+    "semantic_hash": "50f2c125b71d1f42f5bde6d63a508d6d"
   }
 }

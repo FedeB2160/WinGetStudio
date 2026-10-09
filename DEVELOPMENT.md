@@ -191,7 +191,7 @@ The Windows CI (`.github/workflows/ci.yml`, GitHub-hosted `windows-2022`) runs b
 
 ## Knowledge graph
 
-`graphify-out\` holds a knowledge graph of this repository: 225 nodes and 392 edges over the code (extracted from the AST) plus the concepts and rationale from the documentation, grouped into 29 communities.
+`graphify-out\` holds a knowledge graph of this repository: 361 nodes and 590 edges over the code (extracted from the AST) plus the concepts and rationale from the documentation, grouped into 42 communities. `.graphifyignore` keeps the generated icon PNGs out of it.
 
 Four files are **committed**, because they are the durable value:
 

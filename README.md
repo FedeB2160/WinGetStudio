@@ -1,3 +1,5 @@
+<img src="assets/icon/icon-128.png" alt="" width="96" align="right">
+
 # WinGet Studio
 
 A Windows desktop front end for `winget`. Everything happens in one table with checkboxes: **update** what has a newer version, **install** something new by searching as you type, **list and uninstall** what is already there, **pin** what must not be touched, and **export / import** the whole package list to rebuild a machine.
