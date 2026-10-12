@@ -23,15 +23,17 @@ is no single-test selector.
 - **`tests\Test-InvokeWinGet.ps1`** — winget execution and table parsing. It extracts the functions from
   the real modules through the AST, so it tests production code rather than a copy. It checks that the
   wait is bound to the process (a detached child holding stdout must not hang it), that the exit code is
-  available, that output is read back as UTF-8, that leftover temp files are swept, and it parses four
-  fixtures (ADR 0006). It needs no admin rights, installs nothing, and calls `winget --version` only when
-  winget exists.
+  available, that output is read back as UTF-8, that leftover temp files are swept, that the unelevated
+  path hands the same command line to its scheduled task (through a stand-in, ADR 0018), and it parses
+  four fixtures (ADR 0006). It needs no admin rights, installs nothing, and calls `winget --version` only
+  when winget exists.
 - **`tests\Test-Ui.ps1`** — runs with `-STA` and **mounts the real app in a hidden window**: `Start-App
   -NoShow` builds the window without displaying it.
 
 **Offline by default; `-Live` is opt-in.** Without `-Live`, `Test-Ui.ps1` touches neither winget nor
 the network; that is what CI runs. `-Live` adds real search, list and export — including the real
 search-as-you-type, where a slower earlier query returns after a newer one — the GitHub release check,
+one `winget --version` through a real unelevated scheduled task (ADR 0018; a console window flashes),
 and one pin cycle on `7zip.7zip` — only when it is installed and not already pinned, and the pin it
 creates is removed in a `finally` that first waits for the queue's winget to exit. The live run stays a
 manual gate before a release.

@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-04 (in place since v1.9.0 or earlier; the resolved path and the quote guard came in v1.10.0, UTF-8 decoding of reads and the temp sweep in v1.10.3)
 - **Depends on:** ADR 0002, ADR 0003, ADR 0008
-- **Referenced by:** ADR 0005, ADR 0006
+- **Referenced by:** ADR 0005, ADR 0006, ADR 0018 (the same command line, run without elevation)
 
 ## Context
 

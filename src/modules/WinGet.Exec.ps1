@@ -67,7 +67,10 @@ function Get-WinGetOutputTail([string]$Text, [int]$Count = 2) {
 # stiamo scappando -> -PassThru + WaitForExit().
 # $Tick viene invocato ogni 30s con i secondi trascorsi (log "elapsed"). Nessun
 # timeout: gli installer lenti non vengono troncati.
-function Invoke-WinGet([string]$exePath, [string]$argLine, [scriptblock]$Tick) {
+# -Unelevated: la stessa riga gira come questo account SENZA elevazione, tramite
+# Invoke-UnelevatedTask (ADR 0018). File di output e percorso di winget restano validi: sono
+# dello stesso account.
+function Invoke-WinGet([string]$exePath, [string]$argLine, [scriptblock]$Tick, [switch]$Unelevated) {
     # La riga finisce dentro cmd per CONCATENAZIONE, e ogni chiamante interpola l'Id del
     # pacchetto fra apici (--id "$($r.Id)"). Con un numero DISPARI di apici doppi il comando
     # che cmd vede non e' quello che intendevamo, e cmd lo esegue lo stesso: meglio fermarsi.
@@ -88,15 +91,23 @@ function Invoke-WinGet([string]$exePath, [string]$argLine, [scriptblock]$Tick) {
         # Il redirect su file lo fa cmd (/s /c + tutta la riga tra apici: cmd toglie solo
         # gli apici esterni e passa il resto verbatim), cosi' non ci sono pipe da svuotare
         # e l'attesa dipende dal solo processo.
-        $psi = New-Object Diagnostics.ProcessStartInfo
-        $psi.FileName        = 'cmd.exe'
-        $psi.Arguments       = "/d /s /c `"`"$exePath`" $argLine >`"$outFile`" 2>`"$errFile`"`""
-        $psi.UseShellExecute = $false
-        $psi.CreateNoWindow  = $true
-        $p = [Diagnostics.Process]::Start($psi)
+        $run = "`"$exePath`" $argLine >`"$outFile`" 2>`"$errFile`""
         $sw = [Diagnostics.Stopwatch]::StartNew()
-        while (-not $p.WaitForExit(30000)) {
-            if ($Tick) { & $Tick ([int]$sw.Elapsed.TotalSeconds) }
+        if ($Unelevated) {
+            # L'attivita' apre una finestra console nella sessione: il titolo dice di chi e'.
+            $code = Invoke-UnelevatedTask "/d /s /c `"title WinGet Studio & $run`"" $Tick
+        }
+        else {
+            $psi = New-Object Diagnostics.ProcessStartInfo
+            $psi.FileName        = 'cmd.exe'
+            $psi.Arguments       = "/d /s /c `"$run`""
+            $psi.UseShellExecute = $false
+            $psi.CreateNoWindow  = $true
+            $p = [Diagnostics.Process]::Start($psi)
+            while (-not $p.WaitForExit(30000)) {
+                if ($Tick) { & $Tick ([int]$sw.Elapsed.TotalSeconds) }
+            }
+            $code = $p.ExitCode
         }
         # -Encoding UTF8 OBBLIGATORIO: winget scrive UTF-8, ma Get-Content in
         # PowerShell 5.1 assume il codepage ANSI del sistema -> i messaggi localizzati
@@ -105,13 +116,56 @@ function Invoke-WinGet([string]$exePath, [string]$argLine, [scriptblock]$Tick) {
         $text = [string](Get-Content $outFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue) +
                 [string](Get-Content $errFile -Raw -Encoding UTF8 -ErrorAction SilentlyContinue)
         return [PSCustomObject]@{
-            ExitCode = $p.ExitCode
+            ExitCode = $code
             Output   = $text
             Seconds  = [int]$sw.Elapsed.TotalSeconds
         }
     }
     finally {
         foreach ($f in @($outFile, $errFile)) { Remove-Item $f -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+# Esegue cmd.exe con $Arguments come QUESTO account ma SENZA elevazione, e ne torna l'exit
+# code. Serve dove winget rifiuta di lavorare da amministratore (0x8A15007D, ADR 0018).
+# Un'attivita' pianificata e' il modo documentato di avere un token non elevato da un processo
+# elevato senza chiedere password: LogonType Interactive la fa girare nella sessione gia'
+# aperta dall'account, RunLevel Limited col token filtrato. Se l'account non ha una sessione
+# aperta l'attivita' non parte, e dopo 30 s si esce con un errore che lo dice.
+# cmd.exe e non conhost o powershell nascosti: conhost restituisce sempre 0 invece dell'exit
+# code, e le finestre nascoste con trucchi sono cio' che gli antivirus aziendali segnalano.
+# Il prezzo e' una finestra console visibile finche' winget lavora.
+# $Tick come in Invoke-WinGet: ogni 30 s, con i secondi trascorsi.
+function Invoke-UnelevatedTask([string]$Arguments, [scriptblock]$Tick) {
+    $name = "WinGetStudio_$([Guid]::NewGuid().ToString('N'))"
+    try {
+        $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+        # Senza le due opzioni di batteria, su un portatile scollegato l'attivita' non parte.
+        $task = New-ScheduledTask `
+            -Action    (New-ScheduledTaskAction -Execute 'cmd.exe' -Argument $Arguments) `
+            -Principal (New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive -RunLevel Limited) `
+            -Settings  (New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero))
+        [void](Register-ScheduledTask -TaskName $name -InputObject $task -ErrorAction Stop)
+        Start-ScheduledTask -TaskName $name -ErrorAction Stop
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        $nextTick = 30
+        while ($true) {
+            Start-Sleep -Milliseconds 500
+            $t = Get-ScheduledTask -TaskName $name -ErrorAction Stop
+            $result = ($t | Get-ScheduledTaskInfo -ErrorAction Stop).LastTaskResult
+            # 0x41301 = in corso, 0x41303 = non ancora partita; altrimenti e' l'exit code di cmd.
+            if ($t.State -ne 'Running' -and $t.State -ne 'Queued' -and $result -notin 0x41301, 0x41303) { break }
+            $s = [int]$sw.Elapsed.TotalSeconds
+            if ($result -eq 0x41303 -and $s -ge 30) { throw "the unelevated task did not start within 30 seconds: $me has no open session to run it in" }
+            if ($Tick -and $s -ge $nextTick) { & $Tick $s; $nextTick += 30 }
+        }
+        # LastTaskResult e' un UInt32, winget esce con HRESULT negativi (0x8A15007D = -1978335107).
+        $code = [int64]$result
+        if ($code -gt [int]::MaxValue) { $code -= 4294967296 }
+        return [int]$code
+    }
+    finally {
+        Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
     }
 }
 

@@ -178,14 +178,14 @@ Every value with a `:` inside must be quoted, or the YAML parser fails — `Shor
 ```powershell
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
-# live: real winget reads/export, the GitHub API, one pin cycle on 7zip.7zip
+# live: real winget reads/export, the GitHub API, one unelevated scheduled task, one pin cycle on 7zip.7zip
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 ```
 
 Two standalone scripts of sequential assertions, no framework and no single-test selector: comment out or run the file.
 
-- **`Test-InvokeWinGet.ps1`** — winget execution (wait bound to the process, exit code available, output read back as UTF-8, temp sweep) and table parsing on four fixtures, through the real functions. Needs no admin rights, installs nothing, calls `winget --version` only when winget exists.
-- **`Test-Ui.ps1`** — needs `-STA`; mounts the real app in a hidden WPF window (`Start-App -NoShow`) and **runs offline by default**. It checks parsing, the module list and the concatenated exe source, controls, themes and contrast, layout, confirmations, the install channels and the release-asset choice. `-Live` adds real search (including search-as-you-type), list and export, the GitHub release check, and one pin cycle on `7zip.7zip` — only when it is installed and not already pinned; the pin is removed in a `finally`.
+- **`Test-InvokeWinGet.ps1`** — winget execution (wait bound to the process, exit code available, output read back as UTF-8, temp sweep, the same command line on the unelevated path) and table parsing on four fixtures, through the real functions. Needs no admin rights, installs nothing, calls `winget --version` only when winget exists.
+- **`Test-Ui.ps1`** — needs `-STA`; mounts the real app in a hidden WPF window (`Start-App -NoShow`) and **runs offline by default**. It checks parsing, the module list and the concatenated exe source, controls, themes and contrast, layout, confirmations, the install channels and the release-asset choice. `-Live` adds real search (including search-as-you-type), list and export, the GitHub release check, one `winget --version` through a real unelevated scheduled task (a console window flashes), and one pin cycle on `7zip.7zip` — only when it is installed and not already pinned; the pin is removed in a `finally`.
 
 The Windows CI (`.github/workflows/ci.yml`, GitHub-hosted `windows-2022`) runs both suites offline on every pull request and push to `main`, then installs Inno Setup 6.7.1, builds the exe and the setup, fails if either is missing, and uploads both as unsigned test artifacts for seven days. What each check guards against, and why CI never sees a signing key: → [ADR 0016](docs/adr/0016-tests.md).
 
@@ -230,7 +230,7 @@ The graph is worth having here because the *why* behind this codebase is spread 
 Each decision that shapes the architecture has an Architecture Decision Record in [docs/adr/](docs/adr/). Read the relevant one before changing that area: most of the oddities in this codebase are bugs already paid for once.
 
 - [ADR 0001](docs/adr/0001-one-exe-built-from-modules.md) — One exe built from modules: ps2exe's single input, the markers, `$moduleNames` and `$AppVersion` as single sources.
-- [ADR 0002](docs/adr/0002-always-elevated.md) — Always elevated, with what that costs for per-user packages (issue #12).
+- [ADR 0002](docs/adr/0002-always-elevated.md) — Always elevated, with what that costs for per-user packages.
 - [ADR 0003](docs/adr/0003-only-one-winget-process-at-a-time.md) — Only one winget process at a time: global busy state, `Test-WinGetBusy`, one queue choke point, cooperative cancel.
 - [ADR 0004](docs/adr/0004-how-winget-is-run.md) — How winget is run: output to file, `Process.Start`, UTF-8, one resolved path, quote guard, temp sweep.
 - [ADR 0005](docs/adr/0005-reads-return-a-result-not-a-list.md) — Reads return a result, not a list, so a failing winget never passes for an empty one.
@@ -246,5 +246,6 @@ Each decision that shapes the architecture has an Architecture Decision Record i
 - [ADR 0015](docs/adr/0015-winget-package-portable-then-inno.md) — The winget package: portable up to 1.10.3, inno from 1.11.0, and how users migrate.
 - [ADR 0016](docs/adr/0016-tests.md) — Tests: two standalone scripts, offline by default, the real app mounted hidden, CI without a key.
 - [ADR 0017](docs/adr/0017-app-icon-drawn-in-code.md) — The app icon is drawn in code: a cardboard box with `>_` and a download badge, 14 pixel-snapped sizes from one script.
+- [ADR 0018](docs/adr/0018-retry-without-elevation-when-winget-refuses-administrator.md) — When winget refuses a per-user uninstall as administrator (`0x8A15007D`, issue #12), the queue repeats it as the same account without elevation, through a one-off scheduled task.
 
 The rule: **a decision that shapes the architecture gets a new numbered ADR**, written from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md); a superseded or withdrawn ADR is kept and its number never reused. **A spec in `docs\superpowers\specs\` is deleted once it is implemented**, after its decisions have been moved into an ADR.

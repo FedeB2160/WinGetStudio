@@ -329,6 +329,41 @@ Check "apici sbilanciati rifiutati invece di eseguiti" $threw
 $ok = Invoke-WinGet 'cmd.exe' '/c echo "bilanciato"'
 Check "apici bilanciati eseguiti (output '$($ok.Output.Trim())')" ($ok.Output -match 'bilanciato')
 
+Write-Host "`n8) Stesso comando senza elevazione" -ForegroundColor Cyan
+# winget rifiuta alcune operazioni da amministratore (0x8A15007D) e la coda le ripete come
+# questo account senza elevazione, con un'attivita' pianificata (ADR 0018). L'attivita' vera
+# la prova Test-Ui -Live; qui una Invoke-UnelevatedTask finta esegue la riga con cmd in modo
+# sincrono, e si verifica che Invoke-WinGet le passi lo stesso comando, legga l'output e torni
+# l'exit code come nel percorso normale.
+$script:taskArgs = $null
+function Invoke-UnelevatedTask([string]$Arguments, [scriptblock]$Tick) {
+    $script:taskArgs = $Arguments
+    $psi = New-Object Diagnostics.ProcessStartInfo 'cmd.exe', $Arguments
+    $psi.UseShellExecute = $false
+    $psi.CreateNoWindow  = $true
+    $p = [Diagnostics.Process]::Start($psi)
+    $p.WaitForExit()
+    $p.ExitCode
+}
+$null = Invoke-WinGet 'cmd.exe' '/c echo diretto'
+Check "senza -Unelevated l'attivita' non entra in gioco" ($null -eq $script:taskArgs)
+$u = Invoke-WinGet 'cmd.exe' '/c echo senza-elevazione' -Unelevated
+Check "con -Unelevated la stessa riga passa dall'attivita', col titolo della finestra ($script:taskArgs)" `
+      ($script:taskArgs -match '^/d /s /c "title WinGet Studio & "cmd\.exe" /c echo senza-elevazione >".+\.out" 2>".+\.err""$')
+Check "output letto dai file come nel percorso normale ('$($u.Output.Trim())')" ($u.Output.Trim() -eq 'senza-elevazione')
+$e = Invoke-WinGet 'cmd.exe' '/c exit -1978335107' -Unelevated
+Check "exit code negativo intatto (=$($e.ExitCode))" ($e.ExitCode -eq -1978335107)
+$threw = $false
+try { Invoke-WinGet 'cmd.exe' '/c echo "sbilanciato' -Unelevated } catch { $threw = $true }
+Check "la guardia sugli apici vale anche senza elevazione" $threw
+
+# L'attivita' vera: token filtrato (RunLevel Limited) nella sessione gia' aperta (Interactive),
+# avviabile anche a batteria, e cancellata comunque, anche quando winget fallisce.
+$taskSrc = Get-FunctionText 'Invoke-UnelevatedTask'
+Check "LogonType Interactive e RunLevel Limited" ($taskSrc -match '-LogonType Interactive' -and $taskSrc -match '-RunLevel Limited')
+Check "avviabile e non fermata a batteria" ($taskSrc -match 'AllowStartIfOnBatteries' -and $taskSrc -match 'DontStopIfGoingOnBatteries')
+Check "Unregister-ScheduledTask in un finally" ($taskSrc -match '(?s)finally\s*\{[^}]*Unregister-ScheduledTask')
+
 # ------------------------------------------------------------------
 Remove-Item -LiteralPath $stubDir -Recurse -Force -ErrorAction SilentlyContinue
 if ($failures -eq 0) { Write-Host "`nTutti i test passati.`n" -ForegroundColor Green; exit 0 }
