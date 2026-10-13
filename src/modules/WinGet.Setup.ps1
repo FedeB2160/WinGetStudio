@@ -102,11 +102,11 @@ function Start-WinGetInstall([switch]$Missing) {
         "The download is checked against the SHA-256 published with the release.`n`n" +
         "If winget is running somewhere else, the new version starts when it closes."
     }
-    $answer = [System.Windows.MessageBox]::Show($window, $text,
-        $(if ($Missing) { 'winget not found' } else { 'Update winget' }),
-        [System.Windows.MessageBoxButton]::YesNo,
-        [System.Windows.MessageBoxImage]::Question,
-        [System.Windows.MessageBoxResult]::No)
+    $answer = Show-AppDialog -Text $text `
+        -Title $(if ($Missing) { 'winget not found' } else { 'Update winget' }) `
+        -Button ([System.Windows.MessageBoxButton]::YesNo) `
+        -Image ([System.Windows.MessageBoxImage]::Question) `
+        -Default ([System.Windows.MessageBoxResult]::No)
     if ($answer -ne [System.Windows.MessageBoxResult]::Yes) {
         if ($Missing) { $window.Close() }
         return
@@ -159,14 +159,13 @@ function Start-WinGetInstall([switch]$Missing) {
                 # morto, scritto da Start-BackgroundJob), e chiudendo sparirebbe con lei. Lo stato
                 # occupato resta alzato: senza winget nessun comando deve partire.
                 Write-Log "winget could not be installed: $why"
-                [System.Windows.MessageBox]::Show($window,
-                    "winget could not be installed: $why`n`n" +
+                Show-AppDialog -Text ("winget could not be installed: $why`n`n" +
                     "The log below says what happened. Install App Installer from the Microsoft Store, or from " +
                     "https://github.com/microsoft/winget-cli/releases, then start WinGet Studio again. If it is installed " +
-                    "already, check that the winget alias is on in Settings > Apps > Advanced app settings > App execution aliases.",
-                    'winget not found',
-                    [System.Windows.MessageBoxButton]::OK,
-                    [System.Windows.MessageBoxImage]::Error) | Out-Null
+                    "already, check that the winget alias is on in Settings > Apps > Advanced app settings > App execution aliases.") `
+                    -Title 'winget not found' `
+                    -Button ([System.Windows.MessageBoxButton]::OK) `
+                    -Image ([System.Windows.MessageBoxImage]::Error) | Out-Null
                 return
             }
             Write-Log "winget update FAILED: $why"

@@ -222,16 +222,15 @@ function Start-SelfUpdate {
         return
     }
 
-    $answer = [System.Windows.MessageBox]::Show(
-        $(if ($installed) { "Download the $($rel.Tag) installer and update WinGet Studio? It closes, updates and reopens.`n`n" }
+    $answer = Show-AppDialog -Text ($(if ($installed) { "Download the $($rel.Tag) installer and update WinGet Studio? It closes, updates and reopens.`n`n" }
           else { "Download $($rel.Tag) and restart WinGet Studio?`n`n" }) +
         "$($rel.Name) - $([int]($rel.Size / 1024)) KB`nFrom: $($rel.Url)`n`n" +
         $(if ($rel.Sha256) { "The download is verified against the SHA-256 published with the release." }
-          else { "WARNING: this release publishes no checksum, so the download cannot be verified." }),
-        "Update WinGet Studio",
-        [System.Windows.MessageBoxButton]::YesNo,
-        [System.Windows.MessageBoxImage]::Question,
-        [System.Windows.MessageBoxResult]::No)
+          else { "WARNING: this release publishes no checksum, so the download cannot be verified." })) `
+        -Title 'Update WinGet Studio' `
+        -Button ([System.Windows.MessageBoxButton]::YesNo) `
+        -Image ([System.Windows.MessageBoxImage]::Question) `
+        -Default ([System.Windows.MessageBoxResult]::No)
     if ($answer -ne [System.Windows.MessageBoxResult]::Yes) { return }
 
     Set-AppBusy $true

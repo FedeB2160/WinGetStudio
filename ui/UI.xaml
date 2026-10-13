@@ -1314,5 +1314,10 @@
                  BorderBrush="{DynamicResource CtrlBorderBrush}"
                  CaretBrush="{DynamicResource FgBrush}"/>
 
+        <!-- Velo sotto un popup (Show-AppDialog, ADR 0020): copre tutta la finestra, margine
+             della griglia compreso (-10), e lo dissolve Set-DialogDim. -->
+        <Border x:Name="DialogDim" Grid.RowSpan="4" Margin="-10" Panel.ZIndex="100"
+                Background="{DynamicResource DimBrush}" Opacity="0" Visibility="Collapsed"/>
+
     </Grid>
 </Window>

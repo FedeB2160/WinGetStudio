@@ -174,10 +174,8 @@ function Install-Rows([object[]]$Rows) {
 function Start-InstallSelected {
     $sel = @($searchItems | Where-Object { $_.Selected })
     if ($sel.Count -eq 0) {
-        [System.Windows.MessageBox]::Show(
-            "No packages selected.", "WinGet Studio",
-            [System.Windows.MessageBoxButton]::OK,
-            [System.Windows.MessageBoxImage]::Information) | Out-Null
+        Show-AppDialog -Text 'No packages selected.' -Button ([System.Windows.MessageBoxButton]::OK) `
+            -Image ([System.Windows.MessageBoxImage]::Information) | Out-Null
         return
     }
     Install-Rows $sel

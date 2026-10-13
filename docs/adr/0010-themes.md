@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-04 (in place since v1.9.0 or earlier; contrast floors, surface step, `CtrlBorderBrush` and the themed scrollbars came in v1.10.0)
 - **Depends on:** ADR 0001
-- **Referenced by:** ADR 0011, ADR 0016
+- **Referenced by:** ADR 0011, ADR 0016, ADR 0020 (dialogs in the theme)
 
 ## Context
 

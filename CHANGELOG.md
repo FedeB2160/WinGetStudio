@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Messages and confirmations follow the theme: a dialog in the app's style, with its title bar dark in the dark theme, centred on the window, which dims behind it. Enter still picks No on every confirmation.
 - The update buttons in Settings now have room around their text: the button template ignored their padding.
 - If winget is missing, WinGet Studio now offers to install it instead of closing: it registers the App Installer that comes with Windows, or downloads App Installer and its dependencies from github.com/microsoft/winget-cli, checked against the published SHA-256.
 - Settings has a **winget** row with the App Installer version. Where the Microsoft Store updates it, the row says so and links to the Store; elsewhere an **Update to vX.Y.Z** button appears when GitHub has a newer winget release.

@@ -99,23 +99,21 @@ function Start-Import {
     # 0 come $null: un export senza pacchetti non ha niente da installare, e winget lo
     # rifiuterebbe dopo la conferma.
     if (-not $count) {
-        [System.Windows.MessageBox]::Show(
-            "This file is not a winget package list, or it lists no packages.`n`n$file",
-            "Cannot import", [System.Windows.MessageBoxButton]::OK,
-            [System.Windows.MessageBoxImage]::Error) | Out-Null
+        Show-AppDialog -Text "This file is not a winget package list, or it lists no packages.`n`n$file" `
+            -Title 'Cannot import' -Button ([System.Windows.MessageBoxButton]::OK) `
+            -Image ([System.Windows.MessageBoxImage]::Error) | Out-Null
         return
     }
 
     # CONFERMA: l'import installa software senza altre domande. Il conteggio viene dal
     # file, non da una stima, e il default e' No.
-    $answer = [System.Windows.MessageBox]::Show(
-        "Install $count package$(if ($count -ne 1) { 's' }) from this list?`n`n$file`n`n" +
+    $answer = Show-AppDialog -Text ("Install $count package$(if ($count -ne 1) { 's' }) from this list?`n`n$file`n`n" +
         "Packages already installed are skipped or upgraded. Packages no longer available " +
-        "in any source are ignored rather than failing the whole import.",
-        "Confirm import",
-        [System.Windows.MessageBoxButton]::YesNo,
-        [System.Windows.MessageBoxImage]::Warning,
-        [System.Windows.MessageBoxResult]::No)
+        "in any source are ignored rather than failing the whole import.") `
+        -Title 'Confirm import' `
+        -Button ([System.Windows.MessageBoxButton]::YesNo) `
+        -Image ([System.Windows.MessageBoxImage]::Warning) `
+        -Default ([System.Windows.MessageBoxResult]::No)
     if ($answer -ne [System.Windows.MessageBoxResult]::Yes) {
         Write-Log "Import cancelled."
         return

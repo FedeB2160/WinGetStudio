@@ -830,6 +830,44 @@ if ($script:jobOut.Count -ne 1 -or $script:jobOut[0] -ne 'only') { throw "LogUI/
 Stop-AllJobs
 "OK job    runspace, -Vars, -Functions, OnDone sul thread UI e cleanup; LogUI fuori dall'output"
 
+# 13g) I popup seguono il tema (ADR 0020): finestra propria con stili e brush della finestra
+# principale, Invio ed Esc come nella MessageBox, No predefinito sulle conferme. Si costruisce
+# senza mostrarla: ShowDialog bloccherebbe la suite.
+$dlg = New-AppDialog -Text "Uninstall 2 packages?`n`nThis cannot be undone." -Title 'Confirm uninstall' `
+    -Button ([System.Windows.MessageBoxButton]::YesNo) -Image ([System.Windows.MessageBoxImage]::Warning) `
+    -Default ([System.Windows.MessageBoxResult]::No)
+$dlgBtns = @($dlg.FindName('DlgButtons').Children)
+if ((@($dlgBtns | ForEach-Object { $_.Content }) -join ',') -ne 'Yes,No') { throw "conferma: pulsanti '$(@($dlgBtns | ForEach-Object { $_.Content }) -join ',')', attesi Yes,No" }
+if (-not $dlgBtns[1].IsDefault -or -not $dlgBtns[1].IsCancel) { throw "conferma: No deve rispondere a Invio e a Esc" }
+if ($dlgBtns[0].IsDefault -or $dlgBtns[0].IsCancel) { throw "conferma: Yes non deve rispondere a Invio ne' a Esc" }
+$dlgIcon = $dlg.FindName('DlgIcon')
+if ($dlgIcon.Text -ne [string][char]0xE814 -or $dlgIcon.Foreground -ne $window.FindResource('WarnBrush')) { throw "conferma: icona di avviso sbagliata" }
+if ($dlg.Background -ne $window.FindResource('BgBrush')) { throw "il popup non prende lo sfondo del tema" }
+$dlgText = $dlg.FindName('DlgText')
+if (-not ($dlgText -is [System.Windows.Controls.TextBox]) -or -not $dlgText.IsReadOnly -or $dlgText.Text -notmatch 'cannot be undone') { throw "il testo del popup non e' selezionabile o non e' quello passato" }
+if ($dlg.Title -ne 'Confirm uninstall') { throw "titolo del popup: '$($dlg.Title)'" }
+$dlg = New-AppDialog -Text 'Not a winget export.' -Title 'Cannot import' `
+    -Button ([System.Windows.MessageBoxButton]::OK) -Image ([System.Windows.MessageBoxImage]::Error)
+$dlgBtns = @($dlg.FindName('DlgButtons').Children)
+if ($dlgBtns.Count -ne 1 -or $dlgBtns[0].Content -ne 'OK' -or -not $dlgBtns[0].IsDefault -or -not $dlgBtns[0].IsCancel) { throw "errore: serve un solo OK, per Invio e per Esc" }
+if ($dlg.FindName('DlgIcon').Text -ne [string][char]0xEB90 -or $dlg.FindName('DlgIcon').Foreground -ne $window.FindResource('ErrBrush')) { throw "errore: icona sbagliata" }
+
+# Il velo sulla finestra principale: compare, e a popup chiuso torna invisibile e trasparente.
+foreach ($anim in $false, $true) {
+    Set-DialogDim $true -Animate:$anim
+    if ($DialogDim.Visibility -ne [System.Windows.Visibility]::Visible) { throw "velo non visibile (animazioni: $anim)" }
+    Set-DialogDim $false -Animate:$anim
+    if (-not (Wait-For { $DialogDim.Visibility -eq [System.Windows.Visibility]::Collapsed } 5)) { throw "velo ancora visibile dopo la chiusura (animazioni: $anim)" }
+    if ($DialogDim.Opacity -ne 0) { throw "velo chiuso ma non trasparente: $($DialogDim.Opacity) (animazioni: $anim)" }
+}
+
+# Nessuna MessageBox di sistema fuori da Show-AppDialog, dove resta solo come ripiego.
+$msgBoxCalls = '\[System\.Windows\.MessageBox\]::Show'
+$allCalls = [regex]::Matches(((Get-ChildItem (Join-Path $root 'src\modules') -Filter *.ps1 | ForEach-Object { Get-Content $_.FullName -Raw }) -join "`n"), $msgBoxCalls).Count
+$fallback = [regex]::Matches((Get-FunctionSource 'Show-AppDialog'), $msgBoxCalls).Count
+if ($allCalls -ne $fallback) { throw "MessageBox di sistema fuori da Show-AppDialog: $($allCalls - $fallback)" }
+"OK dialog popup a tema: pulsanti, default ed Esc, icona, sfondo, testo selezionabile, velo; nessuna MessageBox diretta"
+
 # 13b) Una ricerca in volo E' un processo winget, anche se di proposito non alza lo stato
 # occupato (la digitazione deve restare fluida). Senza questo controllo, digitare in Install
 # e passare subito a Installed lanciava due winget insieme — ed e' cosi' che un comando
@@ -1176,7 +1214,7 @@ if ($frame.CornerRadius.TopLeft -ne 0) {
 # prima di mettere qualcosa in coda. E' l'unica operazione irreversibile del programma:
 # il controllo e' statico perche' una MessageBox headless bloccherebbe la suite.
 $uninstallSrc = Get-FunctionSource 'Start-UninstallSelected'
-$posConfirm = $uninstallSrc.IndexOf('MessageBox')
+$posConfirm = $uninstallSrc.IndexOf('Show-AppDialog')
 $posQueue   = $uninstallSrc.IndexOf('Start-WinGetQueue')
 if ($posConfirm -lt 0) { throw "Start-UninstallSelected non chiede conferma" }
 if ($posQueue -lt 0)   { throw "Start-UninstallSelected non mette nulla in coda" }
@@ -1492,7 +1530,7 @@ else {
 # L'import NON si esegue: installerebbe software. Di quello si verifica solo che resti
 # dietro una conferma, come per la disinstallazione.
 $importSrc = Get-FunctionSource 'Start-Import'
-$posConfirm = $importSrc.IndexOf('MessageBox')
+$posConfirm = $importSrc.IndexOf('Show-AppDialog')
 $posRun     = $importSrc.IndexOf('Invoke-PackageImport')
 if ($posConfirm -lt 0 -or $posRun -lt 0) { throw "Start-Import non chiede conferma o non avvia nulla" }
 if ($posConfirm -gt $posRun) { throw "la conferma di import arriva DOPO l'avvio" }
@@ -1613,7 +1651,7 @@ if (-not $relM -or $relM.Tag -ne 'v9.9.9' -or $relM.Url) { throw "asset mancante
 # la finestra NON si chiude.
 $updSrc = Get-FunctionSource 'Start-SelfUpdate'
 $refuse = $updSrc.IndexOf('-not $rel.Sha256')
-if ($refuse -lt 0 -or $refuse -gt $updSrc.IndexOf('MessageBox')) { throw "installed: il digest mancante non e' rifiutato prima della conferma" }
+if ($refuse -lt 0 -or $refuse -gt $updSrc.IndexOf('Show-AppDialog')) { throw "installed: il digest mancante non e' rifiutato prima della conferma" }
 if ($updSrc -notmatch '/SILENT /CLOSEAPPLICATIONS /relaunch=1') { throw "il setup non viene avviato con /SILENT /CLOSEAPPLICATIONS /relaunch=1" }
 if ($updSrc -notmatch '"wgt_') { throw "il setup scaricato non ha il prefisso wgt_: resterebbe in %TEMP%" }
 if ($updSrc -notmatch '(?s)Start-Process -FilePath \$tmp[^\r\n]*-ErrorAction Stop.*?catch.*?Set-AppBusy \$false.*?return') {
@@ -1625,8 +1663,8 @@ if ((Get-FunctionSource 'Start-UpdateCheck') -notmatch 'Get-InstallChannel') { t
 # Il download e' l'unico punto in cui il programma ESEGUE codice preso da internet:
 # la conferma deve precederlo e il checksum deve essere confrontato.
 $updSrc = Get-FunctionSource 'Start-SelfUpdate'
-if ($updSrc.IndexOf('MessageBox') -lt 0) { throw "Start-SelfUpdate non chiede conferma" }
-if ($updSrc.IndexOf('MessageBox') -gt $updSrc.IndexOf('Invoke-WebRequest')) { throw "la conferma arriva DOPO il download" }
+if ($updSrc.IndexOf('Show-AppDialog') -lt 0) { throw "Start-SelfUpdate non chiede conferma" }
+if ($updSrc.IndexOf('Show-AppDialog') -gt $updSrc.IndexOf('Invoke-WebRequest')) { throw "la conferma arriva DOPO il download" }
 if ($updSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma di aggiornamento non ha No come default" }
 if ($updSrc -notmatch 'Get-FileHash.*SHA256|SHA256') { throw "il file scaricato non viene verificato con SHA-256" }
 if ($updSrc -notmatch 'Tls12') { throw "manca TLS 1.2: PowerShell 5.1 negozia TLS 1.0 e GitHub rifiuta" }
@@ -1770,7 +1808,7 @@ finally {
 # tutto, con No come default; checksum obbligatorio prima del download; nessuna chiusura
 # forzata di altre app. Statico: una MessageBox bloccherebbe la suite.
 $instSrc = Get-FunctionSource 'Start-WinGetInstall'
-if ($instSrc.IndexOf('MessageBox') -lt 0 -or $instSrc.IndexOf('MessageBox') -gt $instSrc.IndexOf('Start-BackgroundJob')) { throw "Start-WinGetInstall non chiede conferma prima del job" }
+if ($instSrc.IndexOf('Show-AppDialog') -lt 0 -or $instSrc.IndexOf('Show-AppDialog') -gt $instSrc.IndexOf('Start-BackgroundJob')) { throw "Start-WinGetInstall non chiede conferma prima del job" }
 if ($instSrc -notmatch 'MessageBoxResult\]::No\)') { throw "la conferma di installazione di winget non ha No come default" }
 if ($instSrc -notmatch 'Test-WinGetBusy') { throw "Start-WinGetInstall non controlla che winget sia libero" }
 $pkgSrc = Get-FunctionSource 'Install-WinGetPackage'

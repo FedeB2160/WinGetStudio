@@ -124,15 +124,14 @@ function Start-UninstallSelected {
     $hidden = @($sel | Where-Object { -not (Test-InstalledMatch $_) }).Count
     $hiddenNote = if ($hidden -gt 0) { "`n`n$hidden of them are currently hidden by the filter." } else { '' }
 
-    $answer = [System.Windows.MessageBox]::Show(
-        "Uninstall $($sel.Count) package$(if ($sel.Count -ne 1) { 's' })?`n`n" +
+    # Default su No: un Invio distratto non deve disinstallare nulla.
+    $answer = Show-AppDialog -Text ("Uninstall $($sel.Count) package$(if ($sel.Count -ne 1) { 's' })?`n`n" +
         ($shownNames -join "`n") + $more + $hiddenNote +
-        "`n`nThis cannot be undone.",
-        "Confirm uninstall",
-        [System.Windows.MessageBoxButton]::YesNo,
-        [System.Windows.MessageBoxImage]::Warning,
-        # Default su No: un Invio distratto non deve disinstallare nulla.
-        [System.Windows.MessageBoxResult]::No)
+        "`n`nThis cannot be undone.") `
+        -Title 'Confirm uninstall' `
+        -Button ([System.Windows.MessageBoxButton]::YesNo) `
+        -Image ([System.Windows.MessageBoxImage]::Warning) `
+        -Default ([System.Windows.MessageBoxResult]::No)
     if ($answer -ne [System.Windows.MessageBoxResult]::Yes) {
         Write-Log "Uninstall cancelled."
         return
