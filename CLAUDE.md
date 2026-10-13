@@ -16,14 +16,14 @@ powershell -ExecutionPolicy Bypass -File .\src\build.ps1
 # Tests — two standalone scripts, no framework, no runner. Offline by default: that is what CI runs
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
-# Real winget reads/export, the GitHub API and one pin cycle on 7zip.7zip
+# Real winget reads/export, the GitHub API, one unelevated scheduled task and one pin cycle on 7zip.7zip
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 
 # winget manifests
 winget validate --manifest .\winget\1.11.0
 ```
 
-`Test-Ui.ps1` requires `-STA` (WPF) and mounts the real app in a hidden window. Without `-Live` it touches neither winget nor the network; `-Live` adds real search/list/export and one pin cycle on `7zip.7zip` (skipped when it is not installed or already pinned). There is no single-test selector: each script is one file of sequential assertions — comment out or run the file.
+`Test-Ui.ps1` requires `-STA` (WPF) and mounts the real app in a hidden window. Without `-Live` it touches neither winget nor the network; `-Live` adds real search/list/export, one `winget --version` through a real unelevated scheduled task (a console window flashes), and one pin cycle on `7zip.7zip` (skipped when it is not installed or already pinned). There is no single-test selector: each script is one file of sequential assertions — comment out or run the file.
 
 ## Architecture
 
@@ -41,6 +41,8 @@ Consequences that constrain edits:
 **Background work.** Runspace code cannot touch controls — every UI write goes through the `UI{}` helper (`$window.Dispatcher.Invoke`). Runspaces do not inherit functions: pass their names to `Start-BackgroundJob -Functions` and the body is recreated inside. Pass state through the job object, never a `GetNewClosure()` capture — a closure gets its own module scope where `$script:` no longer refers to the script.
 
 **Only ever one winget process at a time.** Two concurrent invocations make one fail with exit 1. Scans read pins inside the same job; after a pin/unpin the busy state is released by the pin re-read, which is the last step. Busy state is global — each tab registers a handler with `Register-BusyHandler`, and `Set-AppBusy` calls them all; anything about to start winget asks `Test-WinGetBusy`, which also counts searches in flight.
+
+**winget refuses some operations as administrator.** On `0x8A15007D` (a per-user `exe`/`inno`/`nullsoft`/`burn`/`portable` uninstall) the queue repeats the command as the same account without elevation, through a one-off scheduled task (`Invoke-WinGet -Unelevated`). Never as the signed-in user when that is another account: the per-user packages in the list belong to the elevated one (ADR 0018).
 
 **Grid rows are `WgtRow`**, a class compiled with `Add-Type` implementing `INotifyPropertyChanged`, not `PSCustomObject` — `NoteProperty` values do not notify WPF and forced a `$Grid.Items.Refresh()` that reset the scroll position.
 

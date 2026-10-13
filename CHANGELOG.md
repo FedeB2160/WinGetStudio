@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Uninstalling a per-user package (installer types exe, inno, nullsoft, burn and portable) no longer fails with `0x8A15007D`: WinGet Studio repeats the command without elevation, through a one-off scheduled task, and a console window shows while it runs. If the app was elevated with another administrator account it does not retry, and the log says why (issue #12).
+
 ## v1.11.1
 
 A new icon and one fix. Coming from v1.11.0: let the app update itself from **Settings**, or run the new setup; installed with winget, use `winget upgrade FedeB2160.WinGetStudio`.

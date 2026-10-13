@@ -1296,6 +1296,62 @@ finally {
     Remove-Item -LiteralPath $wingetReadStub -Force -ErrorAction SilentlyContinue
 }
 
+# 16c) winget rifiuta di disinstallare un pacchetto per-utente da amministratore (0x8A15007D,
+# issue #12): la coda ripete lo stesso comando come questo account senza elevazione (ADR 0018).
+# Se l'account elevato non e' l'utente della sessione non ci riprova: il pacchetto e' di
+# quell'account, e quell'account non ha una sessione in cui farlo girare. winget e attivita'
+# pianificata sono finti: il .cmd esce col codice vero, Invoke-UnelevatedTask torna 0.
+$adminStub = Join-Path ([IO.Path]::GetTempPath()) "wgt-admin-stub-$PID.cmd"
+[IO.File]::WriteAllLines($adminStub, @('@echo off',
+    'echo The package installed for user scope cannot be uninstalled when running with administrator privileges.',
+    'exit /b -1978335107'), [Text.Encoding]::ASCII)
+$wingetPathBefore = $wingetPath
+$realTaskFn       = ${function:Invoke-UnelevatedTask}
+$realMismatchFn   = ${function:Test-ElevatedUserMismatch}
+try {
+    Stop-AllJobs
+    $wingetPath = $adminStub
+    function Invoke-UnelevatedTask { 0 }
+    $userRow = [WgtRow]@{ Id = 'WgtStudio.UserScopeFixture'; Name = 'User scope fixture' }
+
+    function Test-ElevatedUserMismatch { $false }
+    $TxtLog.Clear()
+    Start-WinGetQueue -Rows @($userRow) -Verb 'Uninstall' -ArgsBuilder { param($r) "uninstall --id `"$($r.Id)`"" } -OnDone { Set-AppBusy $false }
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw "coda di disinstallazione (nuovo tentativo) non terminata" }
+    if ($TxtLog.Text -notmatch 'retrying without elevation') { throw "0x8A15007D non ripetuto senza elevazione: $($TxtLog.Text.Trim())" }
+    if ($userRow.Status -ne 'ok') { throw "il nuovo tentativo riuscito non vale come esito: '$($userRow.Status)' ($($userRow.StatusDetail))" }
+
+    function Test-ElevatedUserMismatch { $true }
+    $TxtLog.Clear()
+    Start-WinGetQueue -Rows @($userRow) -Verb 'Uninstall' -ArgsBuilder { param($r) "uninstall --id `"$($r.Id)`"" } -OnDone { Set-AppBusy $false }
+    if (-not (Wait-For { -not $script:isBusy } 30)) { throw "coda di disinstallazione (account diverso) non terminata" }
+    if ($TxtLog.Text -match 'retrying without elevation') { throw "ripetuto come un account che non e' quello del pacchetto" }
+    if ($TxtLog.Text -notmatch 'not the signed-in user') { throw "account elevato diverso: il log non spiega perche' non riprova: $($TxtLog.Text.Trim())" }
+    if ($userRow.Status -ne 'error') { throw "account elevato diverso: la riga non e' in errore ('$($userRow.Status)')" }
+    "OK admin   0x8A15007D ripetuto senza elevazione; con un altro account elevato spiegato e non ripetuto"
+}
+finally {
+    if ($realTaskFn) { ${function:Invoke-UnelevatedTask} = $realTaskFn } else { Remove-Item function:Invoke-UnelevatedTask -ErrorAction SilentlyContinue }
+    ${function:Test-ElevatedUserMismatch} = $realMismatchFn
+    Stop-AllJobs
+    Set-AppBusy $false
+    $wingetPath = $wingetPathBefore
+    Remove-Item -LiteralPath $adminStub -Force -ErrorAction SilentlyContinue
+}
+
+# Il meccanismo vero, solo con -Live: un'attivita' pianificata nella sessione di chi esegue il
+# test, senza elevazione, lancia winget --version. Prova registrazione, avvio, attesa, file di
+# output, exit code e pulizia. Per un attimo compare una finestra console.
+if (-not $realWinget) {
+    "SKIP unelev   senza -Live o winget non presente"
+}
+else {
+    $u = Invoke-WinGet $realWinget '--version' -Unelevated
+    if ($u.ExitCode -ne 0 -or $u.Output -notmatch 'v\d') { throw "winget --version senza elevazione: exit $($u.ExitCode), output '$($u.Output)'" }
+    if (Get-ScheduledTask -TaskName 'WinGetStudio_*' -ErrorAction SilentlyContinue) { throw "attivita' pianificata rimasta dopo il nuovo tentativo" }
+    "OK unelev  winget --version da un'attivita' pianificata non elevata: $($u.Output.Trim())"
+}
+
 # I pin dell'app sono Blocking: un pin normale winget lo salta solo con upgrade --all, e questa
 # app aggiorna con upgrade --id, dove lo ignora (UpdateFlow.cpp: includePinned = m_isSinglePackage).
 if ((Get-FunctionSource 'Set-PackagePin') -notmatch "'add --blocking'") { throw "i pin dell'app non sono blocking" }

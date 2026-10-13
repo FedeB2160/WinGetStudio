@@ -203,7 +203,7 @@ function Start-WinGetQueue {
     }
 
     # [void]: il job non deve finire sulla pipeline del chiamante.
-    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet', 'Get-WinGetOutputTail' -Vars $jobVars -Script {
+    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet', 'Get-WinGetOutputTail', 'Invoke-UnelevatedTask', 'Test-ElevatedUserMismatch' -Vars $jobVars -Script {
         Invoke-Expression "function Get-WinGetArgs { $argsFnBody }"
 
         $done    = 0
@@ -216,8 +216,25 @@ function Start-WinGetQueue {
             UI { $item.Status = 'updating'; $item.StatusDetail = 'In progress...' }
             LogUI "-> $name [$id]"
             try {
-                $r = Invoke-WinGet $wingetPath (Get-WinGetArgs $item) `
-                        { param($s) LogUI "   ...$name running for ${s}s" }
+                $argLine = Get-WinGetArgs $item
+                $tick    = { param($s) LogUI "   ...$name running for ${s}s" }
+                $r = Invoke-WinGet $wingetPath $argLine $tick
+                # 0x8A15007D: winget rifiuta di disinstallare (o riparare) un pacchetto per-utente
+                # da amministratore, ed e' un blocco voluto (issue #12). Si ripete la stessa riga
+                # come QUESTO account senza elevazione (ADR 0018): i pacchetti per-utente in
+                # elenco sono i suoi. Se l'account elevato non e' quello della sessione non ha
+                # dove girare, e ripetere come l'utente della sessione colpirebbe un altro
+                # profilo: lo si dice e basta.
+                if ($r.ExitCode -eq -1978335107) {
+                    $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
+                    if (Test-ElevatedUserMismatch) {
+                        LogUI "   winget refuses this as administrator, and the package belongs to $me, which is not the signed-in user: sign in as $me to uninstall it."
+                    }
+                    else {
+                        LogUI "   winget refuses this as administrator: retrying without elevation..."
+                        $r = Invoke-WinGet $wingetPath $argLine $tick -Unelevated
+                    }
+                }
                 $code  = $r.ExitCode
                 $token = Get-UpdateStatus $code
 

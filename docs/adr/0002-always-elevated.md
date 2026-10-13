@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-04 (in place since v1.9.0 or earlier: v1.0.0 already shipped "automatic UAC elevation")
 - **Depends on:** ADR 0001
-- **Referenced by:** ADR 0004 (what an elevated process must not run), ADR 0013 (no second UAC prompt for the setup), ADR 0014 (machine scope only), ADR 0015 (`ElevationRequirement: elevatesSelf`)
+- **Referenced by:** ADR 0004 (what an elevated process must not run), ADR 0013 (no second UAC prompt for the setup), ADR 0014 (machine scope only), ADR 0015 (`ElevationRequirement: elevatesSelf`), ADR 0018 (retry without elevation, issue #12)
 
 ## Context
 
@@ -44,28 +44,19 @@ WinGet Studio **always runs elevated**, asking once, at startup.
   privileges."* This is a deliberate security block in winget (`UninstallFlow.cpp`:
   `AdminExecutionShouldBlockUserScopePackages` plus `Runtime::IsRunningWithNonDefaultFullToken()`;
   the same check exists for `repair` in `ShellExecuteInstallerHandler.cpp`) and no option gets
-  round it. MSI, MSIX and Store packages, and install and upgrade, are unaffected. Workaround in
-  the meantime: uninstall from **Settings → Apps**, or `winget uninstall <id>` from a terminal that
-  is **not** elevated.
-- The open follow-up, planned after 1.11.0 as a separate release, is one of the three approaches
-  issue #12 lists:
-  1. **Retry unelevated only when needed (recommended in the issue).** The app stays elevated;
-     on `0x8A15007D` it repeats the same command as the signed-in user through a scheduled task
-     (`-LogonType Interactive -RunLevel Limited`) in that user's session, with result and output
-     passed back through a file. One UAC prompt, a change confined to `WinGet.Exec.ps1`, and the
-     command runs as the package's owner even when elevation used another admin account. Against:
-     an indirect mechanism, to be checked against domain policies, with the task and files to
-     clean up.
-  2. **Unelevated app, elevation per operation**, the model of the winget CLI and UniGetUI. The
-     right model in general, but one UAC prompt per machine-scope package in a queue, and a large
-     change: startup, the self-update (the setup launched with `-Verb RunAs`),
-     `Test-ElevatedUserMismatch`, the winget manifest's `ElevationRequirement` and the README.
-  3. **Unelevated app with an elevated helper process per queue.** One UAC per queue, but
-     inter-process communication makes it the most complex of the three.
+  round it. MSI, MSIX and Store packages, and install and upgrade, are unaffected.
+- Issue #12 listed three ways out: retry unelevated through a scheduled task only when needed; an
+  unelevated app with elevation per operation, the model of the winget CLI and UniGetUI; an
+  unelevated app with an elevated helper process per queue. **ADR 0018 chose the first**, with one
+  correction. This ADR said to repeat the command as the signed-in user, so that it would run as
+  the package's owner even when elevation used another admin account. But elevated, the per-user
+  packages in the list belong to the *elevated* account, so the retry runs as that same account
+  without elevation, and when the elevated account is not the signed-in user it does not retry at
+  all.
 - Everything that runs inside this process runs as administrator, which is why text that reaches
   a command line is guarded (ADR 0004) and why the installed form is machine scope only (ADR 0014).
 
 ## Alternatives considered
 
-The sources record no alternative weighed when elevation was first adopted. The three
-approaches above are the alternatives now on the table for issue #12; none has been chosen yet.
+The sources record no alternative weighed when elevation was first adopted. For issue #12, the
+three approaches above are weighed in ADR 0018, which chose the first.
