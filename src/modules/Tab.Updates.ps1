@@ -177,10 +177,8 @@ function Start-UpdateSelected {
 
     $selected = @($items | Where-Object { $_.Selected })
     if ($selected.Count -eq 0) {
-        [System.Windows.MessageBox]::Show(
-            "No items selected.", "WinGet Studio",
-            [System.Windows.MessageBoxButton]::OK,
-            [System.Windows.MessageBoxImage]::Information) | Out-Null
+        Show-AppDialog -Text 'No items selected.' -Button ([System.Windows.MessageBoxButton]::OK) `
+            -Image ([System.Windows.MessageBoxImage]::Information) | Out-Null
         return
     }
 

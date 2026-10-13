@@ -20,8 +20,11 @@ function Test-SystemDark {
     } catch { $false }
 }
 
-$script:dwmReady = $false
-function Set-TitleBarDark([bool]$dark) {
+$script:dwmReady  = $false
+# Tema applicato in questo momento: lo legge anche Show-AppDialog per la barra del popup.
+$script:themeDark = $false
+# $target: la finestra principale, o un popup (ADR 0020).
+function Set-TitleBarDark([bool]$dark, [System.Windows.Window]$target = $window) {
     # Senza questo la barra titolo resta bianca in Dark-Mode (la disegna Windows, non WPF).
     if (-not $dark -and -not $script:dwmReady) { return }   # gia' chiara: niente da fare
     if (-not $script:dwmReady) {
@@ -33,7 +36,7 @@ public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int va
 '@
         $script:dwmReady = $true
     }
-    $hwnd = (New-Object Windows.Interop.WindowInteropHelper $window).Handle
+    $hwnd = (New-Object Windows.Interop.WindowInteropHelper $target).Handle
     if ($hwnd -eq [IntPtr]::Zero) { return }   # finestra non ancora mostrata
     $v = [int]$dark
     # DWMWA_USE_IMMERSIVE_DARK_MODE = 20 (Win10 2004+ / Win11). Su build precedenti
@@ -50,6 +53,7 @@ function Set-Theme {
     $window.Resources.MergedDictionaries.Clear()
     $window.Resources.MergedDictionaries.Add(
         (Read-Xaml $(if ($dark) { 'Theme.Dark.xaml' } else { 'Theme.Light.xaml' })))
+    $script:themeDark = $dark
     Set-TitleBarDark $dark
 
     # In System si dice quale dei due tempi sta seguendo, altrimenti la scelta non spiega

@@ -776,6 +776,30 @@ if ($script:jobs.Count -ne 0) { throw "con la spunta giu' il controllo automatic
 $ChkAutoCheck.IsChecked = $true
 "OK settgs griglia a due colonne, ABOUT completo con link, controllo all'avvio spegnibile"
 
+# I pulsanti a larghezza libera (Update to vX) hanno margine attorno al testo: il template dei
+# Button deve applicare il Padding. Prima lo ignorava, e il testo toccava il bordo.
+$BtnUpdateApp.Visibility = [System.Windows.Visibility]::Visible
+$BtnUpdateApp.Content    = 'Update to v9.9.9'
+[void]$BtnUpdateApp.ApplyTemplate()
+$inf = New-Object System.Windows.Size ([double]::PositiveInfinity), ([double]::PositiveInfinity)
+# UpdateLayout tra le due misure: senza, WPF restituisce la misura in cache.
+$BtnUpdateApp.Padding = New-Object System.Windows.Thickness 0
+$BtnUpdateApp.UpdateLayout(); $BtnUpdateApp.Measure($inf); $w0 = $BtnUpdateApp.DesiredSize.Width
+$BtnUpdateApp.Padding = New-Object System.Windows.Thickness 12, 0, 12, 0
+$BtnUpdateApp.UpdateLayout(); $BtnUpdateApp.Measure($inf); $w12 = $BtnUpdateApp.DesiredSize.Width
+$BtnUpdateApp.Visibility = [System.Windows.Visibility]::Collapsed
+$BtnUpdateApp.Content    = $null
+if ($w12 - $w0 -lt 24) { throw "il template dei pulsanti ignora il Padding ($w0 px senza, $w12 px con 12+12)" }
+"OK btnpad il Padding dei pulsanti si applica: $w0 -> $w12 px"
+
+# UPDATES: "Check for updates" e la spunta valgono per entrambe le voci, quindi stanno in una
+# riga loro, sopra la voce di WinGet Studio e quella di App Installer.
+$rowOf = { param($c) [System.Windows.Controls.Grid]::GetRow($c.Parent) }
+$rowCheck = & $rowOf $BtnCheckUpdate
+if ((& $rowOf $ChkAutoCheck) -ne $rowCheck) { throw "Check for updates e la spunta non stanno nella stessa riga" }
+if ($rowCheck -ge (& $rowOf $TxtVersion) -or $rowCheck -ge (& $rowOf $TxtWinGetVersion)) { throw "i controlli comuni non stanno sopra le voci" }
+"OK updrows controlli comuni in una riga sopra WinGet Studio e App Installer"
+
 # 13) Start-BackgroundJob regge? Ci passeranno tutte le operazioni winget. Si verifica
 # in un colpo: le -Vars arrivano nel runspace, le -Functions vengono ricreate la'
 # dentro (senza, muoiono con "termine non riconosciuto"), OnDone gira sul thread UI col
@@ -813,6 +837,44 @@ if (-not (Wait-For { $null -ne $script:jobOut })) { throw "job con LogUI: OnDone
 if ($script:jobOut.Count -ne 1 -or $script:jobOut[0] -ne 'only') { throw "LogUI/UI scrivono nell'output del job: $($script:jobOut.Count) risultati" }
 Stop-AllJobs
 "OK job    runspace, -Vars, -Functions, OnDone sul thread UI e cleanup; LogUI fuori dall'output"
+
+# 13g) I popup seguono il tema (ADR 0020): finestra propria con stili e brush della finestra
+# principale, Invio ed Esc come nella MessageBox, No predefinito sulle conferme. Si costruisce
+# senza mostrarla: ShowDialog bloccherebbe la suite.
+$dlg = New-AppDialog -Text "Uninstall 2 packages?`n`nThis cannot be undone." -Title 'Confirm uninstall' `
+    -Button ([System.Windows.MessageBoxButton]::YesNo) -Image ([System.Windows.MessageBoxImage]::Warning) `
+    -Default ([System.Windows.MessageBoxResult]::No)
+$dlgBtns = @($dlg.FindName('DlgButtons').Children)
+if ((@($dlgBtns | ForEach-Object { $_.Content }) -join ',') -ne 'Yes,No') { throw "conferma: pulsanti '$(@($dlgBtns | ForEach-Object { $_.Content }) -join ',')', attesi Yes,No" }
+if (-not $dlgBtns[1].IsDefault -or -not $dlgBtns[1].IsCancel) { throw "conferma: No deve rispondere a Invio e a Esc" }
+if ($dlgBtns[0].IsDefault -or $dlgBtns[0].IsCancel) { throw "conferma: Yes non deve rispondere a Invio ne' a Esc" }
+$dlgIcon = $dlg.FindName('DlgIcon')
+if ($dlgIcon.Text -ne [string][char]0xE814 -or $dlgIcon.Foreground -ne $window.FindResource('WarnBrush')) { throw "conferma: icona di avviso sbagliata" }
+if ($dlg.Background -ne $window.FindResource('BgBrush')) { throw "il popup non prende lo sfondo del tema" }
+$dlgText = $dlg.FindName('DlgText')
+if (-not ($dlgText -is [System.Windows.Controls.TextBox]) -or -not $dlgText.IsReadOnly -or $dlgText.Text -notmatch 'cannot be undone') { throw "il testo del popup non e' selezionabile o non e' quello passato" }
+if ($dlg.Title -ne 'Confirm uninstall') { throw "titolo del popup: '$($dlg.Title)'" }
+$dlg = New-AppDialog -Text 'Not a winget export.' -Title 'Cannot import' `
+    -Button ([System.Windows.MessageBoxButton]::OK) -Image ([System.Windows.MessageBoxImage]::Error)
+$dlgBtns = @($dlg.FindName('DlgButtons').Children)
+if ($dlgBtns.Count -ne 1 -or $dlgBtns[0].Content -ne 'OK' -or -not $dlgBtns[0].IsDefault -or -not $dlgBtns[0].IsCancel) { throw "errore: serve un solo OK, per Invio e per Esc" }
+if ($dlg.FindName('DlgIcon').Text -ne [string][char]0xEB90 -or $dlg.FindName('DlgIcon').Foreground -ne $window.FindResource('ErrBrush')) { throw "errore: icona sbagliata" }
+
+# Il velo sulla finestra principale: compare, e a popup chiuso torna invisibile e trasparente.
+foreach ($anim in $false, $true) {
+    Set-DialogDim $true -Animate:$anim
+    if ($DialogDim.Visibility -ne [System.Windows.Visibility]::Visible) { throw "velo non visibile (animazioni: $anim)" }
+    Set-DialogDim $false -Animate:$anim
+    if (-not (Wait-For { $DialogDim.Visibility -eq [System.Windows.Visibility]::Collapsed } 5)) { throw "velo ancora visibile dopo la chiusura (animazioni: $anim)" }
+    if ($DialogDim.Opacity -ne 0) { throw "velo chiuso ma non trasparente: $($DialogDim.Opacity) (animazioni: $anim)" }
+}
+
+# Nessuna MessageBox di sistema fuori da Show-AppDialog, dove resta solo come ripiego.
+$msgBoxCalls = '\[System\.Windows\.MessageBox\]::Show'
+$allCalls = [regex]::Matches(((Get-ChildItem (Join-Path $root 'src\modules') -Filter *.ps1 | ForEach-Object { Get-Content $_.FullName -Raw }) -join "`n"), $msgBoxCalls).Count
+$fallback = [regex]::Matches((Get-FunctionSource 'Show-AppDialog'), $msgBoxCalls).Count
+if ($allCalls -ne $fallback) { throw "MessageBox di sistema fuori da Show-AppDialog: $($allCalls - $fallback)" }
+"OK dialog popup a tema: pulsanti, default ed Esc, icona, sfondo, testo selezionabile, velo; nessuna MessageBox diretta"
 
 # 13b) Una ricerca in volo E' un processo winget, anche se di proposito non alza lo stato
 # occupato (la digitazione deve restare fluida). Senza questo controllo, digitare in Install
@@ -1160,7 +1222,7 @@ if ($frame.CornerRadius.TopLeft -ne 0) {
 # prima di mettere qualcosa in coda. E' l'unica operazione irreversibile del programma:
 # il controllo e' statico perche' una MessageBox headless bloccherebbe la suite.
 $uninstallSrc = Get-FunctionSource 'Start-UninstallSelected'
-$posConfirm = $uninstallSrc.IndexOf('MessageBox')
+$posConfirm = $uninstallSrc.IndexOf('Show-AppDialog')
 $posQueue   = $uninstallSrc.IndexOf('Start-WinGetQueue')
 if ($posConfirm -lt 0) { throw "Start-UninstallSelected non chiede conferma" }
 if ($posQueue -lt 0)   { throw "Start-UninstallSelected non mette nulla in coda" }
@@ -1476,7 +1538,7 @@ else {
 # L'import NON si esegue: installerebbe software. Di quello si verifica solo che resti
 # dietro una conferma, come per la disinstallazione.
 $importSrc = Get-FunctionSource 'Start-Import'
-$posConfirm = $importSrc.IndexOf('MessageBox')
+$posConfirm = $importSrc.IndexOf('Show-AppDialog')
 $posRun     = $importSrc.IndexOf('Invoke-PackageImport')
 if ($posConfirm -lt 0 -or $posRun -lt 0) { throw "Start-Import non chiede conferma o non avvia nulla" }
 if ($posConfirm -gt $posRun) { throw "la conferma di import arriva DOPO l'avvio" }
@@ -1597,7 +1659,7 @@ if (-not $relM -or $relM.Tag -ne 'v9.9.9' -or $relM.Url) { throw "asset mancante
 # la finestra NON si chiude.
 $updSrc = Get-FunctionSource 'Start-SelfUpdate'
 $refuse = $updSrc.IndexOf('-not $rel.Sha256')
-if ($refuse -lt 0 -or $refuse -gt $updSrc.IndexOf('MessageBox')) { throw "installed: il digest mancante non e' rifiutato prima della conferma" }
+if ($refuse -lt 0 -or $refuse -gt $updSrc.IndexOf('Show-AppDialog')) { throw "installed: il digest mancante non e' rifiutato prima della conferma" }
 if ($updSrc -notmatch '/SILENT /CLOSEAPPLICATIONS /relaunch=1') { throw "il setup non viene avviato con /SILENT /CLOSEAPPLICATIONS /relaunch=1" }
 if ($updSrc -notmatch '"wgt_') { throw "il setup scaricato non ha il prefisso wgt_: resterebbe in %TEMP%" }
 if ($updSrc -notmatch '(?s)Start-Process -FilePath \$tmp[^\r\n]*-ErrorAction Stop.*?catch.*?Set-AppBusy \$false.*?return') {
@@ -1609,8 +1671,8 @@ if ((Get-FunctionSource 'Start-UpdateCheck') -notmatch 'Get-InstallChannel') { t
 # Il download e' l'unico punto in cui il programma ESEGUE codice preso da internet:
 # la conferma deve precederlo e il checksum deve essere confrontato.
 $updSrc = Get-FunctionSource 'Start-SelfUpdate'
-if ($updSrc.IndexOf('MessageBox') -lt 0) { throw "Start-SelfUpdate non chiede conferma" }
-if ($updSrc.IndexOf('MessageBox') -gt $updSrc.IndexOf('Invoke-WebRequest')) { throw "la conferma arriva DOPO il download" }
+if ($updSrc.IndexOf('Show-AppDialog') -lt 0) { throw "Start-SelfUpdate non chiede conferma" }
+if ($updSrc.IndexOf('Show-AppDialog') -gt $updSrc.IndexOf('Invoke-WebRequest')) { throw "la conferma arriva DOPO il download" }
 if ($updSrc -notmatch 'MessageBoxResult\]::No') { throw "la conferma di aggiornamento non ha No come default" }
 if ($updSrc -notmatch 'Get-FileHash.*SHA256|SHA256') { throw "il file scaricato non viene verificato con SHA-256" }
 if ($updSrc -notmatch 'Tls12') { throw "manca TLS 1.2: PowerShell 5.1 negozia TLS 1.0 e GitHub rifiuta" }
@@ -1650,6 +1712,7 @@ try {
     Start-UpdateCheck
     if (-not (Wait-For { $BtnUpdateApp.Visibility -eq [System.Windows.Visibility]::Visible } 30)) { throw "il controllo all'avvio non parte con la scansione in corso" }
     if ($BtnUpdateApp.IsEnabled) { throw "durante la scansione il pulsante di aggiornamento deve restare spento" }
+    if ($TxtUpdateStatus.Text) { throw "accanto al pulsante di aggiornamento c'e' anche la scritta: '$($TxtUpdateStatus.Text)'" }
     Set-AppBusy $false
     if (-not $BtnUpdateApp.IsEnabled) { throw "a scansione finita il pulsante di aggiornamento resta spento" }
     "OK autochk controllo all'avvio in parallelo alla scansione, pulsante attivo a scansione finita"
@@ -1723,6 +1786,7 @@ try {
     Invoke-WinGetCheckFixture -Manual
     if ($BtnUpdateWinGet.Visibility -ne [System.Windows.Visibility]::Visible) { throw "senza Store e con una release piu' recente il pulsante non compare" }
     if ($BtnUpdateWinGet.Content -ne 'Update to v1.29.380') { throw "pulsante winget: '$($BtnUpdateWinGet.Content)'" }
+    if ($TxtWinGetStatus.Text) { throw "accanto al pulsante winget c'e' anche la scritta: '$($TxtWinGetStatus.Text)'" }
     if ($TxtWinGetStore.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "senza Store compare l'etichetta dello Store" }
     if ($script:pendingWinGet.Tag -ne 'v1.29.380') { throw "la release da installare non arriva al pulsante" }
 
@@ -1754,7 +1818,7 @@ finally {
 # tutto, con No come default; checksum obbligatorio prima del download; nessuna chiusura
 # forzata di altre app. Statico: una MessageBox bloccherebbe la suite.
 $instSrc = Get-FunctionSource 'Start-WinGetInstall'
-if ($instSrc.IndexOf('MessageBox') -lt 0 -or $instSrc.IndexOf('MessageBox') -gt $instSrc.IndexOf('Start-BackgroundJob')) { throw "Start-WinGetInstall non chiede conferma prima del job" }
+if ($instSrc.IndexOf('Show-AppDialog') -lt 0 -or $instSrc.IndexOf('Show-AppDialog') -gt $instSrc.IndexOf('Start-BackgroundJob')) { throw "Start-WinGetInstall non chiede conferma prima del job" }
 if ($instSrc -notmatch 'MessageBoxResult\]::No\)') { throw "la conferma di installazione di winget non ha No come default" }
 if ($instSrc -notmatch 'Test-WinGetBusy') { throw "Start-WinGetInstall non controlla che winget sia libero" }
 $pkgSrc = Get-FunctionSource 'Install-WinGetPackage'

@@ -2,8 +2,10 @@
 
 ## Unreleased
 
+- Messages and confirmations follow the theme: a dialog in the app's style, with its title bar dark in the dark theme, centred on the window, which dims behind it. Enter still picks No on every confirmation.
+- The update buttons in Settings now have room around their text: the button template ignored their padding.
 - If winget is missing, WinGet Studio now offers to install it instead of closing: it registers the App Installer that comes with Windows, or downloads App Installer and its dependencies from github.com/microsoft/winget-cli, checked against the published SHA-256.
-- Settings has a **winget** row with the App Installer version. Where the Microsoft Store updates it, the row says so and links to the Store; elsewhere an **Update to vX.Y.Z** button appears when GitHub has a newer winget release.
+- Settings has an **App Installer (winget)** entry with its version, under **Check for updates** and **Check at startup**, which now sit above both entries. Where the Microsoft Store updates it, the row says so and links to the Store; elsewhere an **Update to vX.Y.Z** button appears when GitHub has a newer winget release.
 - The automatic update check at startup runs again: since v1.9.0 it stopped silently because the startup scan had already made the app busy, so a new version showed up only after pressing **Check for updates**.
 - Uninstalling a per-user package (installer types exe, inno, nullsoft, burn and portable) no longer fails with `0x8A15007D`: WinGet Studio repeats the command without elevation, through a one-off scheduled task, and a console window shows while it runs. If the app was elevated with another administrator account it does not retry, and the log says why (issue #12).
 

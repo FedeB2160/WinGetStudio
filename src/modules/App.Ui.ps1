@@ -23,6 +23,165 @@ function Format-WinGetReadError([string]$Command, $Result) {
 }
 
 # ------------------------------------------------------------------
+# POPUP A TEMA (ADR 0020)
+# ------------------------------------------------------------------
+# La MessageBox di sistema ignora il tema: in Dark esce bianca. Il popup e' una finestra
+# propria che prende stili e colori della finestra principale, e rifa' a mano quello che la
+# MessageBox dava gratis: Invio ed Esc, il pulsante predefinito, il suono, il testo copiabile,
+# la posizione al centro dell'app. Gli enum sono quelli della MessageBox, cosi' le chiamate
+# restano leggibili allo stesso modo.
+$script:dialogXaml = @'
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        ShowInTaskbar="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
+        MinWidth="360" MaxWidth="520"
+        Background="{DynamicResource BgBrush}" Foreground="{DynamicResource FgBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid Margin="20,20,24,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="DlgIcon" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28"
+                       Margin="0,0,16,0" VerticalAlignment="Top"/>
+            <TextBox x:Name="DlgText" Grid.Column="1" IsReadOnly="True" TextWrapping="Wrap"
+                     BorderThickness="0" Background="Transparent" Padding="0"
+                     VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+        </Grid>
+        <Border Grid.Row="1" Background="{DynamicResource HeaderBgBrush}" Padding="16,12"
+                BorderBrush="{DynamicResource CtrlBorderBrush}" BorderThickness="0,1,0,0">
+            <StackPanel x:Name="DlgButtons" Orientation="Horizontal" HorizontalAlignment="Right"/>
+        </Border>
+    </Grid>
+</Window>
+'@
+
+# Costruisce il popup SENZA mostrarlo, cosi' il test lo puo' ispezionare.
+function New-AppDialog {
+    param(
+        [string]$Text,
+        [string]$Title = 'WinGet Studio',
+        [System.Windows.MessageBoxButton]$Button = 'OK',
+        [System.Windows.MessageBoxImage]$Image = 'None',
+        [System.Windows.MessageBoxResult]$Default = 'None'
+    )
+    $dlg = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader ([xml]$script:dialogXaml)))
+    # Stili (il template dei Button compreso) e brush del tema corrente: quelli della finestra
+    # principale, che li tiene nelle sue Resources.
+    $dlg.Resources.MergedDictionaries.Add($window.Resources)
+    $dlg.Title = $Title
+    $dlg.FindName('DlgText').Text = $Text
+    # Owner solo a finestra visibile: su una finestra mai mostrata WPF lancia un'eccezione.
+    if ($window.IsVisible) {
+        $dlg.Owner = $window
+        $dlg.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterOwner
+    }
+    else { $dlg.WindowStartupLocation = [System.Windows.WindowStartupLocation]::CenterScreen }
+
+    # Icone e colori della colonna Result; informazione e domanda nel colore accento.
+    $icon = @{ 16 = @(0xEB90, 'ErrBrush'); 48 = @(0xE814, 'WarnBrush')
+               32 = @(0xE9CE, 'AccentBrush'); 64 = @(0xE946, 'AccentBrush') }[[int]$Image]
+    $iconBlock = $dlg.FindName('DlgIcon')
+    if ($icon) {
+        $iconBlock.Text = [string][char]$icon[0]
+        $iconBlock.SetResourceReference([System.Windows.Controls.TextBlock]::ForegroundProperty, $icon[1])
+    }
+    else { $iconBlock.Visibility = [System.Windows.Visibility]::Collapsed }
+
+    # Invio sceglie il predefinito (No sulle conferme, se chi chiama lo chiede), Esc e la X
+    # l'ultimo, cioe' No oppure OK. Il predefinito e' in colore accento: si vede cosa fa Invio.
+    $names  = @(if ($Button -eq [System.Windows.MessageBoxButton]::YesNo) { 'Yes', 'No' } else { 'OK' })
+    $def    = if ($names.Count -eq 1) { 'OK' } elseif ($Default -eq [System.Windows.MessageBoxResult]::No) { 'No' } else { 'Yes' }
+    foreach ($n in $names) {
+        $b = New-Object System.Windows.Controls.Button
+        $b.Content   = $n
+        $b.Tag       = $n
+        $b.MinWidth  = 88
+        $b.Height    = 28
+        $b.Padding   = New-Object System.Windows.Thickness 16, 0, 16, 0
+        $b.Margin    = New-Object System.Windows.Thickness 8, 0, 0, 0
+        $b.IsDefault = $n -eq $def
+        $b.IsCancel  = $n -eq $names[-1]
+        if ($b.IsDefault) {
+            $b.SetResourceReference([System.Windows.Controls.Control]::BackgroundProperty, 'AccentBrush')
+            $b.SetResourceReference([System.Windows.Controls.Control]::ForegroundProperty, 'AccentFgBrush')
+        }
+        # Il sender e non $b: l'handler non vede le variabili di questo ciclo (ADR 0008).
+        $b.Add_Click({ param($s, $e) $w = [System.Windows.Window]::GetWindow($s); $w.Tag = $s.Tag; $w.Close() })
+        [void]$dlg.FindName('DlgButtons').Children.Add($b)
+    }
+    $dlg.Add_Loaded({
+        param($s, $e)
+        $d = @($s.FindName('DlgButtons').Children | Where-Object { $_.IsDefault })[0]
+        if ($d) { [void]$d.Focus() }
+    })
+    # La barra del titolo la disegna Windows: va scurita come quella della finestra principale.
+    $dlg.Add_SourceInitialized({ param($s, $e) Set-TitleBarDark $script:themeDark $s })
+    return $dlg
+}
+
+# Velo sulla finestra principale mentre un popup e' aperto. Dissolvenza di 150 ms, niente se in
+# Windows le animazioni sono spente. $script:dimOn dice se nel frattempo un altro popup l'ha
+# riacceso, e allora la fine della dissolvenza in uscita non lo deve nascondere.
+$script:dimOn = $false
+function Set-DialogDim([bool]$On, [bool]$Animate = [System.Windows.SystemParameters]::ClientAreaAnimation) {
+    $script:dimOn = $On
+    $prop = [System.Windows.UIElement]::OpacityProperty
+    if ($On) { $DialogDim.Visibility = [System.Windows.Visibility]::Visible }
+    if (-not $Animate) {
+        $DialogDim.BeginAnimation($prop, $null)
+        $DialogDim.Opacity = [double][int]$On
+        if (-not $On) { $DialogDim.Visibility = [System.Windows.Visibility]::Collapsed }
+        return
+    }
+    $a = New-Object System.Windows.Media.Animation.DoubleAnimation
+    $a.To       = [double][int]$On
+    $a.Duration = New-Object System.Windows.Duration ([TimeSpan]::FromMilliseconds(150))
+    $ease = New-Object System.Windows.Media.Animation.CubicEase
+    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseOut
+    $a.EasingFunction = $ease
+    if (-not $On) {
+        $a.Add_Completed({ if (-not $script:dimOn) { $DialogDim.Visibility = [System.Windows.Visibility]::Collapsed } })
+    }
+    $DialogDim.BeginAnimation($prop, $a)
+}
+
+# Mostra il popup e torna la risposta come la MessageBox ([MessageBoxResult]).
+function Show-AppDialog {
+    param(
+        [string]$Text,
+        [string]$Title = 'WinGet Studio',
+        [System.Windows.MessageBoxButton]$Button = 'OK',
+        [System.Windows.MessageBoxImage]$Image = 'None',
+        [System.Windows.MessageBoxResult]$Default = 'None'
+    )
+    try { $dlg = New-AppDialog -Text $Text -Title $Title -Button $Button -Image $Image -Default $Default }
+    catch {
+        # Ripiego sulla MessageBox di sistema: un messaggio non deve perdersi proprio quando
+        # qualcosa e' guasto (tema o XAML).
+        if ($window -and $window.IsVisible) { return [System.Windows.MessageBox]::Show($window, $Text, $Title, $Button, $Image, $Default) }
+        return [System.Windows.MessageBox]::Show($Text, $Title, $Button, $Image, $Default)
+    }
+    # Il suono che la MessageBox fa per lo stesso tipo di messaggio.
+    switch ([int]$Image) {
+        16 { [System.Media.SystemSounds]::Hand.Play() }
+        48 { [System.Media.SystemSounds]::Exclamation.Play() }
+        32 { [System.Media.SystemSounds]::Question.Play() }
+        64 { [System.Media.SystemSounds]::Asterisk.Play() }
+    }
+    Set-DialogDim $true
+    try { [void]$dlg.ShowDialog() } finally { Set-DialogDim $false }
+    if ($dlg.Tag) { return [System.Windows.MessageBoxResult]$dlg.Tag }
+    # Esc o la X: la risposta prudente, cioe' No (oppure OK).
+    if ($Button -eq [System.Windows.MessageBoxButton]::YesNo) { return [System.Windows.MessageBoxResult]::No }
+    return [System.Windows.MessageBoxResult]::OK
+}
+
+# ------------------------------------------------------------------
 # STATO "OCCUPATO" GLOBALE
 # ------------------------------------------------------------------
 # winget non e' affidabile in parallelo, quindi un'operazione in corso su una scheda

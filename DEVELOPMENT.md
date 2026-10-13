@@ -2,7 +2,7 @@
 
 Everything a change to this codebase needs to get done: layout, build, signing, release, tests. *Why* things are built the way they are is recorded in the Architecture Decision Records under [docs/adr/](docs/adr/) — see [Decisions](#decisions). For what the app does and how to use it, see [README.md](README.md).
 
-The **UI and the documentation are in English**; the in-code comments are in Italian. User-facing strings live in `ui\UI.xaml` (labels, column headers) and in the `Write-Log` / `LogUI` / `MessageBox` calls under `src\modules\`.
+The **UI and the documentation are in English**; the in-code comments are in Italian. User-facing strings live in `ui\UI.xaml` (labels, column headers) and in the `Write-Log` / `LogUI` / `Show-AppDialog` calls under `src\modules\`.
 
 Two rules for on-screen prose, which the About tab is the only place long enough to break:
 
@@ -248,5 +248,6 @@ Each decision that shapes the architecture has an Architecture Decision Record i
 - [ADR 0017](docs/adr/0017-app-icon-drawn-in-code.md) — The app icon is drawn in code: a cardboard box with `>_` and a download badge, 14 pixel-snapped sizes from one script.
 - [ADR 0018](docs/adr/0018-retry-without-elevation-when-winget-refuses-administrator.md) — When winget refuses a per-user uninstall as administrator (`0x8A15007D`, issue #12), the queue repeats it as the same account without elevation, through a one-off scheduled task.
 - [ADR 0019](docs/adr/0019-installing-and-updating-winget.md) — Installing winget when it is missing (register, else GitHub with SHA-256), its version in Settings, and its update: by the Store where it can, by a GitHub button elsewhere.
+- [ADR 0020](docs/adr/0020-themed-dialogs.md) — Dialogs in the app's theme (`Show-AppDialog`): same enums as the MessageBox, default No kept, dimmed window behind, MessageBox only as fallback.
 
 The rule: **a decision that shapes the architecture gets a new numbered ADR**, written from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md); a superseded or withdrawn ADR is kept and its number never reused. **A spec in `docs\superpowers\specs\` is deleted once it is implemented**, after its decisions have been moved into an ADR.

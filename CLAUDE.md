@@ -54,7 +54,8 @@ Glyphs must be written `[char]0xE706`, never `` "`u{E706}" `` — that escape ne
 
 ## Conventions
 
-- **UI text and documentation in English; in-code comments in Italian.** User-facing strings live in `ui\UI.xaml` and in the `Write-Log` / `LogUI` / `MessageBox` calls under `src\modules\`.
+- **UI text and documentation in English; in-code comments in Italian.** User-facing strings live in `ui\UI.xaml` and in the `Write-Log` / `LogUI` / `Show-AppDialog` calls under `src\modules\`.
+- **Dialogs go through `Show-AppDialog`** (`App.Ui.ps1`, ADR 0020), never `[System.Windows.MessageBox]::Show`, which ignores the theme. Same enums as the MessageBox; confirmations keep `-Default ([System.Windows.MessageBoxResult]::No)`.
 - Signing: `build.ps1` picks `$env:WINGETSTUDIO_CERT_THUMBPRINT` if set, else only the certificate in `Cert:\CurrentUser\My` matching `assets\WinGetStudio-codesign.cer`; it still succeeds unsigned. Never generate a replacement certificate to get a build through: without the key `build.ps1` builds unsigned, and a second key with the same subject cannot be told apart by name. Private keys (`*.pfx`, `*.p12`, `*.snk`) are gitignored — only the public `.cer` is committed.
 - A decision that shapes the architecture gets a new numbered ADR in `docs\adr\`, from `docs\adr\TEMPLATE.md`; a superseded or withdrawn ADR is kept and its number never reused.
 - A spec in `docs\superpowers\specs\` is deleted once implemented, after its decisions have been moved into an ADR.

@@ -91,7 +91,11 @@
                         <Border x:Name="bd" CornerRadius="4" BorderThickness="1"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <!-- Margin dal Padding: senza, il Padding="12,0" dei pulsanti a
+                                 larghezza libera (Update to vX) non contava e il testo toccava il
+                                 bordo. Gli altri hanno larghezza fissa e il testo resta centrato. -->
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -1192,9 +1196,9 @@
                                 <RowDefinition Height="Auto"/>   <!-- 1 tema -->
                                 <RowDefinition Height="Auto"/>   <!-- 2 striscia dei tab -->
                                 <RowDefinition Height="Auto"/>   <!-- 3 UPDATES -->
-                                <RowDefinition Height="Auto"/>   <!-- 4 WinGet Studio: versione, pulsanti ed esito -->
-                                <RowDefinition Height="Auto"/>   <!-- 5 winget: versione, Store o pulsante, esito -->
-                                <RowDefinition Height="Auto"/>   <!-- 6 spunta controllo all'avvio -->
+                                <RowDefinition Height="Auto"/>   <!-- 4 controlli comuni: Check for updates, spunta -->
+                                <RowDefinition Height="Auto"/>   <!-- 5 WinGet Studio: versione, pulsante, esito -->
+                                <RowDefinition Height="Auto"/>   <!-- 6 App Installer (winget): versione, Store o pulsante, esito -->
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="APPEARANCE"
@@ -1218,47 +1222,55 @@
 
                             <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="UPDATES"
                                        Style="{StaticResource SettingsHeader}"/>
-                            <!-- Versione, pulsanti ed esito su UNA riga, con la sua etichetta a
-                                 sinistra come nelle righe di APPEARANCE. Prima erano tre righe
-                                 impilate e due di quelle avevano la prima colonna vuota: la
-                                 spunta e i pulsanti restavano appesi a meta' pagina, rientrati
-                                 rispetto a un'etichetta che non c'era. La sezione ha due voci,
-                                 non sei, quindi va letta in due righe. -->
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="WinGet Studio" Margin="0,0,14,10"
+                            <!-- I controlli valgono per tutte e due le voci, quindi stanno in una
+                                 riga loro, sopra le voci e allo stesso filo delle etichette.
+                                 Il controllo all'avvio e' una chiamata anonima all'API di GitHub
+                                 (due dove lo Store non aggiorna winget): acceso di default, ma si
+                                 spegne, perche' un programma che va in rete da solo deve almeno
+                                 dirlo e lasciare la scelta. Il pulsante resta sempre attivo.
+                                 Lo spinner sta in fondo: quando compare non sposta niente. -->
+                            <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,16">
+                                <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
+                                <CheckBox x:Name="ChkAutoCheck" IsChecked="True" Margin="16,0,0,0"
+                                          VerticalAlignment="Center"
+                                          Content="Check at startup"
+                                          Style="{StaticResource ThemedCheckBox}"
+                                          ToolTip="Anonymous calls to the GitHub API when the app starts: one for WinGet Studio, and one for winget where the Microsoft Store does not update it. Turn it off to go online only when you press Check for updates"
+                                          Foreground="{DynamicResource FgBrush}"/>
+                                <Control x:Name="UpdateSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                         Margin="12,0,0,0" Visibility="Collapsed"/>
+                            </StackPanel>
+                            <!-- Una voce per riga: etichetta, versione, pulsante di aggiornamento ed
+                                 esito. Il pulsante compare solo quando c'e' una versione piu'
+                                 recente, e allora l'esito tace: direbbe la stessa cosa. Margine 14
+                                 e non 10: le due voci restano distanziate. -->
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="WinGet Studio" Margin="0,0,14,14"
                                        VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
-                            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                            <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,14">
                                 <TextBlock x:Name="TxtVersion" VerticalAlignment="Center"
                                            FontWeight="SemiBold" Margin="0,0,18,0"
                                            Foreground="{DynamicResource FgBrush}"/>
-                                <Button x:Name="BtnCheckUpdate" Content="Check for updates" Width="140" Height="26"/>
-                                <!-- Compare solo quando una release e' piu' recente di questa.
-                                     Foreground dal tema e NON "White": l'accento del tema scuro
+                                <!-- Foreground dal tema e NON "White": l'accento del tema scuro
                                      e' azzurro chiaro (#4CC2FF) e il bianco sopra faceva 2.01:1,
                                      cioe' illeggibile sul pulsante piu' importante della
                                      schermata. Test-Ui.ps1 misura la coppia. -->
-                                <Button x:Name="BtnUpdateApp" Height="26" Padding="12,0" Margin="8,0,0,0"
+                                <Button x:Name="BtnUpdateApp" Height="26" Padding="12,0"
                                         Visibility="Collapsed"
                                         Background="{DynamicResource AccentBrush}"
                                         Foreground="{DynamicResource AccentFgBrush}"/>
-                                <Control x:Name="UpdateSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
-                                         Margin="10,0,0,0" Visibility="Collapsed"/>
                                 <!-- TextTrimming: l'esito piu' lungo ("No release found...") non
                                      deve allargare la pagina e far comparire la barra in basso. -->
                                 <TextBlock x:Name="TxtUpdateStatus" VerticalAlignment="Center" Margin="12,0,0,0"
                                            TextTrimming="CharacterEllipsis"
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
-                            <!-- Il controllo all'avvio e' una chiamata anonima all'API di GitHub.
-                                 Acceso di default (e' il comportamento di sempre), ma si spegne:
-                                 un programma che va in rete da solo deve almeno dirlo e lasciare
-                                 la scelta. Il pulsante qui sopra resta sempre attivo. -->
                             <!-- winget stesso (ADR 0019): la versione di App Installer e chi lo
                                  aggiorna. Dove lo Store e' libero di farlo lo dice il link (lo apre
                                  l'handler unico dei Hyperlink in Start-App); altrimenti il pulsante
                                  compare quando GitHub ha una release piu' recente. -->
-                            <TextBlock Grid.Row="5" Grid.Column="0" Text="winget" Margin="0,0,14,10"
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="App Installer (winget)" Margin="0,0,14,10"
                                        VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
-                            <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                            <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
                                 <TextBlock x:Name="TxtWinGetVersion" VerticalAlignment="Center"
                                            FontWeight="SemiBold" Margin="0,0,18,0"
                                            Foreground="{DynamicResource FgBrush}"/>
@@ -1274,14 +1286,6 @@
                                            TextTrimming="CharacterEllipsis"
                                            Foreground="{DynamicResource SubtleFgBrush}"/>
                             </StackPanel>
-                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Automatic" Margin="0,0,14,0"
-                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
-                            <CheckBox Grid.Row="6" Grid.Column="1" x:Name="ChkAutoCheck" IsChecked="True"
-                                      HorizontalAlignment="Left" VerticalAlignment="Center"
-                                      Content="Check for updates at startup"
-                                      Style="{StaticResource ThemedCheckBox}"
-                                      ToolTip="Anonymous calls to the GitHub API when the app starts: one for WinGet Studio, and one for winget where the Microsoft Store does not update it. Turn it off to go online only when you press Check for updates"
-                                      Foreground="{DynamicResource FgBrush}"/>
                         </Grid>
                     </ScrollViewer>
                 </TabItem>
@@ -1309,6 +1313,11 @@
                  Foreground="{DynamicResource FgBrush}"
                  BorderBrush="{DynamicResource CtrlBorderBrush}"
                  CaretBrush="{DynamicResource FgBrush}"/>
+
+        <!-- Velo sotto un popup (Show-AppDialog, ADR 0020): copre tutta la finestra, margine
+             della griglia compreso (-10), e lo dissolve Set-DialogDim. -->
+        <Border x:Name="DialogDim" Grid.RowSpan="4" Margin="-10" Panel.ZIndex="100"
+                Background="{DynamicResource DimBrush}" Opacity="0" Visibility="Collapsed"/>
 
     </Grid>
 </Window>
