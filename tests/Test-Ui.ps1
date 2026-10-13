@@ -805,8 +805,14 @@ $script:jobOut = $null
 if (-not (Wait-For { $null -ne $script:jobOut })) { throw "Start-BackgroundJob: OnDone non e' mai stato richiamato (30s)" }
 if ($script:jobOut -ne '42|ok') { throw "Start-BackgroundJob: risultato inatteso '$($script:jobOut)' (atteso '42|ok')" }
 if ($script:jobs.Count -ne 0) { throw "job non rimosso dalla lista: $($script:jobs.Count) ancora attivi" }
+# LogUI e UI{} non scrivono nulla nell'output del job: un $null in testa al risultato faceva
+# credere all'installazione di winget che il job non avesse risposto.
+$script:jobOut = $null
+[void](Start-BackgroundJob -Script { LogUI 'job log fixture'; UI { }; 'only' } -OnDone { param($r) $script:jobOut = @($r) })
+if (-not (Wait-For { $null -ne $script:jobOut })) { throw "job con LogUI: OnDone mai richiamato" }
+if ($script:jobOut.Count -ne 1 -or $script:jobOut[0] -ne 'only') { throw "LogUI/UI scrivono nell'output del job: $($script:jobOut.Count) risultati" }
 Stop-AllJobs
-"OK job    runspace, -Vars, -Functions, OnDone sul thread UI e cleanup"
+"OK job    runspace, -Vars, -Functions, OnDone sul thread UI e cleanup; LogUI fuori dall'output"
 
 # 13b) Una ricerca in volo E' un processo winget, anche se di proposito non alza lo stato
 # occupato (la digitazione deve restare fluida). Senza questo controllo, digitare in Install
@@ -960,8 +966,9 @@ $items.Clear()
 $script:listStale = $false
 Refresh-SelectionState
 
-# Le quattro code che alterano la macchina lo dichiarano, e solo il Check sblocca.
-foreach ($fn in 'Start-UpdateSelected', 'Install-Rows', 'Start-UninstallSelected', 'Invoke-PackageImport') {
+# Le code che alterano la macchina lo dichiarano, e solo il Check sblocca. Anche l'aggiornamento
+# di winget: App Installer puo' essere una riga della scheda Updates.
+foreach ($fn in 'Start-UpdateSelected', 'Install-Rows', 'Start-UninstallSelected', 'Invoke-PackageImport', 'Start-WinGetInstall') {
     if ((Get-FunctionSource $fn) -notmatch 'Set-UpdatesStale') { throw "$fn non marca la lista come vecchia" }
 }
 if ((Get-FunctionSource 'Load-Upgrades') -notmatch 'listStale\s*=\s*\$false') { throw "Load-Upgrades non sblocca il pulsante" }
@@ -1626,6 +1633,154 @@ $selfGuardSrc = Get-FunctionSource 'Start-SelfUpdate'
 if ($selfGuardSrc -notmatch 'Test-IsWinGetPortable') { throw "Start-SelfUpdate non ha la guardia Test-IsWinGetPortable" }
 ${function:Get-RunningExePath} = $realExePath
 "OK winget  con l'exe dentro %LOCALAPPDATA%\Microsoft\WinGet\Packages l'auto-update sta fermo"
+
+# Il controllo automatico all'avvio parte INSIEME alla scansione: Load-Upgrades alza lo stato
+# occupato nello stesso handler, e una guardia su isBusy lo faceva tacere sempre (dalla v1.9.0:
+# il pulsante compariva solo dopo un controllo manuale). Parla solo con GitHub, quindi non
+# aspetta nessuno; il pulsante resta spento finche' la scansione non finisce.
+$realExePath   = ${function:Get-RunningExePath}
+$realLatestRel = ${function:Get-LatestRelease}
+$autoBefore    = $ChkAutoCheck.IsChecked
+try {
+    function Get-RunningExePath { 'D:\Tools\WinGetStudio.exe' }
+    function Get-LatestRelease { [PSCustomObject]@{ Tag = 'v9.9.9'; Version = '9.9.9'; Name = 'WinGetStudio.exe'; Url = 'https://github.com/x/exe'; Size = 2048; Sha256 = 'BB' } }
+    $ChkAutoCheck.IsChecked  = $true
+    $BtnUpdateApp.Visibility = [System.Windows.Visibility]::Collapsed
+    Set-AppBusy $true
+    Start-UpdateCheck
+    if (-not (Wait-For { $BtnUpdateApp.Visibility -eq [System.Windows.Visibility]::Visible } 30)) { throw "il controllo all'avvio non parte con la scansione in corso" }
+    if ($BtnUpdateApp.IsEnabled) { throw "durante la scansione il pulsante di aggiornamento deve restare spento" }
+    Set-AppBusy $false
+    if (-not $BtnUpdateApp.IsEnabled) { throw "a scansione finita il pulsante di aggiornamento resta spento" }
+    "OK autochk controllo all'avvio in parallelo alla scansione, pulsante attivo a scansione finita"
+}
+finally {
+    ${function:Get-RunningExePath} = $realExePath
+    ${function:Get-LatestRelease}  = $realLatestRel
+    $ChkAutoCheck.IsChecked  = $autoBefore
+    $BtnUpdateApp.Visibility = [System.Windows.Visibility]::Collapsed
+    Set-AppBusy $false
+    Stop-AllJobs
+}
+
+# 21) winget stesso (ADR 0019). Chi aggiorna App Installer: lo Store se c'e' e la policy lo
+# lascia fare, altrimenti il pulsante. Casi passati come parametri, nessun registro nel test.
+$storeCases = @(
+    @{ Store = $false; Policy = $null;                                       Want = $false }
+    @{ Store = $true;  Policy = $null;                                       Want = $true }
+    @{ Store = $true;  Policy = [PSCustomObject]@{ RemoveWindowsStore = 1 }; Want = $false }
+    @{ Store = $true;  Policy = [PSCustomObject]@{ AutoDownload = 2 };       Want = $false }
+    @{ Store = $true;  Policy = [PSCustomObject]@{ AutoDownload = 4 };       Want = $true }
+)
+foreach ($c in $storeCases) {
+    $got = Test-StoreUpdatesWinGet -HasStore $c.Store -Policy $c.Policy
+    if ($got -ne $c.Want) { throw "Test-StoreUpdatesWinGet store=$($c.Store) policy=$($c.Policy): $got, atteso $($c.Want)" }
+}
+
+# Dipendenze: solo quelle dell'architettura di Windows, a qualunque profondita' nello zip.
+$depDir = Join-Path ([IO.Path]::GetTempPath()) "wgt-deps-test-$PID"
+foreach ($f in 'x64\a.appx', 'x86\b.appx', 'arm64\c.appx', 'x64\d.msix') {
+    [void](New-Item -ItemType File -Path (Join-Path $depDir "nested\$f") -Force)
+}
+try {
+    $x64 = @(Get-WinGetDependency $depDir 'AMD64' | ForEach-Object { Split-Path $_ -Leaf } | Sort-Object)
+    if (($x64 -join ',') -ne 'a.appx,d.msix') { throw "dipendenze AMD64 sbagliate: $($x64 -join ',')" }
+    $arm = @(Get-WinGetDependency $depDir 'ARM64' | ForEach-Object { Split-Path $_ -Leaf })
+    if (($arm -join ',') -ne 'c.appx') { throw "dipendenze ARM64 sbagliate: $($arm -join ',')" }
+    $threw = $false
+    try { [void](Get-WinGetDependency $depDir 'IA64') } catch { $threw = $true }
+    if (-not $threw) { throw "un'architettura senza dipendenze deve fermare l'installazione" }
+}
+finally { Remove-Item -LiteralPath $depDir -Recurse -Force -ErrorAction SilentlyContinue }
+
+# Il controllo in Settings, con versione locale, Store e GitHub finti.
+$realVersionFn = ${function:Get-WinGetVersion}
+$realStoreFn   = ${function:Test-StoreUpdatesWinGet}
+$realLatestRel = ${function:Get-LatestRelease}
+$autoBefore    = $ChkAutoCheck.IsChecked
+function Invoke-WinGetCheckFixture([switch]$Manual) {
+    $BtnUpdateWinGet.Visibility = [System.Windows.Visibility]::Collapsed
+    $TxtWinGetStore.Visibility  = [System.Windows.Visibility]::Collapsed
+    $TxtWinGetVersion.Text = ''
+    $TxtWinGetStatus.Text  = ''
+    Start-WinGetCheck -Manual:$Manual
+    if (-not (Wait-For { $script:jobs.Count -eq 0 } 30)) { throw "Start-WinGetCheck non e' terminato" }
+}
+try {
+    Stop-AllJobs
+    function Get-LatestRelease { [PSCustomObject]@{ Tag = 'v1.29.380'; Version = '1.29.380'; Name = 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle'; Url = 'https://github.com/x/bundle'; Size = 217276577; Sha256 = 'AA' } }
+    function Get-WinGetVersion { '1.27.470.0' }
+
+    # Store: etichetta col link, nessun pulsante, nessuna chiamata a GitHub.
+    function Test-StoreUpdatesWinGet { $true }
+    Invoke-WinGetCheckFixture -Manual
+    if ($TxtWinGetVersion.Text -notmatch '1\.27\.470\.0') { throw "versione di App Installer non mostrata: '$($TxtWinGetVersion.Text)'" }
+    if ($TxtWinGetStore.Visibility -ne [System.Windows.Visibility]::Visible) { throw "con lo Store l'etichetta non compare" }
+    if ($BtnUpdateWinGet.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "con lo Store compare il pulsante GitHub" }
+
+    # Senza Store: release piu' recente, pulsante.
+    function Test-StoreUpdatesWinGet { $false }
+    Invoke-WinGetCheckFixture -Manual
+    if ($BtnUpdateWinGet.Visibility -ne [System.Windows.Visibility]::Visible) { throw "senza Store e con una release piu' recente il pulsante non compare" }
+    if ($BtnUpdateWinGet.Content -ne 'Update to v1.29.380') { throw "pulsante winget: '$($BtnUpdateWinGet.Content)'" }
+    if ($TxtWinGetStore.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "senza Store compare l'etichetta dello Store" }
+    if ($script:pendingWinGet.Tag -ne 'v1.29.380') { throw "la release da installare non arriva al pulsante" }
+
+    # Stessa versione (1.29.380.0 contro v1.29.380): aggiornato, nessun pulsante.
+    function Get-WinGetVersion { '1.29.380.0' }
+    Invoke-WinGetCheckFixture -Manual
+    if ($BtnUpdateWinGet.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "con la stessa versione compare il pulsante" }
+    if ($TxtWinGetStatus.Text -notmatch 'Up to date') { throw "controllo manuale senza esito: '$($TxtWinGetStatus.Text)'" }
+
+    # Spunta giu' e controllo automatico: la versione si', GitHub no.
+    function Get-WinGetVersion { '1.27.470.0' }
+    $ChkAutoCheck.IsChecked = $false
+    Invoke-WinGetCheckFixture
+    if ($TxtWinGetVersion.Text -notmatch '1\.27\.470\.0') { throw "con la spunta giu' la versione locale non viene mostrata" }
+    if ($BtnUpdateWinGet.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "con la spunta giu' il controllo automatico e' andato su GitHub" }
+    "OK wgcheck Store o pulsante, policy dello Store, versione uguale, spunta giu' senza GitHub, dipendenze per architettura"
+}
+finally {
+    ${function:Get-WinGetVersion}       = $realVersionFn
+    ${function:Test-StoreUpdatesWinGet} = $realStoreFn
+    ${function:Get-LatestRelease}       = $realLatestRel
+    $ChkAutoCheck.IsChecked = $autoBefore
+    $BtnUpdateWinGet.Visibility = [System.Windows.Visibility]::Collapsed
+    $script:pendingWinGet = $null
+    Stop-AllJobs
+}
+
+# Installare winget e' scaricare e installare codice come amministratore: conferma prima di
+# tutto, con No come default; checksum obbligatorio prima del download; nessuna chiusura
+# forzata di altre app. Statico: una MessageBox bloccherebbe la suite.
+$instSrc = Get-FunctionSource 'Start-WinGetInstall'
+if ($instSrc.IndexOf('MessageBox') -lt 0 -or $instSrc.IndexOf('MessageBox') -gt $instSrc.IndexOf('Start-BackgroundJob')) { throw "Start-WinGetInstall non chiede conferma prima del job" }
+if ($instSrc -notmatch 'MessageBoxResult\]::No\)') { throw "la conferma di installazione di winget non ha No come default" }
+if ($instSrc -notmatch 'Test-WinGetBusy') { throw "Start-WinGetInstall non controlla che winget sia libero" }
+$pkgSrc = Get-FunctionSource 'Install-WinGetPackage'
+$refuse = $pkgSrc.IndexOf('-not $rel.Sha256')
+if ($refuse -lt 0 -or $refuse -gt $pkgSrc.IndexOf('Invoke-WebRequest -Uri')) { throw "un asset senza checksum non viene rifiutato prima del download" }
+if ($pkgSrc -notmatch 'Get-FileHash') { throw "il download di winget non viene verificato" }
+if ($pkgSrc -notmatch 'Add-AppxPackage[^\r\n]*-DeferRegistrationWhenPackagesAreInUse') { throw "l'installazione non rinvia la registrazione se winget e' in uso" }
+if ($pkgSrc -match 'Add-AppxPackage[^\r\n]*Force') { throw "l'installazione chiude d'autorita' altri processi" }
+$appSrc = Get-FunctionSource 'Start-App'
+if ($appSrc.IndexOf('MessageBox') -ge 0 -and $appSrc.IndexOf('MessageBox') -lt $appSrc.IndexOf('Read-Xaml')) { throw "Start-App esce ancora prima della finestra quando winget manca" }
+if ($appSrc -notmatch 'Start-WinGetInstall -Missing') { throw "all'avvio, senza winget, non viene proposta l'installazione" }
+"OK wginst  conferma con default No, checksum prima del download, registrazione rinviata, avvio senza uscita"
+
+# Asset reali di winget su GitHub (solo -Live): se Microsoft li rinomina, l'installazione si
+# rompe in silenzio, e lo si scopre qui.
+if (-not $Live) {
+    "SKIP wgrel   senza -Live"
+}
+else {
+    foreach ($a in 'Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle', 'DesktopAppInstaller_Dependencies.zip') {
+        $wr = Get-LatestRelease 'microsoft/winget-cli' $a
+        if (-not $wr -or $wr.Url -notmatch '^https://github\.com/' -or -not $wr.Sha256) { throw "winget-cli: asset $a senza URL o checksum" }
+    }
+    if ($realWinget -and (Get-WinGetVersion) -notmatch '^\d+\.\d+\.\d+') { throw "Get-WinGetVersion non legge la versione di App Installer" }
+    "OK wgrel   asset winget-cli $($wr.Tag) con checksum; App Installer $(Get-WinGetVersion)"
+}
 
 # Chiamata reale all'API pubblica (una richiesta, limite anonimo 60/ora).
 $rel = if ($Live) { Get-LatestRelease 'FedeB2160/WinGetStudio' } else { $null }

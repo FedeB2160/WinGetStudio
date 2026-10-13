@@ -8,7 +8,7 @@ Light and dark theme, no telemetry, no branding, a single `.exe` with nothing to
 
 ## Requirements
 
-- Windows 10 or 11 with **winget** (the *App Installer* package from the Microsoft Store). Without it the app says so at startup and exits.
+- Windows 10 (1809 or later) or 11 with **winget** (the *App Installer* package). If it is missing, the app offers to install it at startup: it first registers the App Installer that comes with Windows, and if there is none it downloads App Installer and its dependencies from [github.com/microsoft/winget-cli](https://github.com/microsoft/winget-cli/releases) (a few hundred MB, checked against the published SHA-256). Saying no closes the app.
 - **Administrator rights**: installing and removing software needs them, so the app asks for elevation when it starts.
 
 ## Getting it
@@ -130,9 +130,10 @@ A pin tells winget to leave a package alone until you remove the pin — for the
 The **Settings** tab, on the right of the strip next to About, is a tab like the others — so the progress bar and the log stay visible while you are in it.
 
 - **Theme** — `Light`, `Dark`, or `System` to follow Windows (which it keeps following while the window is open).
-- **Installed version** and **Check for updates** — see below.
+- **WinGet Studio**, its version and **Check for updates** — see below.
+- **winget**, the version of App Installer, and who updates it — see below.
 - **Tab strip** — whether the tabs show their icon, their name, or both. Every tab also has a tooltip saying what it is for.
-- **Check for updates at startup** — on by default, and it can be turned off: it is one anonymous call to the GitHub API every time the app starts. The **Check for updates** button always works regardless.
+- **Check for updates at startup** — on by default, and it can be turned off: it is one anonymous call to the GitHub API every time the app starts, two where the Microsoft Store does not update winget. The **Check for updates** button always works regardless.
 
 ### About
 
@@ -156,6 +157,13 @@ Its own tab, at the very right end of the strip: what the app does function by f
 At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the Settings tab, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, the file is verified against the checksum published with the release. A copy installed with the setup then runs the new installer, which closes WinGet Studio, updates it and reopens it; a portable copy replaces itself and restarts; a copy installed with winget is updated with `winget upgrade FedeB2160.WinGetStudio`.
 
 If there is no newer release, no network, or you are running from source, the check says nothing at all. You can always ask explicitly with **Check for updates**, which does report the outcome either way.
+
+### winget itself
+
+The **winget** row in Settings shows the installed version of App Installer, the package that carries winget. Who updates it depends on the machine:
+
+- **Where the Microsoft Store is available and allowed to update apps**, it keeps App Installer up to date on its own, and the row links to the Store's *Downloads and updates* page.
+- **Elsewhere** (Windows LTSC and Server, Windows Sandbox, a Store turned off by policy), the startup check also asks GitHub for the latest winget release. If it is newer, an **Update to vX.Y.Z** button appears: it downloads App Installer and its dependencies from github.com/microsoft/winget-cli (about 300 MB), checks them against the published SHA-256 and installs them. If winget is running somewhere else at that moment, the new version starts when it closes.
 
 ## Building it, and how it works inside
 

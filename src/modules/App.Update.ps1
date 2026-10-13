@@ -1,8 +1,8 @@
 <#
     App.Update.ps1 — aggiornamento automatico dell'applicazione dalle release GitHub.
 
-    Il repo e' pubblico, quindi l'API si interroga SENZA token (60 richieste/ora per IP,
-    e qui se ne usa una sola all'avvio).
+    Il repo e' pubblico, quindi l'API si interroga SENZA token (60 richieste/ora per IP:
+    all'avvio una per l'app, e una per winget dove non lo aggiorna lo Store, WinGet.Setup.ps1).
 
     COME SI SOSTITUISCE DA SOLO: su Windows un eseguibile in esecuzione non puo' essere
     sovrascritto, ma PUO' essere rinominato. Quindi si rinomina in ".old", si scrive il
@@ -154,7 +154,9 @@ function Start-UpdateCheck([switch]$Manual) {
     # Il controllo AUTOMATICO si puo' spegnere; quello chiesto dal pulsante no — chi lo premette
     # lo sta chiedendo adesso.
     if (-not $Manual -and -not $ChkAutoCheck.IsChecked) { return }
-    if ($script:isBusy) { return }
+    # Nessuna guardia sullo stato occupato: si parla solo con GitHub, e all'avvio Load-Upgrades
+    # lo alza nello stesso handler, quindi una guardia qui faceva tacere il controllo SEMPRE
+    # (dalla v1.9.0). Il pulsante resta spento finche' la scansione non finisce (handler busy).
 
     if ($Manual) {
         $TxtUpdateStatus.Text        = 'Checking...'
@@ -208,8 +210,8 @@ function Start-SelfUpdate {
     $rel = $script:pendingUpdate
     # Test-WinGetBusy e non isBusy: questa funzione finisce sostituendo l'eseguibile e
     # chiudendo la finestra, e farlo mentre un runspace sta ancora dentro winget e' l'ultima
-    # cosa da fare. Il controllo automatico degli aggiornamenti (Start-UpdateCheck) resta su
-    # isBusy: quello parla solo con GitHub e non tocca niente.
+    # cosa da fare. Il controllo degli aggiornamenti (Start-UpdateCheck) invece non ha guardie:
+    # parla solo con GitHub e non tocca niente.
     if (-not $rel -or (Test-WinGetBusy) -or (Test-IsWinGetPortable)) { return }
     $exe = Get-RunningExePath
     if (-not $exe) { return }

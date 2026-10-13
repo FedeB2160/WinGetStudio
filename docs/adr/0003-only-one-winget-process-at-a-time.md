@@ -36,8 +36,10 @@ uninstall, pin). It refuses to start when `Test-WinGetBusy` is true ("Another wi
 still running"), and it takes the busy state itself, so no caller can forget to. The paths that
 call winget outside the queue guard themselves: both scans; export and import twice each,
 because the file dialog gives a pending search time to come back; and `Start-SelfUpdate`,
-because it ends by replacing the executable and closing the window. `Start-UpdateCheck`
-deliberately does not — it only talks to GitHub.
+because it ends by replacing the executable and closing the window; and `Start-WinGetInstall`,
+because it replaces winget itself (ADR 0019). `Start-UpdateCheck` and `Start-WinGetCheck`
+deliberately do not: they only talk to GitHub and read the App Installer package, so they run
+alongside the startup scan.
 
 **Pins are read inside the same job.** The scans read the pins in the job that reads the list.
 After a pin or unpin the busy state is released by the pin re-read, which is the last step

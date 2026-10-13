@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-04 (v1.9.0; the winget-portable guard came in v1.10.1, the four install channels in v1.11.0)
 - **Depends on:** ADR 0001, ADR 0002, ADR 0003, ADR 0012
-- **Referenced by:** ADR 0014, ADR 0015
+- **Referenced by:** ADR 0014, ADR 0015, ADR 0019 (the same check, for winget)
 
 ## Context
 
@@ -94,6 +94,10 @@ equality: from the catalogue the Id is `FedeB2160.WinGetStudio`, from a local ma
   - it came back as 1.11.0, with the uninstall entry at 1.11.0 and no `wgt_` file left behind.
 
 **To watch**
+- **The startup check must not wait on the busy state.** From v1.9.0 to v1.11.1 `Start-UpdateCheck`
+  returned on `$script:isBusy`, and `Load-Upgrades` raises it in the same `ContentRendered` handler:
+  the automatic check never ran, and the button showed only after a manual check. The guard is gone;
+  the check talks only to GitHub, and the busy handler keeps the button off until the scan ends.
 - **Tag and `$AppVersion` must agree**, or the app keeps proposing an update already installed or
   never proposes one.
 - **The latest release is what every copy sees.** v1.0.0 was removed from GitHub after the rename: it

@@ -74,8 +74,11 @@ foreach ($__kv in $__fnBodies.GetEnumerator()) {
 }
 # Il codice del runspace NON puo' toccare i controlli: ogni scrittura sulla UI passa da
 # qui. Definite per tutti i job, non copiate in ognuno che serve.
+# [void]: questo overload di Invoke torna object, e senza il cast ogni UI{} e ogni LogUI
+# scriveva un $null nell'output del job. Il job di installazione di winget tornava cosi'
+# [$null, risultato] e dentro le sue funzioni i $null si mescolavano ai valori raccolti.
 function UI([scriptblock]$action) {
-    $window.Dispatcher.Invoke([System.Windows.Threading.DispatcherPriority]::Background, [action]$action)
+    [void]$window.Dispatcher.Invoke([System.Windows.Threading.DispatcherPriority]::Background, [action]$action)
 }
 function LogUI([string]$m) {
     $ts = (Get-Date).ToString('HH:mm:ss')
@@ -115,6 +118,12 @@ function LogUI([string]$m) {
             # funzione mancante in -Functions) finisce nello stream Error, non in EndInvoke:
             # senza questa riga il job tornava vuoto senza lasciare traccia nel log.
             foreach ($err in $j.PowerShell.Streams.Error) { Write-Log "ERROR in background job: $($err.Exception.Message)" }
+            # Un job fermato o fallito senza un record d'errore non deve sparire nel nulla: si dice
+            # almeno in che stato si e' fermato. Completed senza output e' normale (le code).
+            $st = $j.PowerShell.InvocationStateInfo
+            if ($st.State -ne 'Completed') {
+                Write-Log "ERROR in background job: it ended in state $($st.State)$(if ($st.Reason) { ": $($st.Reason.Message)" })."
+            }
         }
         catch { Write-Log "ERROR in background job: $($_.Exception.Message)" }
         finally {

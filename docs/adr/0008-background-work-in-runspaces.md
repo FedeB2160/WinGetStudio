@@ -44,6 +44,12 @@ not inherit the caller's functions, and does not share its `$script:` scope.
 - One mechanism for every background task, with a uniform log and cleanup.
 
 **To watch**
+- **`UI{}` and `LogUI` must write nothing to the job's output.** The `Dispatcher.Invoke(priority,
+  delegate)` overload returns `object`: until v1.11.1 every call wrote a `$null` into the output. The
+  queues ignore their output, so nobody saw it; the winget install job (ADR 0019) got
+  `[$null, result]` back and read it as "no result", and inside its functions the `$null`s mixed with
+  the collected file paths. `UI{}` now casts the call to `[void]`, and `Test-Ui.ps1` checks that a
+  job with `LogUI` returns exactly its own output.
 - A function missing from `-Functions` makes the job fail with "term not recognized"; a variable
   missing from `-Vars` is silently `$null` (the `$wingetPath` case in ADR 0004).
 - `OnDone` runs on the UI thread but does **not** see the locals of the function that started the

@@ -1192,8 +1192,9 @@
                                 <RowDefinition Height="Auto"/>   <!-- 1 tema -->
                                 <RowDefinition Height="Auto"/>   <!-- 2 striscia dei tab -->
                                 <RowDefinition Height="Auto"/>   <!-- 3 UPDATES -->
-                                <RowDefinition Height="Auto"/>   <!-- 4 versione, pulsanti ed esito -->
-                                <RowDefinition Height="Auto"/>   <!-- 5 spunta controllo all'avvio -->
+                                <RowDefinition Height="Auto"/>   <!-- 4 WinGet Studio: versione, pulsanti ed esito -->
+                                <RowDefinition Height="Auto"/>   <!-- 5 winget: versione, Store o pulsante, esito -->
+                                <RowDefinition Height="Auto"/>   <!-- 6 spunta controllo all'avvio -->
                             </Grid.RowDefinitions>
 
                             <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Text="APPEARANCE"
@@ -1223,7 +1224,7 @@
                                  spunta e i pulsanti restavano appesi a meta' pagina, rientrati
                                  rispetto a un'etichetta che non c'era. La sezione ha due voci,
                                  non sei, quindi va letta in due righe. -->
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Installed version" Margin="0,0,14,10"
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="WinGet Studio" Margin="0,0,14,10"
                                        VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
                             <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
                                 <TextBlock x:Name="TxtVersion" VerticalAlignment="Center"
@@ -1251,13 +1252,35 @@
                                  Acceso di default (e' il comportamento di sempre), ma si spegne:
                                  un programma che va in rete da solo deve almeno dirlo e lasciare
                                  la scelta. Il pulsante qui sopra resta sempre attivo. -->
-                            <TextBlock Grid.Row="5" Grid.Column="0" Text="Automatic" Margin="0,0,14,0"
+                            <!-- winget stesso (ADR 0019): la versione di App Installer e chi lo
+                                 aggiorna. Dove lo Store e' libero di farlo lo dice il link (lo apre
+                                 l'handler unico dei Hyperlink in Start-App); altrimenti il pulsante
+                                 compare quando GitHub ha una release piu' recente. -->
+                            <TextBlock Grid.Row="5" Grid.Column="0" Text="winget" Margin="0,0,14,10"
                                        VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
-                            <CheckBox Grid.Row="5" Grid.Column="1" x:Name="ChkAutoCheck" IsChecked="True"
+                            <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                                <TextBlock x:Name="TxtWinGetVersion" VerticalAlignment="Center"
+                                           FontWeight="SemiBold" Margin="0,0,18,0"
+                                           Foreground="{DynamicResource FgBrush}"/>
+                                <Button x:Name="BtnUpdateWinGet" Height="26" Padding="12,0"
+                                        Visibility="Collapsed"
+                                        Background="{DynamicResource AccentBrush}"
+                                        Foreground="{DynamicResource AccentFgBrush}"/>
+                                <TextBlock x:Name="TxtWinGetStore" VerticalAlignment="Center" Visibility="Collapsed"
+                                           Foreground="{DynamicResource SubtleFgBrush}">Updated by the <Hyperlink
+                                           NavigateUri="ms-windows-store://downloadsandupdates"
+                                           Foreground="{DynamicResource AccentBrush}">Microsoft Store</Hyperlink></TextBlock>
+                                <TextBlock x:Name="TxtWinGetStatus" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{DynamicResource SubtleFgBrush}"/>
+                            </StackPanel>
+                            <TextBlock Grid.Row="6" Grid.Column="0" Text="Automatic" Margin="0,0,14,0"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+                            <CheckBox Grid.Row="6" Grid.Column="1" x:Name="ChkAutoCheck" IsChecked="True"
                                       HorizontalAlignment="Left" VerticalAlignment="Center"
                                       Content="Check for updates at startup"
                                       Style="{StaticResource ThemedCheckBox}"
-                                      ToolTip="One anonymous call to the GitHub API when the app starts. Turn it off to go online only when you press Check for updates"
+                                      ToolTip="Anonymous calls to the GitHub API when the app starts: one for WinGet Studio, and one for winget where the Microsoft Store does not update it. Turn it off to go online only when you press Check for updates"
                                       Foreground="{DynamicResource FgBrush}"/>
                         </Grid>
                     </ScrollViewer>

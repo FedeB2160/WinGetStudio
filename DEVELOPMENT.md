@@ -247,5 +247,6 @@ Each decision that shapes the architecture has an Architecture Decision Record i
 - [ADR 0016](docs/adr/0016-tests.md) — Tests: two standalone scripts, offline by default, the real app mounted hidden, CI without a key.
 - [ADR 0017](docs/adr/0017-app-icon-drawn-in-code.md) — The app icon is drawn in code: a cardboard box with `>_` and a download badge, 14 pixel-snapped sizes from one script.
 - [ADR 0018](docs/adr/0018-retry-without-elevation-when-winget-refuses-administrator.md) — When winget refuses a per-user uninstall as administrator (`0x8A15007D`, issue #12), the queue repeats it as the same account without elevation, through a one-off scheduled task.
+- [ADR 0019](docs/adr/0019-installing-and-updating-winget.md) — Installing winget when it is missing (register, else GitHub with SHA-256), its version in Settings, and its update: by the Store where it can, by a GitHub button elsewhere.
 
 The rule: **a decision that shapes the architecture gets a new numbered ADR**, written from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md); a superseded or withdrawn ADR is kept and its number never reused. **A spec in `docs\superpowers\specs\` is deleted once it is implemented**, after its decisions have been moved into an ADR.

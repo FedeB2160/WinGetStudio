@@ -133,17 +133,9 @@ function Initialize-TabHeaders {
 # senza $script: compilerebbe e passerebbe ogni controllo statico, per poi fallire a
 # finestra aperta).
 function Start-App([switch]$NoShow) {
-    # 1) winget presente?
+    # 1) winget presente? Se manca la finestra si apre lo stesso: l'installazione la propone
+    #    Start-WinGetInstall al primo rendering, con log e barra (ADR 0019).
     $script:wingetPath = Get-WinGetPath
-    if (-not $script:wingetPath) {
-        [System.Windows.MessageBox]::Show(
-            "winget is not installed or not available in PATH.`n`n" +
-            "Install 'App Installer' from the Microsoft Store (Windows 10/11) and try again.",
-            "winget not found",
-            [System.Windows.MessageBoxButton]::OK,
-            [System.Windows.MessageBoxImage]::Error) | Out-Null
-        return
-    }
 
     # 2) Finestra
     $script:window = Read-Xaml 'UI.xaml'
@@ -161,6 +153,7 @@ function Start-App([switch]$NoShow) {
         'BtnExport', 'BtnImport',
         'CmbTheme', 'TxtThemeHint', 'TxtVersion', 'BtnCheckUpdate', 'BtnUpdateApp',
         'UpdateSpinner', 'TxtUpdateStatus', 'ChkAutoCheck', 'CmbTabStyle',
+        'TxtWinGetVersion', 'BtnUpdateWinGet', 'TxtWinGetStatus', 'TxtWinGetStore',
         'TabAbout', 'AboutTable',
         'TabInstall', 'TabInstalled', 'TabUpdates', 'TabSettings'
     )) {
@@ -216,6 +209,7 @@ function Start-App([switch]$NoShow) {
     Initialize-InstalledTab
     Initialize-Backup
     Initialize-Update
+    Initialize-WinGetSetup
     Clear-WinGetTempFiles            # residui di Invoke-WinGet tenuti aperti da un installer
 
     # Alla chiusura: ferma i timer e chiudi i job pendenti, cosi' il processo termina
@@ -230,7 +224,15 @@ function Start-App([switch]$NoShow) {
 
     # Carica gli upgrade all'apertura. Secondo Set-Theme: al primo giro la finestra non
     # aveva ancora un HWND, quindi la barra titolo non era stata colorata.
-    $script:window.Add_ContentRendered({ Set-Theme; Load-Upgrades; Start-UpdateCheck })
+    # I due controlli parlano solo con GitHub e col pacchetto App Installer, quindi girano
+    # insieme alla scansione: l'unico che lancia winget e' Load-Upgrades (ADR 0003).
+    # Senza winget, invece della scansione si propone di installarlo.
+    $script:window.Add_ContentRendered({
+        Set-Theme
+        Start-UpdateCheck
+        if ($script:wingetPath) { Load-Upgrades; Start-WinGetCheck }
+        else { Start-WinGetInstall -Missing }
+    })
 
     if ($NoShow) { return }
     $script:window.ShowDialog() | Out-Null
