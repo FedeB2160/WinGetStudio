@@ -2,13 +2,32 @@
 
 ## Unreleased
 
-- The README has screenshots in the light and dark theme, badges and a features list. The antivirus troubleshooting moved to its own page, [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), updated for the installer.
-- Messages and confirmations follow the theme: a dialog in the app's style, with its title bar dark in the dark theme, centred on the window, which dims behind it. Enter still picks No on every confirmation.
+## v1.12.0
+
+WinGet Studio now looks after winget itself, uninstalls the per-user programs it used to refuse, and every message follows the theme.
+
+> **Coming from v1.11.1:** open **Settings** and press **Check for updates**. In v1.11.1 the automatic check at startup never ran (see *Fixes*), so this version will not show up on its own. Installed with winget, use `winget upgrade FedeB2160.WinGetStudio`.
+
+### winget, installed and kept up to date
+
+If winget is missing, WinGet Studio no longer says so and closes: it offers to install it. It first registers the App Installer that comes with Windows, which takes seconds and covers a new profile or another administrator account. If there is none, as in Windows Sandbox, LTSC or Server, it downloads App Installer and its dependencies from github.com/microsoft/winget-cli, checks them against the published SHA-256 and installs them.
+
+**Settings** now has an **App Installer (winget)** entry with its version. Where the Microsoft Store keeps App Installer up to date, the entry says so and links to the Store. Elsewhere an **Update to vX.Y.Z** button appears when GitHub has a newer winget release.
+
+### Per-user programs uninstall again
+
+winget refuses to uninstall per-user programs (installer types exe, inno, nullsoft, burn and portable) from an elevated app, with `0x8A15007D`, and WinGet Studio always runs elevated. Now it repeats the uninstall without elevation, through a one-off scheduled task, and a console window shows while it runs. If the app was elevated with another administrator account, those programs belong to that account: it does not retry, and the log says why (issue #12).
+
+### Messages in the app's style
+
+Every confirmation and message is now a dialog in the app's own style, with its title bar dark in the dark theme, centred on the window, which dims behind it. Enter still picks **No** on every confirmation, and Esc or the close button answer No as well. In Settings, **Check for updates** and **Check at startup** sit above both entries, and the update buttons have room around their text.
+
+The README has screenshots in both themes, and the antivirus troubleshooting moved to its own page, [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), updated for the installer.
+
+### Fixes
+
+- The automatic update check at startup runs again. Since v1.9.0 it stopped silently, because the startup scan had already made the app busy, so a new version showed up only after pressing **Check for updates**.
 - The update buttons in Settings now have room around their text: the button template ignored their padding.
-- If winget is missing, WinGet Studio now offers to install it instead of closing: it registers the App Installer that comes with Windows, or downloads App Installer and its dependencies from github.com/microsoft/winget-cli, checked against the published SHA-256.
-- Settings has an **App Installer (winget)** entry with its version, under **Check for updates** and **Check at startup**, which now sit above both entries. Where the Microsoft Store updates it, the row says so and links to the Store; elsewhere an **Update to vX.Y.Z** button appears when GitHub has a newer winget release.
-- The automatic update check at startup runs again: since v1.9.0 it stopped silently because the startup scan had already made the app busy, so a new version showed up only after pressing **Check for updates**.
-- Uninstalling a per-user package (installer types exe, inno, nullsoft, burn and portable) no longer fails with `0x8A15007D`: WinGet Studio repeats the command without elevation, through a one-off scheduled task, and a console window shows while it runs. If the app was elevated with another administrator account it does not retry, and the log says why (issue #12).
 
 ## v1.11.1
 
