@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The README has screenshots in the light and dark theme, badges and a features list. The antivirus troubleshooting moved to its own page, [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md), updated for the installer.
 - Messages and confirmations follow the theme: a dialog in the app's style, with its title bar dark in the dark theme, centred on the window, which dims behind it. Enter still picks No on every confirmation.
 - The update buttons in Settings now have room around their text: the button template ignored their padding.
 - If winget is missing, WinGet Studio now offers to install it instead of closing: it registers the App Installer that comes with Windows, or downloads App Installer and its dependencies from github.com/microsoft/winget-cli, checked against the published SHA-256.
