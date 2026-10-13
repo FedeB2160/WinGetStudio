@@ -78,8 +78,13 @@ $tempDir = [IO.Path]::GetTempPath()
 $stale = [IO.Path]::Combine($tempDir, "wgt_$([Guid]::NewGuid().ToString('N')).out")
 $keep  = [IO.Path]::Combine($tempDir, "wgtkeep_$PID.txt")
 [IO.File]::WriteAllText($stale, 'x'); [IO.File]::WriteAllText($keep, 'x')
+# Anche le cartelle: quella del download di winget (300 MB) se il processo muore a meta'.
+$staleDir = [IO.Path]::Combine($tempDir, "wgt_test_$PID")
+[void][IO.Directory]::CreateDirectory([IO.Path]::Combine($staleDir, 'deps'))
+[IO.File]::WriteAllText([IO.Path]::Combine($staleDir, 'deps\x.appx'), 'x')
 Clear-WinGetTempFiles
 Check "un wgt_*.out rimasto viene rimosso" (-not [IO.File]::Exists($stale))
+Check "una cartella wgt_* rimasta viene rimossa col contenuto" (-not [IO.Directory]::Exists($staleDir))
 Check "un file con un altro nome resta dov'e'" ([IO.File]::Exists($keep))
 [IO.File]::Delete($keep)
 

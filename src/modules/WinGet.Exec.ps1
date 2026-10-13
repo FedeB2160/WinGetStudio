@@ -12,9 +12,15 @@
 # bene per Process.Start; il fallback al nome nudo serve se Source e' vuoto.
 function Get-WinGetPath {
     $cmd = Get-Command winget -ErrorAction SilentlyContinue
-    if (-not $cmd) { return $null }
-    if ($cmd.Source) { return $cmd.Source }
-    return 'winget'
+    if ($cmd) {
+        if ($cmd.Source) { return $cmd.Source }
+        return 'winget'
+    }
+    # PATH senza WindowsApps (problema noto, winget-cli#210): l'alias c'e' lo stesso. Senza
+    # questo, a winget appena installato l'app riproporrebbe l'installazione a ogni avvio.
+    $alias = Join-Path $env:LOCALAPPDATA 'Microsoft\WindowsApps\winget.exe'
+    if (Test-Path -LiteralPath $alias) { return $alias }
+    return $null
 }
 
 # Mappa l'exit code di winget in un token di stato: ok / warning / error.
@@ -45,6 +51,11 @@ function Get-UpdateStatus([int]$code) {
 function Clear-WinGetTempFiles {
     foreach ($f in [IO.Directory]::GetFiles([IO.Path]::GetTempPath(), 'wgt_*')) {
         try { [IO.File]::Delete($f) } catch { }
+    }
+    # Anche le cartelle: quella del download di winget (WinGet.Setup.ps1) pesa 300 MB se il
+    # processo muore a meta'.
+    foreach ($d in [IO.Directory]::GetDirectories([IO.Path]::GetTempPath(), 'wgt_*')) {
+        try { [IO.Directory]::Delete($d, $true) } catch { }
     }
 }
 

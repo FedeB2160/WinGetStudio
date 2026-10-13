@@ -81,6 +81,7 @@ function Resolve-Asset([string]$rel) {
 $moduleNames = @(
     'WinGet.Exec.ps1'
     'WinGet.Parse.ps1'
+    'WinGet.Setup.ps1'
     'App.Ui.ps1'
     'App.Prefs.ps1'
     'App.Jobs.ps1'
