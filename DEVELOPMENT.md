@@ -100,6 +100,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\src\icon.ps1
 
 What the icon shows, and why it is drawn in code: → [ADR 0017](docs/adr/0017-app-icon-drawn-in-code.md).
 
+## Screenshots
+
+The images in the README (`docs\images\*.png`, light and dark) are drawn from the real interface, with sample data, by `src\screenshots.ps1`. Like the icon script, it is not part of the build: the output is committed. Run it again after any visible change to the window:
+
+```powershell
+powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\src\screenshots.ps1
+```
+
+It mounts the app the way `Test-Ui.ps1` does, in a hidden window, and touches neither winget nor the network. The window frame is drawn by Windows, so it is not in the images.
+
 ## Signing
 
 `build.ps1` signs the exe after compiling, choosing the certificate in this order:
