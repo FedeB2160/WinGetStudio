@@ -91,7 +91,11 @@
                         <Border x:Name="bd" CornerRadius="4" BorderThickness="1"
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <!-- Margin dal Padding: senza, il Padding="12,0" dei pulsanti a
+                                 larghezza libera (Update to vX) non contava e il testo toccava il
+                                 bordo. Gli altri hanno larghezza fissa e il testo resta centrato. -->
+                            <ContentPresenter Margin="{TemplateBinding Padding}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">

@@ -776,6 +776,22 @@ if ($script:jobs.Count -ne 0) { throw "con la spunta giu' il controllo automatic
 $ChkAutoCheck.IsChecked = $true
 "OK settgs griglia a due colonne, ABOUT completo con link, controllo all'avvio spegnibile"
 
+# I pulsanti a larghezza libera (Update to vX) hanno margine attorno al testo: il template dei
+# Button deve applicare il Padding. Prima lo ignorava, e il testo toccava il bordo.
+$BtnUpdateApp.Visibility = [System.Windows.Visibility]::Visible
+$BtnUpdateApp.Content    = 'Update to v9.9.9'
+[void]$BtnUpdateApp.ApplyTemplate()
+$inf = New-Object System.Windows.Size ([double]::PositiveInfinity), ([double]::PositiveInfinity)
+# UpdateLayout tra le due misure: senza, WPF restituisce la misura in cache.
+$BtnUpdateApp.Padding = New-Object System.Windows.Thickness 0
+$BtnUpdateApp.UpdateLayout(); $BtnUpdateApp.Measure($inf); $w0 = $BtnUpdateApp.DesiredSize.Width
+$BtnUpdateApp.Padding = New-Object System.Windows.Thickness 12, 0, 12, 0
+$BtnUpdateApp.UpdateLayout(); $BtnUpdateApp.Measure($inf); $w12 = $BtnUpdateApp.DesiredSize.Width
+$BtnUpdateApp.Visibility = [System.Windows.Visibility]::Collapsed
+$BtnUpdateApp.Content    = $null
+if ($w12 - $w0 -lt 24) { throw "il template dei pulsanti ignora il Padding ($w0 px senza, $w12 px con 12+12)" }
+"OK btnpad il Padding dei pulsanti si applica: $w0 -> $w12 px"
+
 # 13) Start-BackgroundJob regge? Ci passeranno tutte le operazioni winget. Si verifica
 # in un colpo: le -Vars arrivano nel runspace, le -Functions vengono ricreate la'
 # dentro (senza, muoiono con "termine non riconosciuto"), OnDone gira sul thread UI col
