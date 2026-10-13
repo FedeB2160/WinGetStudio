@@ -200,7 +200,9 @@ function Start-WinGetCheck([switch]$Manual) {
                 if ($manual) { $TxtWinGetStatus.Text = 'The check did not complete: see the log.' }
                 return
             }
-            $TxtWinGetVersion.Text = if ($r.Version) { "App Installer $($r.Version)" } else { 'App Installer not found' }
+            # Il nome sta nell'etichetta ("App Installer (winget)"), qui solo la versione, come
+            # nella riga di WinGet Studio.
+            $TxtWinGetVersion.Text = if ($r.Version) { "v$($r.Version)" } else { 'not found' }
             $TxtWinGetStore.Visibility = if ($r.Store) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
             $rel = $r.Release
             if ($r.Store -or -not $r.Version) { return }
@@ -220,7 +222,8 @@ function Start-WinGetCheck([switch]$Manual) {
             $BtnUpdateWinGet.Content    = "Update to $($rel.Tag)"
             $BtnUpdateWinGet.ToolTip    = "Download App Installer $($rel.Tag) ($([int]($rel.Size / 1MB)) MB) and its dependencies from GitHub, and install them"
             $BtnUpdateWinGet.Visibility = [System.Windows.Visibility]::Visible
-            $TxtWinGetStatus.Text       = "$($rel.Tag) is available."
+            # Il pulsante dice gia' quale versione c'e': una scritta accanto la ripeterebbe.
+            $TxtWinGetStatus.Text       = ''
             Write-Log "winget $($rel.Tag) is available (App Installer $($r.Version) is installed)."
         })
 }

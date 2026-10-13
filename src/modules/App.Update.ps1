@@ -200,7 +200,8 @@ function Start-UpdateCheck([switch]$Manual) {
                 "Download the installer $($rel.Name) ($([int]($rel.Size / 1024)) KB): WinGet Studio closes, updates and reopens"
             } else { "Download $($rel.Name) ($([int]($rel.Size / 1024)) KB) from GitHub and restart" }
             $BtnUpdateApp.Visibility = [System.Windows.Visibility]::Visible
-            $TxtUpdateStatus.Text    = "$($rel.Tag) is available."
+            # Il pulsante dice gia' quale versione c'e': una scritta accanto la ripeterebbe.
+            $TxtUpdateStatus.Text    = ''
             Write-Log "Version $($rel.Tag) is available (you have v$AppVersion)."
         })
 }

@@ -46,7 +46,7 @@ problem, and without the fallback a freshly installed winget would be offered ag
 
 **The version shown is App Installer's, read from the package.** `Get-WinGetVersion` uses
 `Get-AppxPackage`, not `winget --version`, so it starts no winget process and runs alongside the
-scan (ADR 0003). Settings shows it as it is ("App Installer 1.29.380.0"), with no mapping for the old
+scan (ADR 0003). Settings shows it as it is, in the **App Installer (winget)** entry ("v1.29.380.0"), with no mapping for the old
 numbering; compared with the latest tag it gives the right answer either way.
 
 **Who updates App Installer.** `Test-StoreUpdatesWinGet` decides:
@@ -61,7 +61,7 @@ numbering; compared with the latest tag it gives the right answer either way.
 
 **The checks run in parallel with the scan.** `ContentRendered` starts `Start-UpdateCheck`,
 `Load-Upgrades` and `Start-WinGetCheck` together; only `Load-Upgrades` starts winget. The
-winget check honours **Check for updates at startup** for its GitHub call (the local version is
+winget check honours **Check at startup** for its GitHub call (the local version is
 always read), and **Check for updates** checks both the app and winget.
 
 **No forced shutdown.** `Add-AppxPackage` gets `-DeferRegistrationWhenPackagesAreInUse`: if an App

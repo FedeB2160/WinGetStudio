@@ -27,7 +27,7 @@ API call** at startup (`releases/latest`, no token; the limit is 60 requests per
 sets TLS 1.2 explicitly — PowerShell 5.1 still negotiates TLS 1.0 by default and GitHub refuses it — and
 sends a `User-Agent`, without which the API answers 403. The tag (`v1.11.0`) is compared with
 `$AppVersion` (ADR 0001) as a `[version]`, not as a string: `"1.10.0" -gt "1.9.0"` is false as text.
-The startup check can be turned off in Settings (**Check for updates at startup**, on by default, since
+The startup check can be turned off in Settings (**Check at startup**, until v1.11.1 "Check for updates at startup", on by default, since
 v1.10.0: a program going online by itself should say so and leave the choice); a manual check always
 reports its outcome.
 

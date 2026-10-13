@@ -792,6 +792,14 @@ $BtnUpdateApp.Content    = $null
 if ($w12 - $w0 -lt 24) { throw "il template dei pulsanti ignora il Padding ($w0 px senza, $w12 px con 12+12)" }
 "OK btnpad il Padding dei pulsanti si applica: $w0 -> $w12 px"
 
+# UPDATES: "Check for updates" e la spunta valgono per entrambe le voci, quindi stanno in una
+# riga loro, sopra la voce di WinGet Studio e quella di App Installer.
+$rowOf = { param($c) [System.Windows.Controls.Grid]::GetRow($c.Parent) }
+$rowCheck = & $rowOf $BtnCheckUpdate
+if ((& $rowOf $ChkAutoCheck) -ne $rowCheck) { throw "Check for updates e la spunta non stanno nella stessa riga" }
+if ($rowCheck -ge (& $rowOf $TxtVersion) -or $rowCheck -ge (& $rowOf $TxtWinGetVersion)) { throw "i controlli comuni non stanno sopra le voci" }
+"OK updrows controlli comuni in una riga sopra WinGet Studio e App Installer"
+
 # 13) Start-BackgroundJob regge? Ci passeranno tutte le operazioni winget. Si verifica
 # in un colpo: le -Vars arrivano nel runspace, le -Functions vengono ricreate la'
 # dentro (senza, muoiono con "termine non riconosciuto"), OnDone gira sul thread UI col
@@ -1704,6 +1712,7 @@ try {
     Start-UpdateCheck
     if (-not (Wait-For { $BtnUpdateApp.Visibility -eq [System.Windows.Visibility]::Visible } 30)) { throw "il controllo all'avvio non parte con la scansione in corso" }
     if ($BtnUpdateApp.IsEnabled) { throw "durante la scansione il pulsante di aggiornamento deve restare spento" }
+    if ($TxtUpdateStatus.Text) { throw "accanto al pulsante di aggiornamento c'e' anche la scritta: '$($TxtUpdateStatus.Text)'" }
     Set-AppBusy $false
     if (-not $BtnUpdateApp.IsEnabled) { throw "a scansione finita il pulsante di aggiornamento resta spento" }
     "OK autochk controllo all'avvio in parallelo alla scansione, pulsante attivo a scansione finita"
@@ -1777,6 +1786,7 @@ try {
     Invoke-WinGetCheckFixture -Manual
     if ($BtnUpdateWinGet.Visibility -ne [System.Windows.Visibility]::Visible) { throw "senza Store e con una release piu' recente il pulsante non compare" }
     if ($BtnUpdateWinGet.Content -ne 'Update to v1.29.380') { throw "pulsante winget: '$($BtnUpdateWinGet.Content)'" }
+    if ($TxtWinGetStatus.Text) { throw "accanto al pulsante winget c'e' anche la scritta: '$($TxtWinGetStatus.Text)'" }
     if ($TxtWinGetStore.Visibility -ne [System.Windows.Visibility]::Collapsed) { throw "senza Store compare l'etichetta dello Store" }
     if ($script:pendingWinGet.Tag -ne 'v1.29.380') { throw "la release da installare non arriva al pulsante" }
 
