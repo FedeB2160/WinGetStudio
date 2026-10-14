@@ -149,7 +149,7 @@ function Start-App([switch]$NoShow) {
         'GridSearch', 'TxtSearchEmpty', 'TxtSearchInfo', 'BtnInstall',
         'TabMain', 'BtnRefreshInstalled', 'TxtFilter', 'InstalledSpinner',
         'TxtInstalledCount', 'GridInstalled', 'TxtInstalledEmpty',
-        'TxtInstalledInfo', 'BtnUninstall', 'BtnRepair', 'BtnSaveLog', 'BtnRetryFailed',
+        'TxtInstalledInfo', 'BtnUninstall', 'BtnRetryFailed', 'MenuSaveLog', 'MenuClearLog',
         'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
         'MenuDetailsSearch', 'MenuDetailsInstalled', 'MenuDetailsUpdates',
         'BtnExport', 'BtnImport',
@@ -176,13 +176,7 @@ function Start-App([switch]$NoShow) {
     # NB: l'app gira elevata, quindi il browser eredita l'elevazione. Aprirlo come utente
     # interattivo richiederebbe una ShellExecute impersonata: se diventa un problema, i link
     # diventano testo selezionabile.
-    $script:window.AddHandler(
-        [System.Windows.Documents.Hyperlink]::RequestNavigateEvent,
-        [System.Windows.Navigation.RequestNavigateEventHandler]{
-            param($s, $e)
-            try { Start-Process $e.Uri.AbsoluteUri } catch { Write-Log "Could not open $($e.Uri): $($_.Exception.Message)" }
-            $e.Handled = $true
-        })
+    Add-LinkHandler $script:window
 
     # Scorciatoie. PreviewKeyDown sulla FINESTRA e non sui controlli: in tunneling la finestra
     # vede il tasto per prima, mentre un DataGrid che ha il fuoco si mangerebbe F5 e Ctrl+F per
@@ -214,8 +208,9 @@ function Start-App([switch]$NoShow) {
     Initialize-WinGetSetup
     Clear-WinGetTempFiles            # residui di Invoke-WinGet tenuti aperti da un installer
 
-    # Intestazione del log: salva, e ripeti i falliti dell'ultima coda (App.Jobs.ps1).
-    $BtnSaveLog.Add_Click({ Save-Log })
+    # Log: salva e pulisci dal tasto destro; ripeti i falliti dell'ultima coda (App.Jobs.ps1).
+    $MenuSaveLog.Add_Click({ Save-Log })
+    $MenuClearLog.Add_Click({ $TxtLog.Clear() })
     $BtnRetryFailed.Add_Click({ Start-RetryFailed })
     Register-BusyHandler { param($busy) Update-RetryButton }
 

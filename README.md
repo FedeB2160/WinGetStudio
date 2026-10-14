@@ -28,8 +28,8 @@ Update, install, uninstall, pin, export and import — all from one table with c
 - **Update** what has a newer version: tick, press **Update**, and each row shows its own outcome.
 - **Install** something new by searching as you type, from the winget catalogue and, if you want, the Microsoft Store.
 - **Details** of any package from the right-click menu: what it is, who publishes it, and where and how it is installed.
-- **List, uninstall and repair** what is already on the machine, including programs installed without winget.
-- **Retry failed** runs the last operation again on just the packages where it failed; the log can be saved to a file.
+- **List and uninstall** what is already on the machine, including programs installed without winget.
+- **Retry failed** runs the last operation again on just the packages where it failed; right-click the log to save it to a file or clear it.
 - **Pin** what must not be touched, so updates skip it.
 - **Export / import** the whole package list to rebuild a machine.
 - **Keeps winget itself working**: installs it if it is missing, and shows when App Installer has a newer version.
@@ -76,7 +76,7 @@ The window has three tabs, plus **Settings** and **About** pinned to the right o
 3. **Update** upgrades them one at a time. Each row shows its own outcome, and slow installers are never cut off: the log writes a line every 30 seconds so you can see it is still working.
    - While the queue runs, **Update** reads **Cancel**. Pressing it lets the package in progress finish and then stops, so nothing is interrupted halfway through an installer; the packages that never ran keep their tick and an empty result.
 4. When the queue ends, **Update** is greyed until you press **Check** again. The versions on screen describe the machine as it was before, so running the queue on them would report failures for packages that had in fact succeeded. The list is not rebuilt automatically on purpose: that would wipe the outcome of each row, which is the point of the Result column.
-5. The log ends with a summary, such as *5 ok, 1 with warnings, 2 failed*. If anything failed, **Retry failed (N)** appears above the log: it runs the same update again on just those packages, after a confirmation. The same button works after an install, an uninstall or a repair.
+5. The log ends with a summary, such as *5 ok, 1 with warnings, 2 failed*. If anything failed, **Retry failed (N)** appears above the log: it runs the same update again on just those packages, after a confirmation. The same button works after an install or an uninstall.
 
 The list stays scrollable while updating (the ticks and the pin entries are greyed, not the list), and columns can be resized by dragging their edge in the header.
 
@@ -117,8 +117,7 @@ The inventory of what is on the machine, loaded the first time you open the tab.
 1. The **filter box** narrows the list by name or ID as you type.
 2. Tick rows and press **Uninstall**. A confirmation lists exactly what will be removed, and defaults to *No*: a stray <kbd>Enter</kbd> cannot delete anything.
    - If the filter is hiding a package you had ticked, both the counter and the confirmation say so, so nothing is removed off screen.
-3. **Repair** runs the installer of the ticked packages again, after the same kind of confirmation. winget can repair MSI and MSIX packages, and other installers only when their manifest says how; for the rest the row says *repair not supported*.
-4. **Export...** saves the list of installed packages to a `.json` file. **Import...** installs the packages a file describes: the quick way to set up a new machine. Before anything is installed, the confirmation lists the packages in the file, all ticked: untick the ones you do not want.
+3. **Export...** saves the list of installed packages to a `.json` file. **Import...** installs the packages a file describes: the quick way to set up a new machine.
 
 Packages you installed without winget appear here too, with IDs like `ARP\Machine\X64\Android Studio`, and can be uninstalled like any other. winget refuses to uninstall some per-user programs from an elevated app; WinGet Studio then repeats the uninstall without elevation, and a console window shows while it runs.
 
@@ -136,7 +135,7 @@ A pin tells winget to leave a package alone until you remove the pin: for the on
 
 ### The log
 
-**Save log...**, above the log, writes it to a text file: handy when something failed and you want to keep the detail.
+**Right-click the log** for *Copy*, *Select all*, *Save log...*, which writes it to a text file and is handy when something failed and you want to keep the detail, and *Clear log*.
 
 ### Confirmations
 

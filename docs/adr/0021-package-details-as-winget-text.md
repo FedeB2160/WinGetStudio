@@ -40,6 +40,11 @@ Two more facts shaped the decision:
 - `Show-PackageDetails` (`App.Ui.ps1`) runs it in a background job, behind `Test-WinGetBusy` and the
   busy state, like an export. The text then appears in a `Show-AppDialog` popup. The popup's text box
   now has `MaxHeight="480"` and scrolls, so a long manifest does not grow the window off the screen.
+- **Web addresses in the text can be clicked.** With `-Links`, `Show-AppDialog` shows the text in a
+  read-only `RichTextBox`, still selectable and copyable, in which every `http(s)://` becomes a
+  `Hyperlink`. Punctuation that closes a sentence or a bracket is not part of the link. The popup is a
+  window of its own, so it gets the same `RequestNavigate` handler as the main window
+  (`Add-LinkHandler`). Like the About links, the browser opens elevated, because the app is.
 - The entry point is **Details of highlighted package** in the context menu of all three grids. The
   Install grid had no context menu until now. The item is disabled while busy, like the pin items.
 - **Every row carries its `Source`.**

@@ -954,9 +954,6 @@
                         <DockPanel Grid.Row="2" Margin="0,8,0,0">
                             <Button x:Name="BtnUninstall" Content="Uninstall" Width="104" Height="26"
                                     DockPanel.Dock="Left" IsEnabled="False"/>
-                            <Button x:Name="BtnRepair" Content="Repair" Width="104" Height="26"
-                                    DockPanel.Dock="Left" Margin="8,0,0,0" IsEnabled="False"
-                                    ToolTip="Run the installer of the ticked packages again to repair them. winget can repair MSI and MSIX packages, and others only when their manifest says how."/>
                             <!-- Export/Import a destra, staccati da Uninstall: agiscono sulla
                                  macchina intera, non sulle righe selezionate. -->
                             <Button x:Name="BtnImport" Content="Import..." Width="104" Height="26"
@@ -1314,19 +1311,19 @@
              righe che rendeva elastiche lasciavano una fascia vuota fra il riquadro delle
              schede e la barra di avanzamento, e il log e' un pannello di servizio che sta
              bene dove sta. -->
-        <!-- Intestazione del log: a destra salva il log e, dopo una coda con errori, ripete solo
-             le righe fallite (Start-RetryFailed). -->
+        <!-- Intestazione del log: a destra, dopo una coda con errori, ripete solo le righe
+             fallite (Start-RetryFailed). Salva e pulisci stanno nel menu del tasto destro. -->
         <DockPanel Grid.Row="2" Margin="0,4,0,2" LastChildFill="True">
-            <Button x:Name="BtnSaveLog" Content="Save log..." DockPanel.Dock="Right" Height="22" Padding="10,0"
-                    ToolTip="Save the log to a text file"/>
             <Button x:Name="BtnRetryFailed" Content="Retry failed" DockPanel.Dock="Right" Height="22" Padding="10,0"
-                    Margin="0,0,8,0" Visibility="Collapsed"
+                    Visibility="Collapsed"
                     ToolTip="Run the last operation again on the packages where it failed"/>
             <TextBlock Text="Log:" FontWeight="Bold" VerticalAlignment="Bottom"
                        Foreground="{DynamicResource FgBrush}"/>
         </DockPanel>
 
         <!-- Log (condiviso da tutte le schede) -->
+        <!-- Il menu proprio sostituisce quello standard del TextBox: Copy e Select all vanno
+             rimessi, coi comandi di sistema che il TextBox sa gia' eseguire. -->
         <TextBox x:Name="TxtLog" Grid.Row="3"
                  IsReadOnly="True" VerticalScrollBarVisibility="Auto"
                  TextWrapping="NoWrap" HorizontalScrollBarVisibility="Auto"
@@ -1334,7 +1331,16 @@
                  Background="{DynamicResource CtrlBgBrush}"
                  Foreground="{DynamicResource FgBrush}"
                  BorderBrush="{DynamicResource CtrlBorderBrush}"
-                 CaretBrush="{DynamicResource FgBrush}"/>
+                 CaretBrush="{DynamicResource FgBrush}">
+            <TextBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Copy"       Command="ApplicationCommands.Copy"/>
+                    <MenuItem Header="Select all" Command="ApplicationCommands.SelectAll"/>
+                    <MenuItem x:Name="MenuSaveLog"  Header="Save log..."/>
+                    <MenuItem x:Name="MenuClearLog" Header="Clear log"/>
+                </ContextMenu>
+            </TextBox.ContextMenu>
+        </TextBox>
 
         <!-- Velo sotto un popup (Show-AppDialog, ADR 0020): copre tutta la finestra, margine
              della griglia compreso (-10), e lo dissolve Set-DialogDim. -->

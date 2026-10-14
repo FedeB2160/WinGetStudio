@@ -85,7 +85,58 @@ $script:dialogXaml = @'
 </Window>
 '@
 
+# Apre nel browser i link cliccati in una finestra. Un handler per finestra e non uno per link,
+# cosi' un link nuovo non richiede codice nuovo. La finestra principale e i popup ne hanno uno
+# ciascuno: l'evento sale solo dentro la propria finestra.
+function Add-LinkHandler($Target) {
+    $Target.AddHandler(
+        [System.Windows.Documents.Hyperlink]::RequestNavigateEvent,
+        [System.Windows.Navigation.RequestNavigateEventHandler]{
+            param($s, $e)
+            try { Start-Process $e.Uri.AbsoluteUri } catch { Write-Log "Could not open $($e.Uri): $($_.Exception.Message)" }
+            $e.Handled = $true
+        })
+}
+
+# Testo con i link cliccabili, per -Links: un RichTextBox in sola lettura, selezionabile e
+# copiabile come il TextBox, dove ogni http(s):// diventa un Hyperlink. La punteggiatura che
+# chiude una frase o una parentesi non fa parte del link. Larghezza fissa: in un popup che
+# prende la misura del contenuto un RichTextBox non ne ha una sua.
+function New-LinkedText([string]$Text) {
+    $p = New-Object System.Windows.Documents.Paragraph
+    $p.Margin = New-Object System.Windows.Thickness 0
+    $lines = $Text -split "`r?`n"
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        $rest = $lines[$i]
+        while ($rest -match '(?<pre>.*?)(?<url>https?://[^\s<>"]*[^\s<>".,;:!?)\]])') {
+            if ($Matches.pre) { $p.Inlines.Add((New-Object System.Windows.Documents.Run $Matches.pre)) }
+            $link = New-Object System.Windows.Documents.Hyperlink (New-Object System.Windows.Documents.Run $Matches.url)
+            $link.NavigateUri = [Uri]$Matches.url
+            $link.SetResourceReference([System.Windows.Documents.TextElement]::ForegroundProperty, 'AccentBrush')
+            $p.Inlines.Add($link)
+            $rest = $rest.Substring($Matches[0].Length)
+        }
+        if ($rest) { $p.Inlines.Add((New-Object System.Windows.Documents.Run $rest)) }
+        if ($i -lt $lines.Count - 1) { $p.Inlines.Add((New-Object System.Windows.Documents.LineBreak)) }
+    }
+    $doc = New-Object System.Windows.Documents.FlowDocument $p
+    $doc.PagePadding = New-Object System.Windows.Thickness 0
+    $doc.FontFamily  = New-Object System.Windows.Media.FontFamily 'Segoe UI'
+    $doc.FontSize    = 12
+    $rtb = New-Object System.Windows.Controls.RichTextBox $doc
+    $rtb.IsReadOnly        = $true
+    $rtb.IsDocumentEnabled = $true
+    $rtb.BorderThickness   = New-Object System.Windows.Thickness 0
+    $rtb.Background        = [System.Windows.Media.Brushes]::Transparent
+    $rtb.Width             = 440
+    $rtb.MaxHeight         = 480
+    $rtb.VerticalScrollBarVisibility = [System.Windows.Controls.ScrollBarVisibility]::Auto
+    $rtb.SetResourceReference([System.Windows.Controls.Control]::ForegroundProperty, 'FgBrush')
+    $rtb
+}
+
 # Costruisce il popup SENZA mostrarlo, cosi' il test lo puo' ispezionare.
+# -Links: gli indirizzi web del testo si aprono col clic (dettagli di un pacchetto).
 function New-AppDialog {
     param(
         [string]$Text,
@@ -93,15 +144,24 @@ function New-AppDialog {
         [System.Windows.MessageBoxButton]$Button = 'OK',
         [System.Windows.MessageBoxImage]$Image = 'None',
         [System.Windows.MessageBoxResult]$Default = 'None',
-        [System.Windows.UIElement]$Content
+        [System.Windows.UIElement]$Content,
+        [switch]$Links
     )
     $dlg = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader ([xml]$script:dialogXaml)))
     # Stili (il template dei Button compreso) e brush del tema corrente: quelli della finestra
     # principale, che li tiene nelle sue Resources.
     $dlg.Resources.MergedDictionaries.Add($window.Resources)
     $dlg.Title = $Title
-    $dlg.FindName('DlgText').Text = $Text
+    $dlgText = $dlg.FindName('DlgText')
+    $dlgText.Text = $Text
+    if ($Links) {
+        $rtb = New-LinkedText $Text
+        [System.Windows.Controls.Grid]::SetColumn($rtb, 1)
+        [void]$dlgText.Parent.Children.Add($rtb)
+        $dlgText.Visibility = [System.Windows.Visibility]::Collapsed
+    }
     if ($Content) { [void]$dlg.FindName('DlgBody').Children.Add($Content) }
+    Add-LinkHandler $dlg
     # Owner solo a finestra visibile: su una finestra mai mostrata WPF lancia un'eccezione.
     if ($window.IsVisible) {
         $dlg.Owner = $window
@@ -185,9 +245,10 @@ function Show-AppDialog {
         [System.Windows.MessageBoxButton]$Button = 'OK',
         [System.Windows.MessageBoxImage]$Image = 'None',
         [System.Windows.MessageBoxResult]$Default = 'None',
-        [System.Windows.UIElement]$Content
+        [System.Windows.UIElement]$Content,
+        [switch]$Links
     )
-    try { $dlg = New-AppDialog -Text $Text -Title $Title -Button $Button -Image $Image -Default $Default -Content $Content }
+    try { $dlg = New-AppDialog -Text $Text -Title $Title -Button $Button -Image $Image -Default $Default -Content $Content -Links:$Links }
     catch {
         # Ripiego sulla MessageBox di sistema: un messaggio non deve perdersi proprio quando
         # qualcosa e' guasto (tema o XAML).
@@ -228,7 +289,7 @@ function Show-PackageDetails([object]$Row, [bool]$Installed) {
             Set-AppBusy $false
             $text = (@($result) | Where-Object { $_ }) -join "`r`n"
             if (-not $text) { $text = 'winget returned no details for this package.' }
-            Show-AppDialog -Text $text -Title "$($script:detailsRow.Name) - details" | Out-Null
+            Show-AppDialog -Text $text -Title "$($script:detailsRow.Name) - details" -Links | Out-Null
         })
 }
 

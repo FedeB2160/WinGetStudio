@@ -255,22 +255,11 @@ function Start-WinGetQueue {
                     'warning' { LogUI "   WARNING (exit $code): $name" }
                     default {
                         LogUI "   ERROR (exit $code): $name"
-                        # Riparazione non possibile per questo pacchetto (0x8A150079 nessuna
-                        # informazione di riparazione, 0x8A15007A non applicabile, 0x8A15007C
-                        # tecnologia d'installazione senza riparazione): e' la regola, non un
-                        # guasto, e si dice in chiaro invece del codice.
-                        $u = ([int64]$code) -band 0xFFFFFFFFL
-                        if ($u -eq 0x8A150079L -or $u -eq 0x8A15007AL -or $u -eq 0x8A15007CL) {
-                            UI { $item.StatusDetail = "exit ${code}: repair not supported" }
-                            LogUI "      winget cannot repair this package: its installer does not support repair."
-                        }
-                        else {
-                            # Ultime DUE righe significative dell'output winget: quando
-                            # l'installer fallisce, winget stampa il percorso del suo log
-                            # DOPO il messaggio d'errore, quindi l'ultima riga da sola
-                            # riportava solo il path e nascondeva la causa (Get-WinGetOutputTail).
-                            foreach ($l in (Get-WinGetOutputTail $r.Output 2)) { LogUI "      $l" }
-                        }
+                        # Ultime DUE righe significative dell'output winget: quando
+                        # l'installer fallisce, winget stampa il percorso del suo log
+                        # DOPO il messaggio d'errore, quindi l'ultima riga da sola
+                        # riportava solo il path e nascondeva la causa (Get-WinGetOutputTail).
+                        foreach ($l in (Get-WinGetOutputTail $r.Output 2)) { LogUI "      $l" }
                     }
                 }
             }
