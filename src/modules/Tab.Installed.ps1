@@ -62,11 +62,17 @@ function Test-InstalledMatch($row) {
     return ($row.Name -like "*$f*") -or ($row.Id -like "*$f*")
 }
 
-function Load-Installed {
+# L'elenco degli installati e' vecchio dopo un'azione da un'altra scheda: si rilegge al prossimo
+# ingresso, con lo stesso meccanismo del primo caricamento.
+function Set-InstalledStale { $script:installedLoaded = $false }
+
+# -KeepOutcome: come Load-Upgrades, la ricarica a coda finita riporta l'esito per ID.
+function Load-Installed([switch]$KeepOutcome) {
     # Non si scansiona sopra un altro winget. Test-WinGetBusy e non isBusy: una ricerca in
     # volo nella scheda Install non alza lo stato occupato, ed e' proprio entrando qui dal
     # typeahead che partivano due winget insieme.
     if (Test-WinGetBusy) { return }
+    $script:installedOutcome = if ($KeepOutcome) { Get-RowOutcome @($installedItems) } else { $null }
     Set-AppBusy $true
     $script:installedLoaded = $true
     Write-Log "Listing installed packages..."
@@ -94,6 +100,8 @@ function Load-Installed {
             $r = @($result)[0]
             $read = if ($r) { $r.Installed }
             if ($read.Success) { foreach ($p in $read.Rows) { if ($p) { $installedItems.Add($p) } } }
+            Set-RowOutcome @($installedItems) $script:installedOutcome
+            $script:installedOutcome = $null
 
             if ($installedItems.Count -eq 0) {
                 # Lista vuota, winget fallito, job morto: tre messaggi diversi.
@@ -151,9 +159,9 @@ function Start-UninstallSelected {
         # Anche la scheda Updates ora mente: un pacchetto disinstallato puo' essere ancora
         # in quell'elenco, e aggiornarlo fallirebbe.
         Set-UpdatesStale
-        # L'elenco non viene ricaricato da solo: cancellerebbe la colonna Result appena
-        # scritta, che e' il resoconto di cosa e' andato come.
-        Write-Log "Uninstall finished: press Refresh to rebuild the list."
+        # L'elenco si rilegge subito, con l'esito riportato per ID: i rimossi spariscono, i
+        # falliti restano col loro esito e si possono ripetere.
+        Load-Installed -KeepOutcome
     }
 }
 

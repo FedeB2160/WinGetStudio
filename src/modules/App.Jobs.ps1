@@ -290,33 +290,53 @@ function Get-QueueSummary([object[]]$Rows) {
     @($parts) -join ', '
 }
 
-# Righe da ripetere: le fallite dell'ultima coda che sono ANCORA nel loro elenco. Dopo una nuova
-# scansione l'elenco contiene oggetti nuovi e quelli vecchi, non piu' a schermo, escono da soli:
-# nessun aggancio nelle scansioni.
-function Get-RetryRows {
+# Esito delle righe per ID, da riportare sulla lista riletta a coda finita: la ricarica crea
+# righe NUOVE, e senza questo la colonna Result e Retry failed sparirebbero (issue #24).
+function Get-RowOutcome([object[]]$Rows) {
+    $map = @{}
+    foreach ($r in $Rows) { if ($r.Status -and $r.Status -ne 'updating') { $map[$r.Id] = @($r.Status, $r.StatusDetail) } }
+    $map
+}
+
+function Set-RowOutcome([object[]]$Rows, [hashtable]$Outcome) {
+    if (-not $Outcome) { return }
+    foreach ($r in $Rows) {
+        $o = $Outcome[$r.Id]
+        if ($o) { $r.Status = $o[0]; $r.StatusDetail = $o[1] }
+    }
+}
+
+# Righe da ripetere in un elenco: quelle con un ID fallito nell'ultima coda e l'esito ancora
+# 'error'. Per ID e non per oggetto: dopo la ricarica automatica le righe sono nuove, con
+# l'esito riportato da Set-RowOutcome. Una riga sparita dall'elenco (un aggiornamento riuscito
+# in un secondo momento, un pacchetto rimosso) non c'e' piu' da ripetere.
+function Get-RetryRows($Collection) {
     $q = $script:lastQueue
     if (-not $q) { return @() }
-    @($q.Rows | Where-Object {
-        $_.Status -eq 'error' -and ($items.Contains($_) -or $installedItems.Contains($_) -or $searchItems.Contains($_))
-    })
+    $failed = @($q.Rows | Where-Object { $_.Status -eq 'error' } | ForEach-Object { $_.Id })
+    if (-not $failed.Count) { return @() }
+    @($Collection | Where-Object { $_.Status -eq 'error' -and $failed -contains $_.Id })
 }
 
-# Il pulsante Retry failed nell'intestazione del log: visibile solo se c'e' qualcosa da
-# ripetere, spento mentre winget lavora. Lo richiama Set-AppBusy (registrato in Start-App).
+# Un Retry failed per scheda, in alto a destra: visibile solo dove c'e' qualcosa da ripetere,
+# spento mentre winget lavora. Lo richiama Set-AppBusy (registrato in Start-App).
 function Update-RetryButton {
-    $n = @(Get-RetryRows).Count
-    $BtnRetryFailed.Content    = "Retry failed ($n)"
-    $BtnRetryFailed.Visibility = if ($n -gt 0) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
-    $BtnRetryFailed.IsEnabled  = -not $script:isBusy
+    foreach ($pair in @(@($BtnRetryUpdates, $items), @($BtnRetryInstall, $searchItems), @($BtnRetryInstalled, $installedItems))) {
+        $n = @(Get-RetryRows $pair[1]).Count
+        $pair[0].Content    = "Retry failed ($n)"
+        $pair[0].Visibility = if ($n -gt 0) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+        $pair[0].IsEnabled  = -not $script:isBusy
+    }
 }
 
-# Ripete l'ultima coda sulle sole righe fallite, con gli stessi argomenti, variabili e OnDone.
-# Il blocco "lista vecchia fino al Check" della scheda Updates NON si applica: esiste perche'
-# ripetere righe RIUSCITE dipingerebbe errori falsi, e qui si ripetono solo le fallite, che non
-# hanno cambiato nulla. Conferma con No predefinito: puo' essere una disinstallazione.
-function Start-RetryFailed {
+# Ripete l'ultima coda sulle sole righe fallite dell'elenco, con gli stessi argomenti, variabili
+# e OnDone (quindi anche la ricarica a coda finita). Il blocco "lista vecchia" della scheda
+# Updates NON si applica: esiste perche' ripetere righe RIUSCITE dipingerebbe errori falsi, e qui
+# si ripetono solo le fallite, che non hanno cambiato nulla. Conferma con No predefinito: puo'
+# essere una disinstallazione.
+function Start-RetryFailed($Collection) {
     $q = $script:lastQueue
-    $rows = @(Get-RetryRows)
+    $rows = @(Get-RetryRows $Collection)
     if ($rows.Count -eq 0) { return }
     $names = @($rows | Select-Object -First 12 | ForEach-Object { "  - $($_.Name)" }) -join "`n"
     $more  = if ($rows.Count -gt 12) { "`n  ... and $($rows.Count - 12) more" } else { '' }

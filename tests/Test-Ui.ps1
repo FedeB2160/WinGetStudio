@@ -997,15 +997,16 @@ else {
     # Il riepilogo conta il pacchetto in volo (fallito: l'ID non esiste) e quelli mai partiti;
     # il fallito, ancora in elenco, si puo' ripetere.
     if ($TxtLog.Text -notmatch "cancelled after .*: (\d+ failed, )?$(5 - $ran) not run\.") { throw "riepilogo della coda annullata assente o sbagliato" }
-    if ($BtnRetryFailed.Visibility -ne 'Visible' -or $BtnRetryFailed.Content -notmatch "\($(@($probeRows | Where-Object { $_.Status -eq 'error' }).Count)\)") {
-        throw "dopo una coda con errori Retry failed non compare: '$($BtnRetryFailed.Content)' $($BtnRetryFailed.Visibility)"
-    }
+    # La coda ricarica la lista da sola (Load-Upgrades): le righe finte non sono aggiornamenti
+    # veri, quindi spariscono, e con loro il Retry failed della scheda.
+    if ($TxtLog.Text -notmatch '(?s)cancelled after.*Searching for updates') { throw "a coda finita la lista non si e' ricaricata da sola" }
+    if (@($items | Where-Object { $_.Id -like 'WinGetStudio.Probe.*' }).Count) { throw "dopo la ricarica restano in elenco le righe finte" }
+    if ($BtnRetryUpdates.Visibility -eq 'Visible') { throw "Retry failed visibile per righe che non sono piu' in elenco" }
 
-    # 4) a coda finita: pulsante di nuovo Update, ma bloccato fino al Check
+    # 4) a coda finita: pulsante di nuovo Update, e lista fresca perche' riletta
     if ($BtnUpdate.Content -ne 'Update') { throw "a coda finita il pulsante dice '$($BtnUpdate.Content)'" }
-    if ($BtnUpdate.IsEnabled) { throw "a coda finita Update non e' bloccato: la lista e' vecchia" }
-    if ($TxtSelected.Text -notmatch 'press Check') { throw "non viene detto perche' Update e' bloccato: '$($TxtSelected.Text)'" }
-    if (-not $BtnRefresh.IsEnabled) { throw "Check deve restare attivo: e' l'unico modo per sbloccare" }
+    if ($script:listStale) { throw "a coda finita e lista riletta, la lista risulta ancora vecchia" }
+    if (-not $BtnRefresh.IsEnabled) { throw "a coda finita Check e' spento" }
     if ($MenuPinUpdates.IsEnabled -ne $true) { throw "a coda finita la voce Pin resta spenta" }
     if ($Grid.IsReadOnly) { throw "a coda finita le spunte restano bloccate" }
 
@@ -1013,23 +1014,21 @@ else {
     $script:listStale = $false
     Refresh-SelectionState
     Stop-AllJobs
-    "OK queue   ciclo coda: Cancel premuto, in volo finito a $ran/5, Update bloccato fino al Check"
+    "OK queue   ciclo coda: Cancel premuto, in volo finito a $ran/5, lista riletta da sola"
 }
 
-# 13f) Dopo un'alterazione della macchina il pulsante Update si blocca fino al Check:
-# ripremerlo rilanciava winget su pacchetti gia' aggiornati, che escono con codice non-zero
-# e finivano in griglia come X ROSSE su righe andate a buon fine.
+# 13f) Dopo un'azione la lista si rilegge da sola (issue #24): la coda della scheda ricarica la
+# PROPRIA lista e ci riporta l'esito per ID, le altre schede toccate si segnano vecchie e si
+# rileggono quando si aprono. Finche' una lista e' vecchia Update resta bloccato: ripremerlo
+# rilancerebbe winget su pacchetti gia' aggiornati, che escono non-zero e finivano in griglia
+# come X ROSSE su righe andate a buon fine.
 $items.Clear()
 $items.Add([WgtRow]@{ Id = 'A.A'; Name = 'A'; Selected = $true })
 $script:listStale = $false
 Refresh-SelectionState
 if (-not $BtnUpdate.IsEnabled) { throw "con una riga selezionata e la lista fresca Update deve essere attivo" }
-
 Set-UpdatesStale
-if ($BtnUpdate.IsEnabled) { throw "dopo un'alterazione Update deve restare bloccato" }
-if ($TxtSelected.Text -notmatch 'press Check') { throw "non viene detto PERCHE' Update e' bloccato: '$($TxtSelected.Text)'" }
-if (-not $BtnRefresh.IsEnabled) { throw "Check deve restare attivo: e' l'unico modo per sbloccare" }
-
+if ($BtnUpdate.IsEnabled) { throw "a lista vecchia Update deve restare bloccato" }
 # I pin NON marcano la lista: bloccano gli aggiornamenti, non cambiano le versioni installate.
 $script:listStale = $false
 Set-PinFlags @('A.A')
@@ -1038,13 +1037,51 @@ $items.Clear()
 $script:listStale = $false
 Refresh-SelectionState
 
-# Le code che alterano la macchina lo dichiarano, e solo il Check sblocca. Anche l'aggiornamento
-# di winget: App Installer puo' essere una riga della scheda Updates.
-foreach ($fn in 'Start-UpdateSelected', 'Install-Rows', 'Start-UninstallSelected', 'Invoke-PackageImport', 'Start-WinGetInstall') {
-    if ((Get-FunctionSource $fn) -notmatch 'Set-UpdatesStale') { throw "$fn non marca la lista come vecchia" }
+# L'esito si riporta per ID sulle righe nuove; una riga che non c'e' piu' resta fuori.
+$oldRows = @([WgtRow]@{ Id = 'A.A'; Status = 'error'; StatusDetail = 'exit 1' }, [WgtRow]@{ Id = 'B.B'; Status = 'ok' }, [WgtRow]@{ Id = 'C.C' })
+$newRows = @([WgtRow]@{ Id = 'A.A' }, [WgtRow]@{ Id = 'C.C' }, [WgtRow]@{ Id = 'D.D' })
+Set-RowOutcome $newRows (Get-RowOutcome $oldRows)
+if ($newRows[0].Status -ne 'error' -or $newRows[0].StatusDetail -ne 'exit 1' -or $newRows[1].Status -or $newRows[2].Status) {
+    throw "esito riportato male: $(@($newRows | ForEach-Object { "$($_.Id)=$($_.Status)" }) -join ',')"
+}
+
+# Chi ricarica cosa a coda finita.
+$ondone = @{
+    'Start-UpdateSelected'    = @('Load-Upgrades -KeepOutcome', 'Set-InstalledStale')
+    'Start-UninstallSelected' = @('Load-Installed -KeepOutcome', 'Set-UpdatesStale')
+    'Install-Rows'            = @('Set-UpdatesStale', 'Set-InstalledStale')
+    'Invoke-PackageImport'    = @('Load-Installed', 'Set-UpdatesStale')
+    'Start-WinGetInstall'     = @('Set-UpdatesStale')
+}
+foreach ($fn in $ondone.Keys) {
+    $src = Get-FunctionSource $fn
+    foreach ($need in $ondone[$fn]) { if ($src -notmatch [regex]::Escape($need)) { throw "$fn a coda finita non fa '$need'" } }
+    if ($src -match 'press (Check|Refresh)') { throw "$fn chiede ancora di premere Check/Refresh" }
 }
 if ((Get-FunctionSource 'Load-Upgrades') -notmatch 'listStale\s*=\s*\$false') { throw "Load-Upgrades non sblocca il pulsante" }
-"OK stale   Update bloccato dopo un'alterazione, sbloccato solo dal Check"
+
+# Una scheda segnata vecchia si rilegge appena la si apre.
+$savedLoadUp = ${function:Load-Upgrades}; $savedLoadInst = ${function:Load-Installed}
+$script:reloads = @()
+function Load-Upgrades { $script:reloads += 'Updates'; $script:listStale = $false }
+function Load-Installed { $script:reloads += 'Installed'; $script:installedLoaded = $true }
+$savedTab = $TabMain.SelectedItem; $savedLoaded = $script:installedLoaded
+try {
+    $TabInstall.IsSelected = $true
+    Set-UpdatesStale; Set-InstalledStale
+    $TabUpdates.IsSelected = $true
+    $TabInstalled.IsSelected = $true
+    if (($script:reloads -join ',') -ne 'Updates,Installed') { throw "aprendo le schede vecchie si e' riletto: '$($script:reloads -join ',')'" }
+    $script:reloads = @()
+    $TabUpdates.IsSelected = $true
+    if ($script:reloads.Count) { throw "una scheda gia' fresca si e' riletta di nuovo" }
+}
+finally {
+    Set-Item function:Load-Upgrades $savedLoadUp; Set-Item function:Load-Installed $savedLoadInst
+    $script:installedLoaded = $savedLoaded; $script:listStale = $false
+    $TabMain.SelectedItem = $savedTab
+}
+"OK stale   coda: lista riletta con l'esito per ID; schede toccate rilette all'apertura"
 
 # 14) La ricerca della scheda Install: debounce, soglia dei 3 caratteri e scarto dei
 # risultati superati. E' l'unica parte della suite che chiama winget davvero, ma solo in
@@ -1533,20 +1570,27 @@ $savedLast = $script:lastQueue
 $installedItems.Add($failIn); $installedItems.Add($okIn)
 try {
     $script:lastQueue = @{ Verb = 'Uninstall'; Rows = @($failIn, $failOut, $okIn); ArgsBuilder = { param($r) "x" }; Vars = @{}; OnDone = {} }
-    $retry = @(Get-RetryRows)
+    $retry = @(Get-RetryRows $installedItems)
     if ($retry.Count -ne 1 -or $retry[0] -ne $failIn) { throw "da ripetere: $(@($retry | ForEach-Object { $_.Name }) -join ', '); atteso solo 'Failed, shown'" }
+    if (@(Get-RetryRows $items).Count -or @(Get-RetryRows $searchItems).Count) { throw "le righe da ripetere finiscono nella scheda sbagliata" }
+    # Dopo la ricarica automatica la riga e' un oggetto NUOVO con l'esito riportato: si ripete quello.
+    $failNew = [WgtRow]@{ Name = 'Failed, shown'; Id = $failIn.Id; Status = 'error' }
+    $installedItems[$installedItems.IndexOf($failIn)] = $failNew
+    $retry = @(Get-RetryRows $installedItems)
+    if ($retry.Count -ne 1 -or $retry[0] -ne $failNew) { throw "dopo la ricarica non si ripete la riga nuova" }
     Update-RetryButton
-    if ($BtnRetryFailed.Visibility -ne 'Visible' -or $BtnRetryFailed.Content -notmatch '\(1\)') { throw "pulsante Retry: '$($BtnRetryFailed.Content)' $($BtnRetryFailed.Visibility)" }
+    if ($BtnRetryInstalled.Visibility -ne 'Visible' -or $BtnRetryInstalled.Content -notmatch '\(1\)') { throw "pulsante Retry di Installed: '$($BtnRetryInstalled.Content)' $($BtnRetryInstalled.Visibility)" }
+    if ($BtnRetryUpdates.Visibility -eq 'Visible' -or $BtnRetryInstall.Visibility -eq 'Visible') { throw "Retry failed compare anche nelle altre schede" }
     Set-AppBusy $true
-    if ($BtnRetryFailed.IsEnabled) { throw "Retry failed resta attivo durante un'operazione" }
+    if ($BtnRetryInstalled.IsEnabled) { throw "Retry failed resta attivo durante un'operazione" }
     Set-AppBusy $false
-    [void]$installedItems.Remove($failIn)
+    [void]$installedItems.Remove($failNew)
     Update-RetryButton
-    if ($BtnRetryFailed.Visibility -eq 'Visible') { throw "senza falliti in elenco il pulsante Retry resta visibile" }
+    if ($BtnRetryInstalled.Visibility -eq 'Visible') { throw "senza falliti in elenco il pulsante Retry resta visibile" }
 }
 finally {
     $script:lastQueue = $savedLast
-    [void]$installedItems.Remove($failIn); [void]$installedItems.Remove($okIn)
+    foreach ($r in @($installedItems | Where-Object { $_.Id -in $failIn.Id, $okIn.Id })) { [void]$installedItems.Remove($r) }
     Update-RetryButton
 }
 $retrySrc = Get-FunctionSource 'Start-RetryFailed'

@@ -154,10 +154,11 @@ function Invoke-PackageImport([string]$file, [int]$count) {
                     foreach ($l in (Get-WinGetOutputTail $r.Output 3)) { Write-Log "   $l" }
                 }
             }
-            Write-Log "Press Refresh to rebuild the installed list."
             Set-AppBusy $false
-            # L'import ha installato software: l'elenco degli aggiornamenti e' di prima.
+            # L'import ha installato software: l'elenco degli aggiornamenti e' di prima e si
+            # rilegge all'apertura; quello degli installati, che e' qui, si rilegge subito.
             Set-UpdatesStale
+            Load-Installed
         })
 }
 
