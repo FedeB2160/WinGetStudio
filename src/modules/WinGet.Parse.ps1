@@ -169,16 +169,18 @@ function Invoke-WinGetRead([string[]]$Arguments, [int]$MaxColumns = 0) {
     }
 }
 
-# Ricerca nel catalogo. Colonne: Nome | Id | Versione | [Corrispondenza] | [Origine] —
-# le ultime due compaiono o no a seconda del risultato.
-# Sorgente della riga: senza Store si cerca con --source winget e winget non stampa Origine,
-# quindi e' winget. Con lo Store e' l'ultima colonna, se c'e': i valori di Corrispondenza
-# ("Tag: 7zip", "Moniker: 7zip") contengono sempre ':', i nomi delle sorgenti mai.
+# Ricerca nel catalogo. Colonne: Nome | Id | Versione | [Corrispondenza] — si usano le prime
+# tre. Una sorgente per volta, quindi la sorgente di ogni riga e' quella interrogata.
 #
-# --source winget: interroga il solo indice LOCALE (~0.4s). Con msstore la stessa ricerca
-#   va in rete e passa a ~5s, troppo per aggiornare l'elenco mentre si digita.
+# --source winget: interroga il solo indice LOCALE (~0.4s). msstore va in rete (~5s), troppo
+#   per aggiornare l'elenco mentre si digita: lo Store si aggiunge solo su richiesta.
+# Con lo Store sono DUE ricerche, winget poi msstore, coi risultati in coda: dalla 1.29 winget
+#   non porta piu' in cima i risultati dello Store, e con un --count unico su tutte le sorgenti
+#   una parola comune lo lasciava fuori (misurato: "spotify" -> 33 winget, lo Store al 34esimo).
+#   Uno Store che non risponde non fa fallire la ricerca: restano i risultati winget e il
+#   motivo va nell'output, da cui la scheda Install mette nel log le righe "msstore".
 # --count: senza un tetto una query di 2-3 lettere torna oltre mille righe (misurato:
-#   "ab" -> 1288) e la griglia annega.
+#   "ab" -> 1288) e la griglia annega. Allo Store ne bastano 10.
 # 0x8A150014 (APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND) e' "nessuna corrispondenza": un
 #   risultato vuoto, non un errore. Solo qui: list e upgrade senza filtri elencano tutto
 #   l'installato e quel codice non lo producono. L'exit si normalizza a 32 bit senza segno
@@ -187,19 +189,26 @@ function Get-WinGetSearch([string]$Query, [bool]$IncludeStore = $false, [int]$Co
     if ([string]::IsNullOrWhiteSpace($Query)) {
         return [PSCustomObject]@{ Success = $true; Rows = [object[]]@(); ExitCode = 0; Output = '' }
     }
-    $wgArgs = @('search', $Query, '--count', "$Count", '--accept-source-agreements')
-    if (-not $IncludeStore) { $wgArgs += @('--source', 'winget') }
-    $read = Invoke-WinGetRead -Arguments $wgArgs
-    if ((([int64]$read.ExitCode) -band 0xFFFFFFFFL) -eq 0x8A150014L) { $read.Success = $true }
-    if (-not $read.Success) { return $read }
-
     $results = New-Object System.Collections.ArrayList
-    foreach ($f in $read.Rows) {
-        $source = if (-not $IncludeStore) { 'winget' } elseif ($f.Count -ge 4 -and $f[-1] -notmatch ':') { $f[-1] } else { '' }
-        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2]; Source = $source })
+    $first = $null
+    foreach ($src in @(@('winget', $Count), @('msstore', 10))) {
+        if ($src[0] -eq 'msstore' -and -not $IncludeStore) { break }
+        $read = Invoke-WinGetRead -Arguments @('search', $Query, '--count', "$($src[1])", '--source', $src[0], '--accept-source-agreements')
+        if ((([int64]$read.ExitCode) -band 0xFFFFFFFFL) -eq 0x8A150014L) { $read.Success = $true }
+        if ($null -eq $first) {
+            $first = $read
+            if (-not $read.Success) { return $read }
+        }
+        elseif (-not $read.Success) {
+            $first.Output += "`r`nmsstore: " + (@(Get-WinGetOutputTail $read.Output 2) -join ' ')
+            continue
+        }
+        foreach ($f in $read.Rows) {
+            [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2]; Source = $src[0] })
+        }
     }
-    $read.Rows = $results.ToArray()
-    return $read
+    $first.Rows = $results.ToArray()
+    return $first
 }
 
 # ID dei pacchetti con un pin. Colonne: Nome | Id | Versione | Origine | Tipo di pin —
