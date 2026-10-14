@@ -1498,7 +1498,10 @@ $repairSrc = Get-FunctionSource 'Start-RepairSelected'
 $posConfirm = $repairSrc.IndexOf('Show-AppDialog'); $posQueue = $repairSrc.IndexOf('Start-WinGetQueue')
 if ($posConfirm -lt 0 -or $posConfirm -gt $posQueue) { throw "la riparazione parte senza conferma" }
 if ($repairSrc -notmatch 'MessageBoxResult\]::No' -or $repairSrc -notmatch 'MessageBoxButton\]::YesNo') { throw "la conferma della riparazione non e' Yes/No con No predefinito" }
-if ($repairSrc -notmatch 'repair --id `"\$\(\$r\.Id\)`" -e --silent --disable-interactivity') { throw "riga di comando della riparazione inattesa" }
+if ($repairSrc -notmatch 'repair --id `"\$\(\$r\.Id\)`" -e\$sourceArg --silent --disable-interactivity') { throw "riga di comando della riparazione inattesa" }
+# Senza --source winget cerca il pacchetto in TUTTE le sorgenti: con lo Store giu' (Sandbox) la
+# riparazione si fermava su 0x8A15003B, errore REST, prima di cominciare.
+if ($repairSrc -notmatch 'if \(\$r\.Source\)') { throw "la riparazione non passa la sorgente della riga" }
 $queueSrc = Get-FunctionSource 'Start-WinGetQueue'
 foreach ($code in '0x8A150079', '0x8A15007A', '0x8A15007C') {
     if ($queueSrc -notmatch $code) { throw "il rifiuto di riparare $code non ha un messaggio leggibile" }
