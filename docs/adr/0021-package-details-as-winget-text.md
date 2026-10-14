@@ -43,9 +43,18 @@ Two more facts shaped the decision:
 - The entry point is **Details of highlighted package** in the context menu of all three grids. The
   Install grid had no context menu until now. The item is disabled while busy, like the pin items.
 - **Every row carries its `Source`.**
-  - Search without the Store runs with `--source winget`, so the source is known.
-  - With the Store, the source is the last column when it has no `:`. Match values always carry one
-    (`Tag: 7zip`, `Moniker: 7zip`), source names never do.
+  - A search queries **one source at a time**, so a result's source is the source that was queried.
+    No column is read for it.
+    - Without the Store, the search is `--source winget --count 25`.
+    - With **MS Store** ticked it is two searches in the same job:
+      1. winget, `--count 25`;
+      2. `--source msstore --count 10`, with its results appended after the winget ones.
+  - Two searches, not one across all sources, for two reasons:
+    - Since winget 1.29, REST sources are no longer sorted to the top. With one `--count` over all
+      sources, a common word fills the list with winget packages. Measured: "spotify" gives 33 winget
+      results with the Store one 34th, so the Store result never appeared.
+    - A Store that does not answer no longer fails the search. The winget results stay, and the reason
+      goes to the log.
   - In `list` it is the last column: `Disponibile` appears only when something has an update, so the
     fourth column is not always the source.
   - In `upgrade` it is the fifth column.
@@ -66,8 +75,11 @@ Two more facts shaped the decision:
 - `show` prints the manifest of the **latest** version. For an installed package that is out of date,
   the catalogue part can describe a newer version than the one installed. The installed part comes
   first for that reason.
-- The source rule for searches relies on Match values containing `:`. A new Match kind without one
-  would be read as a source, and the install would then fail visibly with "source not found".
+- A search with the Store is two winget processes in a row, never at the same time (ADR 0003). The
+  Store part goes over the network and takes about 5 s, which is why it still runs only on Enter or
+  **Search**, never while typing.
+- Other configured sources (a company REST source, for instance) are not searched. Before this change
+  they were included when **MS Store** was ticked, because that search covered every source.
 - Available versions (`show --versions`) are not shown: the app has no way to install a specific
   version, so the list would not lead anywhere.
 

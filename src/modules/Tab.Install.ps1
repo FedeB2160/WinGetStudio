@@ -80,7 +80,7 @@ function Start-Search([bool]$IncludeStore = $false) {
     # ORA nel campo e, se l'utente ha continuato a digitare, il risultato vecchio si
     # butta. Senza questo, due ricerche che rientrano fuori ordine lascerebbero in
     # griglia i risultati della query precedente.
-    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetSearch' `
+    [void](Start-BackgroundJob -Functions 'Get-WinGetTable', 'Invoke-WinGetRead', 'Get-WinGetSearch', 'Get-WinGetOutputTail' `
         -Vars @{ q = $q; store = $IncludeStore; wingetPath = $wingetPath } `
         -Script {
             [PSCustomObject]@{ Query = $q; Search = Get-WinGetSearch $q $store }
