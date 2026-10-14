@@ -361,7 +361,9 @@ if ($uiText -notmatch '(?s)GridHeader.*?HorizontalContentAlignment"\s+Value="Cen
 # spuntate: se non lo dicono, si spunta una riga e poi non si capisce perche' il pin sia
 # finito altrove. E' documentato nei commenti da sempre, ma il commento non lo legge nessuno
 # col tasto destro premuto.
-$menuHeaders = @([regex]::Matches($uiText, '<MenuItem[^>]*Header="([^"]*)"') | ForEach-Object { $_.Groups[1].Value })
+# Solo i menu delle GRIGLIE: quello del log agisce sul log, non su righe.
+$gridMenus = @([regex]::Matches($uiText, '(?s)<DataGrid\.ContextMenu>.*?</DataGrid\.ContextMenu>') | ForEach-Object { $_.Value }) -join "`n"
+$menuHeaders = @([regex]::Matches($gridMenus, '<MenuItem[^>]*Header="([^"]*)"') | ForEach-Object { $_.Groups[1].Value })
 if ($menuHeaders.Count -eq 0) { throw "nessuna voce di menu trovata: regex da rivedere" }
 $vague = @($menuHeaders | Where-Object { $_ -notmatch 'highlighted' })
 if ($vague.Count -gt 0) { throw "voci di menu che non dicono su cosa agiscono: $($vague -join ', ')" }
@@ -1504,35 +1506,13 @@ if ($realWinget) {
     else { "OK store   'spotify' con lo Store: $(@($liveSearch.Rows | Where-Object { $_.Source -eq 'msstore' }).Count) risultati msstore dopo $(@($liveSearch.Rows | Where-Object { $_.Source -eq 'winget' }).Count) winget" }
 }
 
-# 16e) Riparazione (issue #24): stessa coda e stessa conferma della disinstallazione, perche'
-# rilancia l'installer di ogni pacchetto. winget ripara MSI e MSIX, gli altri solo se il
-# manifest lo dice: il rifiuto deve arrivare leggibile, non come un codice.
-$repairSrc = Get-FunctionSource 'Start-RepairSelected'
-$posConfirm = $repairSrc.IndexOf('Show-AppDialog'); $posQueue = $repairSrc.IndexOf('Start-WinGetQueue')
-if ($posConfirm -lt 0 -or $posConfirm -gt $posQueue) { throw "la riparazione parte senza conferma" }
-if ($repairSrc -notmatch 'MessageBoxResult\]::No' -or $repairSrc -notmatch 'MessageBoxButton\]::YesNo') { throw "la conferma della riparazione non e' Yes/No con No predefinito" }
-if ($repairSrc -notmatch 'repair --id `"\$\(\$r\.Id\)`" -e\$sourceArg --silent --disable-interactivity') { throw "riga di comando della riparazione inattesa" }
-# Senza --source winget cerca il pacchetto in TUTTE le sorgenti: con lo Store giu' (Sandbox) la
-# riparazione si fermava su 0x8A15003B, errore REST, prima di cominciare.
-if ($repairSrc -notmatch 'if \(\$r\.Source\)') { throw "la riparazione non passa la sorgente della riga" }
+# 16e) La riparazione (issue #24) e' stata provata e tolta: winget ripara un MSI con msiexec /f,
+# che rilegge l'MSI originale, e winget lo cancella dopo l'installazione (Error 1706, 1603).
+# Non deve tornare senza prove nuove: vedi ADR 0018.
+if ($uiText -match 'BtnRepair' -or ${function:Start-RepairSelected}) { throw "la riparazione e' tornata senza prove nuove (ADR 0018)" }
 $queueSrc = Get-FunctionSource 'Start-WinGetQueue'
-foreach ($code in '0x8A150079', '0x8A15007A', '0x8A15007C') {
-    if ($queueSrc -notmatch $code) { throw "il rifiuto di riparare $code non ha un messaggio leggibile" }
-}
-if ($queueSrc -match 'to uninstall it') { throw "il messaggio 'firma come...' parla di disinstallazione anche per la riparazione" }
-$repRow = [WgtRow]@{ Name = 'Repair fixture'; Id = "WgtStudio.RepairFixture$PID"; Selected = $true }
-$installedItems.Add($repRow)
-try {
-    Refresh-InstalledState
-    if (-not $BtnRepair.IsEnabled) { throw "con una riga spuntata Repair resta spento" }
-    Set-AppBusy $true
-    if ($BtnRepair.IsEnabled) { throw "Repair resta attivo durante un'operazione" }
-    Set-AppBusy $false
-    if (-not $BtnRepair.IsEnabled) { throw "a operazione finita Repair resta spento" }
-}
-finally { [void]$installedItems.Remove($repRow); Refresh-InstalledState }
-if ($BtnRepair.IsEnabled) { throw "senza righe spuntate Repair e' attivo" }
-"OK repair  conferma prima della coda, rifiuti leggibili, pulsante legato a spunte e stato occupato"
+if ($queueSrc -match 'to uninstall it') { throw "il messaggio 'firma come...' parla sempre di disinstallazione, qualunque sia la coda" }
+"OK repair  assente di proposito; messaggio della coda legato al suo verbo"
 
 # 16f) Esito della coda, ripeti i falliti, salva il log. Il riepilogo conta dalle righe
 # stesse; i falliti da ripetere sono quelli dell'ultima coda ANCORA in elenco: dopo una nuova
@@ -1573,6 +1553,10 @@ $retrySrc = Get-FunctionSource 'Start-RetryFailed'
 $posConfirm = $retrySrc.IndexOf('Show-AppDialog'); $posQueue = $retrySrc.IndexOf('Start-WinGetQueue')
 if ($posConfirm -lt 0 -or $posConfirm -gt $posQueue -or $retrySrc -notmatch 'MessageBoxResult\]::No') { throw "Retry failed riparte senza conferma con No predefinito" }
 
+# Salva e pulisci il log stanno nel menu del tasto destro sul log, con Copy e Select all che
+# un menu proprio toglierebbe a quello standard del TextBox.
+$logMenu = @($TxtLog.ContextMenu.Items | Where-Object { $_ -is [System.Windows.Controls.MenuItem] })
+if ((@($logMenu | ForEach-Object { $_.Header }) -join '|') -ne 'Copy|Select all|Save log...|Clear log') { throw "menu del log: $(@($logMenu | ForEach-Object { $_.Header }) -join '|')" }
 $logFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-logtest-$PID.txt"
 $TxtLog.Clear(); Write-Log ('log check ' + [char]0x00E8)
 try {
@@ -1581,7 +1565,9 @@ try {
     if ($saved -notmatch ('log check ' + [char]0x00E8)) { throw "il log salvato non contiene il testo del log: '$saved'" }
 }
 finally { Remove-Item -LiteralPath $logFile -ErrorAction SilentlyContinue }
-"OK report  riepilogo della coda, ripeti solo i falliti ancora in elenco, log salvato in UTF-8"
+$MenuClearLog.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.MenuItem]::ClickEvent)))
+if ($TxtLog.Text) { throw "Clear log non ha svuotato il log: '$($TxtLog.Text)'" }
+"OK report  riepilogo della coda, ripeti solo i falliti ancora in elenco, log salvato in UTF-8 e pulito dal menu"
 
 # 17) Elenco installati e filtro locale. Il caricamento vero solo con -Live; il filtro si
 # prova sempre, su righe finte: non deve dipendere da cosa e' installato sulla macchina.

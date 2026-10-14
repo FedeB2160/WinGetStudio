@@ -94,10 +94,27 @@ used another administrator account. That part was wrong:
    session 0, where an uninstaller that shows a dialog would wait forever unseen, and S4U tasks get
    no network credentials.
 
-## Note 2026-10-14 — repair
+## Note 2026-10-14 — repair, tried and left out
 
-Repair ([issue #24](https://github.com/FedeB2160/WinGetStudio/issues/24)) goes through the same queue,
-and winget refuses `repair` of a per-user `exe`, `inno`, `nullsoft`, `burn` or `portable` package as
-administrator with the same `0x8A15007D` (`ShellExecuteInstallerHandler.cpp`). The retry is
-verb-agnostic, so repair gets it with no extra code. The message for a mismatched account now names
-the queue's verb instead of always saying "uninstall".
+[Issue #24](https://github.com/FedeB2160/WinGetStudio/issues/24) asked for a Repair action. It was
+built on the shared queue, and tested in Windows Sandbox with winget 1.29.380. It was then removed
+before release.
+
+- **Without `--source`, `winget repair` looks the package up in every source.** With the Store
+  unreachable, it stopped on `0x8A15003B`, a REST error, before repairing anything.
+- **With `--source winget`, the repair ran, and failed with `0x8A15007B` and installer exit `1603`.**
+  This happened for 7-Zip, installed as the MSI (`--installer-type wix`), and for Notepad++
+  (nullsoft). The same command failed the same way from a terminal, so the app was not the cause.
+- **The verbose winget log showed the cause for the MSI.** winget runs
+  `msiexec /f {ProductCode} /passive /norestart`. The Windows Installer log of that command says
+  `SOURCEMGMT: Failed to resolve source` and `Error 1706. An installation package for the product
+  7-Zip ... cannot be found`. `/f` re-reads the original MSI. winget downloaded it to a temporary
+  folder, deleted it after the install, and does not download it again to repair.
+
+Every MSI installed by winget is in that state. On the packages WinGet Studio users actually have,
+the button would almost always fail with an error they cannot act on. Repair is therefore not
+offered. It should come back only with new evidence: for instance a winget version that downloads
+the installer again to repair.
+
+What stays from that work: the retry without elevation does not depend on the verb, and the message
+for a mismatched account now names the queue's verb instead of always saying "uninstall".

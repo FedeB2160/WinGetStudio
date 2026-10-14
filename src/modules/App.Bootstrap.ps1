@@ -149,7 +149,7 @@ function Start-App([switch]$NoShow) {
         'GridSearch', 'TxtSearchEmpty', 'TxtSearchInfo', 'BtnInstall',
         'TabMain', 'BtnRefreshInstalled', 'TxtFilter', 'InstalledSpinner',
         'TxtInstalledCount', 'GridInstalled', 'TxtInstalledEmpty',
-        'TxtInstalledInfo', 'BtnUninstall', 'BtnRepair', 'BtnSaveLog', 'BtnRetryFailed',
+        'TxtInstalledInfo', 'BtnUninstall', 'BtnRetryFailed', 'MenuSaveLog', 'MenuClearLog',
         'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
         'MenuDetailsSearch', 'MenuDetailsInstalled', 'MenuDetailsUpdates',
         'BtnExport', 'BtnImport',
@@ -208,8 +208,9 @@ function Start-App([switch]$NoShow) {
     Initialize-WinGetSetup
     Clear-WinGetTempFiles            # residui di Invoke-WinGet tenuti aperti da un installer
 
-    # Intestazione del log: salva, e ripeti i falliti dell'ultima coda (App.Jobs.ps1).
-    $BtnSaveLog.Add_Click({ Save-Log })
+    # Log: salva e pulisci dal tasto destro; ripeti i falliti dell'ultima coda (App.Jobs.ps1).
+    $MenuSaveLog.Add_Click({ Save-Log })
+    $MenuClearLog.Add_Click({ $TxtLog.Clear() })
     $BtnRetryFailed.Add_Click({ Start-RetryFailed })
     Register-BusyHandler { param($busy) Update-RetryButton }
 
