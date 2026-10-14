@@ -766,7 +766,7 @@ foreach ($dash in '&#8212;', [char]0x2014, [char]0x2013) {
 }
 "OK dash    nessun trattino lungo nel testo a schermo"
 # I link aprono il browser: WPF non lo fa da solo, serve un handler.
-if ((Get-FunctionSource 'Start-App') -notmatch 'RequestNavigateEvent') {
+if ((Get-FunctionSource 'Start-App') -notmatch 'Add-LinkHandler \$script:window' -or (Get-FunctionSource 'Add-LinkHandler') -notmatch 'RequestNavigateEvent') {
     throw "nessun handler per i link: cliccarli non aprirebbe nulla"
 }
 # Il controllo all'avvio si puo' spegnere: con la spunta giu' non deve partire NESSUN job,
@@ -1477,6 +1477,19 @@ finally {
 # Il testo di show e' lungo (tag, installer): il popup deve scorrere invece di allungarsi.
 $dlgText = (New-AppDialog -Text ("riga`n" * 200)).FindName('DlgText')
 if ($dlgText.VerticalScrollBarVisibility -ne 'Auto' -or [double]::IsInfinity($dlgText.MaxHeight)) { throw "il testo lungo del popup non scorre" }
+# Nei dettagli gli indirizzi si aprono col clic: -Links mostra il testo in un RichTextBox in sola
+# lettura (selezionabile e copiabile come prima) con un Hyperlink per ogni URL, senza la
+# punteggiatura che lo chiude. Il popup e' una finestra a se': deve gestire lui l'apertura.
+$linkDlg = New-AppDialog -Text "Home page: https://7-zip.org/download.html`nLicenza: LGPL-2.1 (https://7-zip.org/license.txt)." -Links
+$rtb = @($linkDlg.FindName('DlgText').Parent.Children | Where-Object { $_ -is [System.Windows.Controls.RichTextBox] })[0]
+if (-not $rtb -or -not $rtb.IsReadOnly -or -not $rtb.IsDocumentEnabled) { throw "-Links: manca il testo con i link, o non e' in sola lettura con i link attivi" }
+if ($linkDlg.FindName('DlgText').Visibility -ne 'Collapsed') { throw "-Links: il testo semplice resta visibile sotto quello con i link" }
+$uris = @($rtb.Document.Blocks | ForEach-Object { $_.Inlines } | Where-Object { $_ -is [System.Windows.Documents.Hyperlink] } | ForEach-Object { $_.NavigateUri.AbsoluteUri })
+if (($uris -join ' ') -ne 'https://7-zip.org/download.html https://7-zip.org/license.txt') { throw "-Links: link trovati '$($uris -join ' ')'" }
+$rtbText = [System.Windows.Documents.TextRange]::new($rtb.Document.ContentStart, $rtb.Document.ContentEnd).Text
+if ($rtbText -notmatch 'Home page: https://7-zip\.org/download\.html' -or $rtbText -notmatch 'license\.txt\)\.') { throw "-Links: il testo non e' quello passato: $rtbText" }
+if ((Get-FunctionSource 'New-AppDialog') -notmatch 'Add-LinkHandler') { throw "il popup non apre i link che mostra" }
+if ((Get-FunctionSource 'Show-PackageDetails') -notmatch '-Links') { throw "i dettagli non mostrano i link" }
 "OK details sorgente in ricerca e install, dettagli in un job dietro lo stato occupato, popup a scorrimento"
 if ($realWinget) {
     $savedWinget = $wingetPath; $wingetPath = $realWinget
