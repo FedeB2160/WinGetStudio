@@ -1276,9 +1276,10 @@ try {
         [void]$readUiFailures.Add("search: '$($TxtSearchEmpty.Text)'")
     }
 
-    # Store che non risponde: winget avvisa, poi esce "nessuna corrispondenza". L'avviso deve
-    # restare a schermo, altrimenti sembra che il pacchetto non esista.
-    Set-ReadStub @('echo Failed when searching source; results will not be included: msstore',
+    # Store che non risponde e nessun risultato winget. Le ricerche sono due (una per sorgente):
+    # lo stub fallisce solo quella con --source msstore. Il motivo deve restare a schermo,
+    # altrimenti sembra che il pacchetto non esista.
+    Set-ReadStub @('echo %* | %SystemRoot%\System32\findstr.exe /c:msstore >nul && (echo Failed to open the source & exit /b 1)',
                    'echo No package found matching input criteria.', 'exit /b -1978335212')
     $TxtSearch.Text = 'wgt-store-fixture'
     $script:searchTimer.Stop()
@@ -1288,9 +1289,9 @@ try {
         [void]$readUiFailures.Add("store: '$($TxtSearchEmpty.Text)'")
     }
 
-    # Store che non risponde ma la sorgente winget trova qualcosa: exit 0 e una tabella, con
-    # l'avviso sopra. La griglia si riempie, e l'avviso deve finire nel log.
-    Set-ReadStub @('echo Failed when searching source; results will not be included: msstore',
+    # Store che non risponde ma la sorgente winget trova qualcosa: la griglia si riempie coi
+    # risultati winget, e il motivo per cui lo Store manca deve finire nel log.
+    Set-ReadStub @('echo %* | %SystemRoot%\System32\findstr.exe /c:msstore >nul && (echo Failed to open the source & exit /b 1)',
                    'echo Name     Id       Version',
                    'echo -------------------------',
                    'echo Only One Only.One 1.0',
@@ -1476,6 +1477,12 @@ if ($realWinget) {
     try { $liveDet = Get-WinGetDetails '7zip.7zip' 'winget' $false } finally { $wingetPath = $savedWinget }
     if ($liveDet -notmatch '7zip\.7zip' -or $liveDet -notmatch 'https?://') { throw "dettagli reali di 7zip.7zip inattesi: $liveDet" }
     "OK details show reale su 7zip.7zip ($(@($liveDet -split "`r`n").Count) righe)"
+    # "spotify" e' il caso che aveva nascosto lo Store: 33 risultati winget e il suo al 34esimo.
+    $wingetPath = $realWinget
+    try { $liveSearch = Get-WinGetSearch 'spotify' $true } finally { $wingetPath = $savedWinget }
+    if ($liveSearch.Output -match 'msstore:') { "SKIP store   lo Store non risponde: $(($liveSearch.Output -split "`r`n")[-1])" }
+    elseif (-not @($liveSearch.Rows | Where-Object { $_.Source -eq 'msstore' }).Count) { throw "la ricerca con lo Store di 'spotify' non mostra risultati msstore" }
+    else { "OK store   'spotify' con lo Store: $(@($liveSearch.Rows | Where-Object { $_.Source -eq 'msstore' }).Count) risultati msstore dopo $(@($liveSearch.Rows | Where-Object { $_.Source -eq 'winget' }).Count) winget" }
 }
 
 # 17) Elenco installati e filtro locale. Il caricamento vero solo con -Live; il filtro si

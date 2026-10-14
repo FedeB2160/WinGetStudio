@@ -301,34 +301,55 @@ Check "pin list con una riga (trovato '$(@($r.Rows) -join ',')')" (@($r.Rows).Co
 
 Write-Host "`n6f) Sorgente di ogni riga" -ForegroundColor Cyan
 # La sorgente serve a installare dalla riga scelta (--source) e a leggerne i dettagli dal
-# catalogo giusto. Le colonne variano: senza MS Store la ricerca gira con --source winget e
-# winget non stampa la colonna Origine; con lo Store l'Origine e' l'ultima, ma la colonna
-# Corrispondenza puo' esserci o no, e i suoi valori ("Tag: 7zip") contengono sempre ':'.
+# catalogo giusto. La ricerca interroga UNA sorgente per volta, quindi la sorgente di ogni riga
+# e' quella interrogata, non una colonna da indovinare. Con MS Store sono due ricerche: dalla
+# 1.29 winget non porta piu' in cima i risultati dello Store, e con un --count unico una parola
+# comune ("spotify": 33 winget, 1 Store) lo lasciava fuori.
+# Stub a due voci: per --source msstore stampa store.txt ed esce con WGT_STORE_EXIT.
+Invoke-Expression (Get-FunctionText 'Get-WinGetOutputTail')
+$storeFixture = Join-Path $stubDir 'store.txt'
+$searchStub = Join-Path $stubDir 'search.cmd'
+[IO.File]::WriteAllText($searchStub, "@echo off`r`necho %* | %SystemRoot%\System32\findstr.exe /c:msstore >nul && (type `"$storeFixture`" & exit /b %WGT_STORE_EXIT%)`r`ntype `"%WGT_STUB_FIXTURE%`"`r`nexit /b %WGT_STUB_EXIT%`r`n")
+function Set-StoreStub([string]$Text, [int]$Exit = 0) {
+    [IO.File]::WriteAllText($storeFixture, $Text, (New-Object Text.UTF8Encoding $false))
+    $env:WGT_STORE_EXIT = "$Exit"
+}
 Set-Stub @'
 Nome    Id             Versione Corrispondenza
 ----------------------------------------------
 7-Zip   7zip.7zip      26.04    Moniker: 7zip
 NanaZip M2Team.NanaZip 7.0.1843 Tag: 7zip
 '@
+Set-StoreStub @'
+Nome                         Id           Versione
+--------------------------------------------------
+Spotify - Music and Podcasts 9NCBCSZSJRSB Unknown
+'@
+$savedPath = $wingetPath; $wingetPath = $searchStub
 $r = @((Get-WinGetSearch 'fixture' $false).Rows)
-Check "senza Store la sorgente e' winget ($(@($r | ForEach-Object { $_.Source }) -join ','))" ($r.Count -eq 2 -and @($r | Where-Object { $_.Source -ne 'winget' }).Count -eq 0)
-$r = @((Get-WinGetSearch 'fixture' $true).Rows)
-Check "con lo Store un 'Tag: x' non e' una sorgente ($(@($r | ForEach-Object { "'$($_.Source)'" }) -join ','))" ($r.Count -eq 2 -and @($r | Where-Object { $_.Source }).Count -eq 0)
-Set-Stub @'
-Nome    Id           Versione Corrispondenza Origine
-----------------------------------------------------
-7-Zip   7zip.7zip    26.04    Moniker: 7zip  winget
-Spotify 9NCBCSZSJRSB Unknown                 msstore
+Check "senza Store: solo winget ($(@($r | ForEach-Object { "$($_.Id)@$($_.Source)" }) -join ','))" ($r.Count -eq 2 -and @($r | Where-Object { $_.Source -ne 'winget' }).Count -eq 0)
+$s = Get-WinGetSearch 'fixture' $true
+$r = @($s.Rows)
+Check "con lo Store: winget poi msstore ($(@($r | ForEach-Object { "$($_.Id)@$($_.Source)" }) -join ','))" `
+      ($s.Success -and $r.Count -eq 3 -and $r[0].Source -eq 'winget' -and $r[2].Id -eq '9NCBCSZSJRSB' -and $r[2].Source -eq 'msstore')
+# Store che non risponde: restano i risultati winget, e il perche' finisce nell'output (la
+# scheda Install mette nel log le righe che nominano msstore).
+Set-StoreStub 'Impossibile aprire la sorgente.' 1
+$s = Get-WinGetSearch 'fixture' $true
+Check "Store giu': ricerca riuscita con i soli winget, avviso su msstore" ($s.Success -and @($s.Rows).Count -eq 2 -and $s.Output -match 'msstore.*Impossibile aprire')
+Set-StoreStub 'Nessun pacchetto trovato.' -1978335212
+$s = Get-WinGetSearch 'fixture' $true
+Check "Store senza corrispondenze: nessun avviso" ($s.Success -and @($s.Rows).Count -eq 2 -and $s.Output -notmatch 'msstore')
+# Nessun winget ma lo Store si: i risultati dello Store si vedono.
+Set-Stub 'Nessun pacchetto trovato.' -1978335212
+Set-StoreStub @'
+Nome    Id           Versione
+-----------------------------
+Spotify 9NCBCSZSJRSB Unknown
 '@
-$r = @((Get-WinGetSearch 'fixture' $true).Rows)
-Check "con lo Store l'ultima colonna e' la sorgente ($(@($r | ForEach-Object { $_.Source }) -join ','))" ($r.Count -eq 2 -and $r[0].Source -eq 'winget' -and $r[1].Source -eq 'msstore')
-Set-Stub @'
-Name     Id       Version
--------------------------
-Only One Only.One 1.0
-'@
-$r = @((Get-WinGetSearch 'fixture' $true).Rows)
-Check "con lo Store e 3 colonne la sorgente resta vuota ('$($r[0].Source)')" ($r.Count -eq 1 -and -not $r[0].Source)
+$s = Get-WinGetSearch 'fixture' $true
+Check "solo lo Store trova: riuscita, una riga msstore" ($s.Success -and @($s.Rows).Count -eq 1 -and @($s.Rows)[0].Source -eq 'msstore')
+$wingetPath = $savedPath
 # list: Disponibile compare solo se qualcosa ha un aggiornamento, quindi la sorgente e'
 # l'ultima colonna, non la quarta. Le righe ARP non ne hanno.
 Set-Stub @'
