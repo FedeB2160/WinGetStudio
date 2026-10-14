@@ -118,7 +118,7 @@ The inventory of what is on the machine, loaded the first time you open the tab.
 2. Tick rows and press **Uninstall**. A confirmation lists exactly what will be removed, and defaults to *No*: a stray <kbd>Enter</kbd> cannot delete anything.
    - If the filter is hiding a package you had ticked, both the counter and the confirmation say so, so nothing is removed off screen.
 3. **Repair** runs the installer of the ticked packages again, after the same kind of confirmation. winget can repair MSI and MSIX packages, and other installers only when their manifest says how; for the rest the row says *repair not supported*.
-4. **Export...** saves the list of installed packages to a `.json` file. **Import...** installs the packages a file describes: the quick way to set up a new machine.
+4. **Export...** saves the list of installed packages to a `.json` file. **Import...** installs the packages a file describes: the quick way to set up a new machine. Before anything is installed, the confirmation lists the packages in the file, all ticked: untick the ones you do not want.
 
 Packages you installed without winget appear here too, with IDs like `ARP\Machine\X64\Android Studio`, and can be uninstalled like any other. winget refuses to uninstall some per-user programs from an elevated app; WinGet Studio then repeats the uninstall without elevation, and a console window shows while it runs.
 

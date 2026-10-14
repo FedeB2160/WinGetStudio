@@ -68,10 +68,14 @@ $script:dialogXaml = @'
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="DlgIcon" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28"
                        Margin="0,0,16,0" VerticalAlignment="Top"/>
-            <TextBox x:Name="DlgText" Grid.Column="1" IsReadOnly="True" TextWrapping="Wrap"
-                     MaxHeight="480" VerticalScrollBarVisibility="Auto"
-                     BorderThickness="0" Background="Transparent" Padding="0"
-                     VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+            <!-- DlgBody: il testo e, se il chiamante lo passa (-Content), un elemento sotto,
+                 come la griglia dell'anteprima dell'import. -->
+            <StackPanel x:Name="DlgBody" Grid.Column="1" VerticalAlignment="Center">
+                <TextBox x:Name="DlgText" IsReadOnly="True" TextWrapping="Wrap"
+                         MaxHeight="480" VerticalScrollBarVisibility="Auto"
+                         BorderThickness="0" Background="Transparent" Padding="0"
+                         Foreground="{DynamicResource FgBrush}"/>
+            </StackPanel>
         </Grid>
         <Border Grid.Row="1" Background="{DynamicResource HeaderBgBrush}" Padding="16,12"
                 BorderBrush="{DynamicResource CtrlBorderBrush}" BorderThickness="0,1,0,0">
@@ -88,7 +92,8 @@ function New-AppDialog {
         [string]$Title = 'WinGet Studio',
         [System.Windows.MessageBoxButton]$Button = 'OK',
         [System.Windows.MessageBoxImage]$Image = 'None',
-        [System.Windows.MessageBoxResult]$Default = 'None'
+        [System.Windows.MessageBoxResult]$Default = 'None',
+        [System.Windows.UIElement]$Content
     )
     $dlg = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader ([xml]$script:dialogXaml)))
     # Stili (il template dei Button compreso) e brush del tema corrente: quelli della finestra
@@ -96,6 +101,7 @@ function New-AppDialog {
     $dlg.Resources.MergedDictionaries.Add($window.Resources)
     $dlg.Title = $Title
     $dlg.FindName('DlgText').Text = $Text
+    if ($Content) { [void]$dlg.FindName('DlgBody').Children.Add($Content) }
     # Owner solo a finestra visibile: su una finestra mai mostrata WPF lancia un'eccezione.
     if ($window.IsVisible) {
         $dlg.Owner = $window
@@ -178,9 +184,10 @@ function Show-AppDialog {
         [string]$Title = 'WinGet Studio',
         [System.Windows.MessageBoxButton]$Button = 'OK',
         [System.Windows.MessageBoxImage]$Image = 'None',
-        [System.Windows.MessageBoxResult]$Default = 'None'
+        [System.Windows.MessageBoxResult]$Default = 'None',
+        [System.Windows.UIElement]$Content
     )
-    try { $dlg = New-AppDialog -Text $Text -Title $Title -Button $Button -Image $Image -Default $Default }
+    try { $dlg = New-AppDialog -Text $Text -Title $Title -Button $Button -Image $Image -Default $Default -Content $Content }
     catch {
         # Ripiego sulla MessageBox di sistema: un messaggio non deve perdersi proprio quando
         # qualcosa e' guasto (tema o XAML).

@@ -1711,6 +1711,53 @@ if ($null -ne (Get-ImportPackageCount (Join-Path ([IO.Path]::GetTempPath()) "man
 if ($importFailures.Count) { throw "conteggio dei file di import: $($importFailures -join '; ')" }
 "OK import  forma Sources/Packages, vuoti e malformati riconosciuti, nomi con [ ]"
 
+# 19b) Anteprima dell'import (issue #24): i pacchetti del file in una griglia dentro la conferma,
+# si toglie la spunta a cio' che non si vuole, e winget importa un file ridotto. Il file ridotto
+# tiene gli oggetto-pacchetto COSI' COME SONO: winget 1.29 ci salva --custom/--override, e cosi'
+# passano senza che l'app ne conosca i nomi. Una sorgente rimasta senza pacchetti si toglie.
+$ipFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-preview-$PID.json"
+[IO.File]::WriteAllText($ipFile, (@'
+{"$schema":"https://aka.ms/winget-packages.schema.2.0.json","CreationDate":"2026-10-14",
+ "Sources":[
+  {"SourceDetails":{"Name":"winget","Identifier":"Microsoft.Winget.Source_8wekyb3d8bbwe","Argument":"https://cdn.winget.microsoft.com/cache","Type":"Microsoft.PreIndexed.Package"},
+   "Packages":[{"PackageIdentifier":"7zip.7zip"},{"PackageIdentifier":"Notepad++.Notepad++","Version":"8.9","Custom":"/NoUpdater"}]},
+  {"SourceDetails":{"Name":"msstore","Identifier":"StoreEdgeFD","Argument":"https://storeedgefd.dsx.mp.microsoft.com/v9.0","Type":"Microsoft.Rest"},
+   "Packages":[{"PackageIdentifier":"9NCBCSZSJRSB"}]}]}
+'@))
+try {
+    $ip = Get-ImportPackages $ipFile
+    $ipIds = @($ip.Rows | ForEach-Object { "$($_.Id)@$($_.Source)" }) -join ','
+    if ($ipIds -ne '7zip.7zip@winget,Notepad++.Notepad++@winget,9NCBCSZSJRSB@msstore') { throw "righe dell'anteprima: $ipIds" }
+    if (@($ip.Rows | Where-Object { -not $_.Selected }).Count) { throw "l'anteprima non parte con tutto spuntato" }
+    if ($ip.Rows[1].Version -ne '8.9') { throw "versione fissata non mostrata: '$($ip.Rows[1].Version)'" }
+    if ($ip.Stored -ne 1) { throw "pacchetti con argomenti salvati: $($ip.Stored), atteso 1" }
+    $subFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-preview-sub-$PID.json"
+    try {
+        [IO.File]::WriteAllText($subFile, (New-ImportSubset $ip.Json @(1)))
+        if ((Get-ImportPackageCount $subFile) -ne 1) { throw "il file ridotto non contiene un solo pacchetto" }
+        $sub = Get-Content -LiteralPath $subFile -Raw | ConvertFrom-Json
+        if (@($sub.Sources).Count -ne 1 -or $sub.Sources[0].SourceDetails.Name -ne 'winget') { throw "la sorgente rimasta vuota (msstore) non e' stata tolta" }
+        $kept = @($sub.Sources[0].Packages)[0]
+        if ($kept.PackageIdentifier -ne 'Notepad++.Notepad++' -or $kept.Custom -ne '/NoUpdater' -or $kept.Version -ne '8.9') { throw "il pacchetto tenuto non e' intatto: $($kept | ConvertTo-Json -Compress)" }
+        if ($sub.'$schema' -ne 'https://aka.ms/winget-packages.schema.2.0.json') { throw "le proprieta' della radice non sono state tenute" }
+        if (@($ip.Json.Sources[0].Packages).Count -ne 2) { throw "New-ImportSubset ha modificato il file letto" }
+    }
+    finally { Remove-Item -LiteralPath $subFile -ErrorAction SilentlyContinue }
+}
+finally { Remove-Item -LiteralPath $ipFile -ErrorAction SilentlyContinue }
+if ($null -ne (Get-ImportPackages (Join-Path ([IO.Path]::GetTempPath()) "manca-$PID.json"))) { throw "anteprima di un file inesistente" }
+# La griglia sta DENTRO la conferma, che resta Yes/No con No predefinito; il file ridotto e'
+# un wgt_ in %TEMP%, che Clear-WinGetTempFiles spazza al prossimo avvio.
+if ($importSrc -notmatch '-Content') { throw "la conferma dell'import non mostra l'anteprima" }
+if ($importSrc -notmatch 'wgt_import_' -or $importSrc -notmatch 'New-ImportSubset') { throw "l'import non passa da un file ridotto wgt_ in %TEMP%" }
+$probe = New-Object System.Windows.Controls.TextBlock
+$dlg = New-AppDialog -Text 'with content' -Button ([System.Windows.MessageBoxButton]::YesNo) -Default ([System.Windows.MessageBoxResult]::No) -Content $probe
+if (-not $dlg.FindName('DlgBody').Children.Contains($probe)) { throw "New-AppDialog -Content non mette l'elemento nel popup" }
+if ($dlg.FindName('DlgText').Text -ne 'with content') { throw "con -Content il testo del popup si perde" }
+$ipGrid = New-ImportPreviewGrid (New-Object System.Collections.ObjectModel.ObservableCollection[object])
+if ($ipGrid.Columns.Count -lt 3 -or $ipGrid.Columns[0] -isnot [System.Windows.Controls.DataGridCheckBoxColumn]) { throw "griglia dell'anteprima senza colonna di spunta" }
+"OK preview anteprima con spunte, file ridotto con i pacchetti intatti, sorgenti vuote tolte"
+
 if (-not $realWinget) {
     "SKIP export  senza -Live o winget non presente"
 }

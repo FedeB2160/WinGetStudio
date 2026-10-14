@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Import** shows the packages in the file before installing them, all ticked, so you can leave some out. What you keep is imported exactly as exported, installer arguments saved by winget 1.29 included.
+
 - **Repair** in the Installed tab runs the installer of the ticked packages again, after a confirmation. winget can repair MSI and MSIX packages, and others only when their manifest says how; for the rest the row says *repair not supported* instead of an error code.
 - Every operation on a list ends with a summary in the log, such as *5 ok, 1 with warnings, 2 failed*, and **Retry failed** above the log runs it again on just the packages where it failed.
 - **Save log...** writes the log to a text file.
