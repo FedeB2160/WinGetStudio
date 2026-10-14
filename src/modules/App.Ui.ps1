@@ -33,6 +33,18 @@ function Write-LogFile([string]$Path) {
     catch { Write-Log "Could not save the log: $($_.Exception.Message)" }
 }
 
+# Tempo di avvio per il log: dall'avvio del processo alla finestra disegnata, diviso fra il prima
+# del codice dell'app (host dell'exe, scansione antivirus) e l'app stessa. Senza l'inizio dello
+# script (test, sorgente caricata a mano) solo il totale.
+function Format-StartupTime([datetime]$ProcessStart, $ScriptStart, [datetime]$Ready) {
+    $ci = [Globalization.CultureInfo]::InvariantCulture
+    $total = ($Ready - $ProcessStart).TotalSeconds.ToString('0.0', $ci)
+    if (-not $ScriptStart) { return "Ready in $total s." }
+    $before = ([datetime]$ScriptStart - $ProcessStart).TotalSeconds.ToString('0.0', $ci)
+    $app    = ($Ready - [datetime]$ScriptStart).TotalSeconds.ToString('0.0', $ci)
+    "Ready in $total s: $before s before the app's code started (exe host, antivirus scan), $app s in the app."
+}
+
 # Messaggio per una lettura winget fallita, su UNA riga (log e riquadri vuoti): exit e le
 # ultime due righe significative, dove winget mette la causa. Stessa regola della coda.
 function Format-WinGetReadError([string]$Command, $Result) {

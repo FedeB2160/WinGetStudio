@@ -21,6 +21,10 @@
 # Aggiornarla qui e basta; Test-Ui.ps1 verifica che la regex la trovi ancora.
 $AppVersion = '1.12.0'
 
+# Quando parte il codice dell'app: nell'exe, tutto cio' che succede prima (host di ps2exe, analisi
+# e scansione antivirus dello script) e' fuori dal nostro controllo. Format-StartupTime li separa.
+$script:appStartedAt = Get-Date
+
 # ------------------------------------------------------------------
 # SELF-ELEVATION (fallback al manifest UAC generato da ps2exe)
 # ------------------------------------------------------------------
