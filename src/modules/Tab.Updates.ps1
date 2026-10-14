@@ -18,9 +18,10 @@ $script:allSelected = $false
 # la altera — un aggiornamento, un'installazione, una disinstallazione, un import — le versioni
 # a schermo non valgono piu', e ripremere Update rilancia winget su pacchetti gia' aggiornati:
 # quelli escono con codice non-zero e si dipingono di ROSSO su righe che erano andate bene.
-# Quindi il pulsante si blocca finche' non si rilegge.
-# PERCHE' NON UNA RICARICA AUTOMATICA: cancellerebbe la colonna Result appena scritta, che e'
-# il resoconto di com'e' andata.
+# Quindi il pulsante si blocca finche' non si rilegge, e si rilegge da solo (issue #24): la coda
+# di questa scheda ricarica subito la lista e ci riporta l'esito di ogni riga per ID
+# (Get-/Set-RowOutcome), un'azione da un'altra scheda la segna vecchia e la lista si rilegge
+# appena si apre la scheda.
 # I PIN non entrano qui: bloccano gli aggiornamenti, non cambiano le versioni installate.
 $script:listStale = $false
 
@@ -95,10 +96,13 @@ function Set-UpdatesBusy([bool]$busy) {
 
 # Carica/ricarica l'elenco upgrade in modo ASINCRONO (req 1): la scansione winget
 # gira in un runspace separato cosi' l'overlay di caricamento resta animato.
-function Load-Upgrades {
+# -KeepOutcome: la ricarica a coda finita riporta sulle righe nuove l'esito di quelle vecchie,
+# per ID. OnDone non vede le variabili di questa funzione, quindi passa da $script: (ADR 0008).
+function Load-Upgrades([switch]$KeepOutcome) {
     # Non si scansiona sopra un altro winget: la scheda Install non alza lo stato occupato
     # mentre cerca, quindi il solo isBusy non basterebbe.
     if (Test-WinGetBusy) { return }
+    $script:updatesOutcome = if ($KeepOutcome) { Get-RowOutcome @($items) } else { $null }
     # La lettura che si sta per fare E' la nuova fotografia: da qui il pulsante torna buono.
     $script:listStale = $false
     Set-AppBusy $true
@@ -144,7 +148,9 @@ function Load-Upgrades {
                     $items.Add($u)
                 }
                 if ($self) { Write-Log "An update for WinGet Studio itself is available: update it from the Settings tab." }
+                Set-RowOutcome @($items) $script:updatesOutcome
             }
+            $script:updatesOutcome = $null
 
             if ($items.Count -eq 0) {
                 # Tre casi, tre messaggi: lista vuota, winget fallito, job morto. Mai "nessun
@@ -193,11 +199,11 @@ function Start-UpdateSelected {
         "upgrade --id `"$($r.Id)`" --include-unknown -e --silent --disable-interactivity --accept-source-agreements --accept-package-agreements"
     } -OnDone {
         Set-AppBusy $false
-        # L'elenco NON si ricarica da solo: cancellerebbe la colonna Result appena scritta,
-        # che e' il resoconto di com'e' andata. Ma le versioni mostrate ora sono vecchie,
-        # quindi Update si blocca fino al Check.
-        Set-UpdatesStale
-        Write-Log "The versions in this list are stale now: press Check to rescan."
+        # Le versioni a schermo sono vecchie: la lista si rilegge subito, con l'esito di ogni riga
+        # riportato per ID. Le riuscite spariscono (non hanno piu' aggiornamenti), le fallite
+        # restano col loro esito e si possono ripetere. Anche l'elenco degli installati e' vecchio.
+        Set-InstalledStale
+        Load-Upgrades -KeepOutcome
     }
 }
 
@@ -206,6 +212,13 @@ function Initialize-UpdatesTab {
     Register-BusyHandler { param($busy) Set-UpdatesBusy $busy }
 
     $BtnRefresh.Add_Click({ Load-Upgrades })
+
+    # Lista segnata vecchia da un'azione in un'altra scheda: si rilegge appena si apre questa.
+    $TabMain.Add_SelectionChanged({
+        param($s, $e)
+        if ($e.OriginalSource -ne $TabMain) { return }
+        if ($script:listStale -and $TabMain.SelectedItem -eq $TabUpdates) { Load-Upgrades }
+    })
 
     # La spunta comanda --include-unknown. Si rilegge dalle preferenze e si risalva a ogni
     # cambio; e ricarica subito, perche' una spunta che cambia COSA c'e' nell'elenco senza

@@ -149,7 +149,7 @@ function Start-App([switch]$NoShow) {
         'GridSearch', 'TxtSearchEmpty', 'TxtSearchInfo', 'BtnInstall',
         'TabMain', 'BtnRefreshInstalled', 'TxtFilter', 'InstalledSpinner',
         'TxtInstalledCount', 'GridInstalled', 'TxtInstalledEmpty',
-        'TxtInstalledInfo', 'BtnUninstall',
+        'TxtInstalledInfo', 'BtnUninstall', 'BtnRetryUpdates', 'BtnRetryInstall', 'BtnRetryInstalled', 'MenuSaveLog', 'MenuClearLog',
         'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
         'MenuDetailsSearch', 'MenuDetailsInstalled', 'MenuDetailsUpdates',
         'BtnExport', 'BtnImport',
@@ -207,6 +207,14 @@ function Start-App([switch]$NoShow) {
     Initialize-Update
     Initialize-WinGetSetup
     Clear-WinGetTempFiles            # residui di Invoke-WinGet tenuti aperti da un installer
+
+    # Log: salva e pulisci dal tasto destro. Retry failed: uno per scheda (App.Jobs.ps1).
+    $MenuSaveLog.Add_Click({ Save-Log })
+    $MenuClearLog.Add_Click({ $TxtLog.Clear() })
+    $BtnRetryUpdates.Add_Click({   Start-RetryFailed $items })
+    $BtnRetryInstall.Add_Click({   Start-RetryFailed $searchItems })
+    $BtnRetryInstalled.Add_Click({ Start-RetryFailed $installedItems })
+    Register-BusyHandler { param($busy) Update-RetryButton }
 
     # Alla chiusura: ferma i timer e chiudi i job pendenti, cosi' il processo termina
     # davvero (niente thread in background lasciati vivi). ENTRAMBI i timer: se la ragione

@@ -80,3 +80,32 @@ a request arriving between two queues does not carry over.
    machine in a state nobody can describe.
 3. **A `$script:` flag for cancellation** — does not work: the runspace has its own scope and
    would not see it.
+
+## Note 2026-10-14 — automatic refresh, summary and Retry failed
+
+[Issue #24](https://github.com/FedeB2160/WinGetStudio/issues/24).
+
+- **Lists refresh themselves.** The Updates lock above stays: a list that no longer describes the
+  machine must not be updated again. What changed is how it is lifted.
+  - **The tab's own list is read again as soon as its queue ends.** Updates calls
+    `Load-Upgrades -KeepOutcome`; Installed calls `Load-Installed -KeepOutcome`, after an uninstall
+    or an import.
+  - **Lists of other tabs are marked stale.** `Set-UpdatesStale` and `Set-InstalledStale` mark them,
+    and they are read again the moment their tab is opened.
+- **Outcomes survive the refresh.** The reason there was no automatic rescan was that it wiped the
+  Result column. `Get-RowOutcome` / `Set-RowOutcome` carry each row's status and detail over to the
+  new rows by Id.
+  - Updated packages drop out of the Updates list, since they have nothing left to update.
+  - Failed ones stay, with their ❌.
+  - The summary in the log keeps the whole count.
+- **Summary.** The queue ends with one line counted from its rows: "5 ok, 1 with warnings, 2 failed, 3
+  not run".
+- **Retry failed (N)** is at the top right of each tab, and appears only in the tab whose list holds
+  failed rows.
+  - `Start-WinGetQueue` remembers its verb, rows, `ArgsBuilder`, `-Vars` and `OnDone` in
+    `$script:lastQueue`.
+  - The rows to retry are found **by Id** among the rows of the list that still read `error`, so they
+    are the refreshed objects.
+  - The retry asks for a Yes/No confirmation, with No as the default, and goes through
+    `Start-WinGetQueue`, so the single choke point holds. Its `OnDone` is the queue's own, refresh
+    included.

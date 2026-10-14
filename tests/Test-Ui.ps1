@@ -361,7 +361,9 @@ if ($uiText -notmatch '(?s)GridHeader.*?HorizontalContentAlignment"\s+Value="Cen
 # spuntate: se non lo dicono, si spunta una riga e poi non si capisce perche' il pin sia
 # finito altrove. E' documentato nei commenti da sempre, ma il commento non lo legge nessuno
 # col tasto destro premuto.
-$menuHeaders = @([regex]::Matches($uiText, '<MenuItem[^>]*Header="([^"]*)"') | ForEach-Object { $_.Groups[1].Value })
+# Solo i menu delle GRIGLIE: quello del log agisce sul log, non su righe.
+$gridMenus = @([regex]::Matches($uiText, '(?s)<DataGrid\.ContextMenu>.*?</DataGrid\.ContextMenu>') | ForEach-Object { $_.Value }) -join "`n"
+$menuHeaders = @([regex]::Matches($gridMenus, '<MenuItem[^>]*Header="([^"]*)"') | ForEach-Object { $_.Groups[1].Value })
 if ($menuHeaders.Count -eq 0) { throw "nessuna voce di menu trovata: regex da rivedere" }
 $vague = @($menuHeaders | Where-Object { $_ -notmatch 'highlighted' })
 if ($vague.Count -gt 0) { throw "voci di menu che non dicono su cosa agiscono: $($vague -join ', ')" }
@@ -1002,12 +1004,19 @@ else {
     $ran = @($probeRows | Where-Object { $_.Status }).Count
     if ($ran -ge 5) { throw "l'annullamento non ha fermato la coda: eseguiti $ran su 5" }
     if ($TxtLog.Text -notmatch 'cancelled') { throw "l'annullamento non e' finito nel log" }
+    # Il riepilogo conta il pacchetto in volo (fallito: l'ID non esiste) e quelli mai partiti;
+    # il fallito, ancora in elenco, si puo' ripetere.
+    if ($TxtLog.Text -notmatch "cancelled after .*: (\d+ failed, )?$(5 - $ran) not run\.") { throw "riepilogo della coda annullata assente o sbagliato" }
+    # La coda ricarica la lista da sola (Load-Upgrades): le righe finte non sono aggiornamenti
+    # veri, quindi spariscono, e con loro il Retry failed della scheda.
+    if ($TxtLog.Text -notmatch '(?s)cancelled after.*Searching for updates') { throw "a coda finita la lista non si e' ricaricata da sola" }
+    if (@($items | Where-Object { $_.Id -like 'WinGetStudio.Probe.*' }).Count) { throw "dopo la ricarica restano in elenco le righe finte" }
+    if ($BtnRetryUpdates.Visibility -eq 'Visible') { throw "Retry failed visibile per righe che non sono piu' in elenco" }
 
-    # 4) a coda finita: pulsante di nuovo Update, ma bloccato fino al Check
+    # 4) a coda finita: pulsante di nuovo Update, e lista fresca perche' riletta
     if ($BtnUpdate.Content -ne 'Update') { throw "a coda finita il pulsante dice '$($BtnUpdate.Content)'" }
-    if ($BtnUpdate.IsEnabled) { throw "a coda finita Update non e' bloccato: la lista e' vecchia" }
-    if ($TxtSelected.Text -notmatch 'press Check') { throw "non viene detto perche' Update e' bloccato: '$($TxtSelected.Text)'" }
-    if (-not $BtnRefresh.IsEnabled) { throw "Check deve restare attivo: e' l'unico modo per sbloccare" }
+    if ($script:listStale) { throw "a coda finita e lista riletta, la lista risulta ancora vecchia" }
+    if (-not $BtnRefresh.IsEnabled) { throw "a coda finita Check e' spento" }
     if ($MenuPinUpdates.IsEnabled -ne $true) { throw "a coda finita la voce Pin resta spenta" }
     if ($Grid.IsReadOnly) { throw "a coda finita le spunte restano bloccate" }
 
@@ -1015,23 +1024,21 @@ else {
     $script:listStale = $false
     Refresh-SelectionState
     Stop-AllJobs
-    "OK queue   ciclo coda: Cancel premuto, in volo finito a $ran/5, Update bloccato fino al Check"
+    "OK queue   ciclo coda: Cancel premuto, in volo finito a $ran/5, lista riletta da sola"
 }
 
-# 13f) Dopo un'alterazione della macchina il pulsante Update si blocca fino al Check:
-# ripremerlo rilanciava winget su pacchetti gia' aggiornati, che escono con codice non-zero
-# e finivano in griglia come X ROSSE su righe andate a buon fine.
+# 13f) Dopo un'azione la lista si rilegge da sola (issue #24): la coda della scheda ricarica la
+# PROPRIA lista e ci riporta l'esito per ID, le altre schede toccate si segnano vecchie e si
+# rileggono quando si aprono. Finche' una lista e' vecchia Update resta bloccato: ripremerlo
+# rilancerebbe winget su pacchetti gia' aggiornati, che escono non-zero e finivano in griglia
+# come X ROSSE su righe andate a buon fine.
 $items.Clear()
 $items.Add([WgtRow]@{ Id = 'A.A'; Name = 'A'; Selected = $true })
 $script:listStale = $false
 Refresh-SelectionState
 if (-not $BtnUpdate.IsEnabled) { throw "con una riga selezionata e la lista fresca Update deve essere attivo" }
-
 Set-UpdatesStale
-if ($BtnUpdate.IsEnabled) { throw "dopo un'alterazione Update deve restare bloccato" }
-if ($TxtSelected.Text -notmatch 'press Check') { throw "non viene detto PERCHE' Update e' bloccato: '$($TxtSelected.Text)'" }
-if (-not $BtnRefresh.IsEnabled) { throw "Check deve restare attivo: e' l'unico modo per sbloccare" }
-
+if ($BtnUpdate.IsEnabled) { throw "a lista vecchia Update deve restare bloccato" }
 # I pin NON marcano la lista: bloccano gli aggiornamenti, non cambiano le versioni installate.
 $script:listStale = $false
 Set-PinFlags @('A.A')
@@ -1040,13 +1047,51 @@ $items.Clear()
 $script:listStale = $false
 Refresh-SelectionState
 
-# Le code che alterano la macchina lo dichiarano, e solo il Check sblocca. Anche l'aggiornamento
-# di winget: App Installer puo' essere una riga della scheda Updates.
-foreach ($fn in 'Start-UpdateSelected', 'Install-Rows', 'Start-UninstallSelected', 'Invoke-PackageImport', 'Start-WinGetInstall') {
-    if ((Get-FunctionSource $fn) -notmatch 'Set-UpdatesStale') { throw "$fn non marca la lista come vecchia" }
+# L'esito si riporta per ID sulle righe nuove; una riga che non c'e' piu' resta fuori.
+$oldRows = @([WgtRow]@{ Id = 'A.A'; Status = 'error'; StatusDetail = 'exit 1' }, [WgtRow]@{ Id = 'B.B'; Status = 'ok' }, [WgtRow]@{ Id = 'C.C' })
+$newRows = @([WgtRow]@{ Id = 'A.A' }, [WgtRow]@{ Id = 'C.C' }, [WgtRow]@{ Id = 'D.D' })
+Set-RowOutcome $newRows (Get-RowOutcome $oldRows)
+if ($newRows[0].Status -ne 'error' -or $newRows[0].StatusDetail -ne 'exit 1' -or $newRows[1].Status -or $newRows[2].Status) {
+    throw "esito riportato male: $(@($newRows | ForEach-Object { "$($_.Id)=$($_.Status)" }) -join ',')"
+}
+
+# Chi ricarica cosa a coda finita.
+$ondone = @{
+    'Start-UpdateSelected'    = @('Load-Upgrades -KeepOutcome', 'Set-InstalledStale')
+    'Start-UninstallSelected' = @('Load-Installed -KeepOutcome', 'Set-UpdatesStale')
+    'Install-Rows'            = @('Set-UpdatesStale', 'Set-InstalledStale')
+    'Invoke-PackageImport'    = @('Load-Installed', 'Set-UpdatesStale')
+    'Start-WinGetInstall'     = @('Set-UpdatesStale')
+}
+foreach ($fn in $ondone.Keys) {
+    $src = Get-FunctionSource $fn
+    foreach ($need in $ondone[$fn]) { if ($src -notmatch [regex]::Escape($need)) { throw "$fn a coda finita non fa '$need'" } }
+    if ($src -match 'press (Check|Refresh)') { throw "$fn chiede ancora di premere Check/Refresh" }
 }
 if ((Get-FunctionSource 'Load-Upgrades') -notmatch 'listStale\s*=\s*\$false') { throw "Load-Upgrades non sblocca il pulsante" }
-"OK stale   Update bloccato dopo un'alterazione, sbloccato solo dal Check"
+
+# Una scheda segnata vecchia si rilegge appena la si apre.
+$savedLoadUp = ${function:Load-Upgrades}; $savedLoadInst = ${function:Load-Installed}
+$script:reloads = @()
+function Load-Upgrades { $script:reloads += 'Updates'; $script:listStale = $false }
+function Load-Installed { $script:reloads += 'Installed'; $script:installedLoaded = $true }
+$savedTab = $TabMain.SelectedItem; $savedLoaded = $script:installedLoaded
+try {
+    $TabInstall.IsSelected = $true
+    Set-UpdatesStale; Set-InstalledStale
+    $TabUpdates.IsSelected = $true
+    $TabInstalled.IsSelected = $true
+    if (($script:reloads -join ',') -ne 'Updates,Installed') { throw "aprendo le schede vecchie si e' riletto: '$($script:reloads -join ',')'" }
+    $script:reloads = @()
+    $TabUpdates.IsSelected = $true
+    if ($script:reloads.Count) { throw "una scheda gia' fresca si e' riletta di nuovo" }
+}
+finally {
+    Set-Item function:Load-Upgrades $savedLoadUp; Set-Item function:Load-Installed $savedLoadInst
+    $script:installedLoaded = $savedLoaded; $script:listStale = $false
+    $TabMain.SelectedItem = $savedTab
+}
+"OK stale   coda: lista riletta con l'esito per ID; schede toccate rilette all'apertura"
 
 # 14) La ricerca della scheda Install: debounce, soglia dei 3 caratteri e scarto dei
 # risultati superati. E' l'unica parte della suite che chiama winget davvero, ma solo in
@@ -1508,6 +1553,76 @@ if ($realWinget) {
     else { "OK store   'spotify' con lo Store: $(@($liveSearch.Rows | Where-Object { $_.Source -eq 'msstore' }).Count) risultati msstore dopo $(@($liveSearch.Rows | Where-Object { $_.Source -eq 'winget' }).Count) winget" }
 }
 
+# 16e) La riparazione (issue #24) e' stata provata e tolta: winget ripara un MSI con msiexec /f,
+# che rilegge l'MSI originale, e winget lo cancella dopo l'installazione (Error 1706, 1603).
+# Non deve tornare senza prove nuove: vedi ADR 0018.
+if ($uiText -match 'BtnRepair' -or ${function:Start-RepairSelected}) { throw "la riparazione e' tornata senza prove nuove (ADR 0018)" }
+$queueSrc = Get-FunctionSource 'Start-WinGetQueue'
+if ($queueSrc -match 'to uninstall it') { throw "il messaggio 'firma come...' parla sempre di disinstallazione, qualunque sia la coda" }
+"OK repair  assente di proposito; messaggio della coda legato al suo verbo"
+
+# 16f) Esito della coda, ripeti i falliti, salva il log. Il riepilogo conta dalle righe
+# stesse; i falliti da ripetere sono quelli dell'ultima coda ANCORA in elenco: dopo una nuova
+# scansione gli oggetti vecchi non si vedono piu' e non vanno rilanciati.
+$sumRows = @(
+    [WgtRow]@{ Id = 'a'; Status = 'ok' }, [WgtRow]@{ Id = 'b'; Status = 'ok' },
+    [WgtRow]@{ Id = 'c'; Status = 'warning' }, [WgtRow]@{ Id = 'd'; Status = 'error' },
+    [WgtRow]@{ Id = 'e'; Status = '' })
+$sum = Get-QueueSummary $sumRows
+if ($sum -ne '2 ok, 1 with warnings, 1 failed, 1 not run') { throw "riepilogo della coda: '$sum'" }
+if ((Get-QueueSummary @([WgtRow]@{ Status = 'ok' })) -ne '1 ok') { throw "il riepilogo non omette i conteggi a zero" }
+if ($queueSrc -notmatch 'Get-QueueSummary' -or $queueSrc -notmatch "'Get-QueueSummary'") { throw "la coda non scrive il riepilogo, o il job non riceve la funzione" }
+
+$failIn  = [WgtRow]@{ Name = 'Failed, shown'; Id = "WgtStudio.FailIn$PID"; Status = 'error' }
+$failOut = [WgtRow]@{ Name = 'Failed, rescanned away'; Id = "WgtStudio.FailOut$PID"; Status = 'error' }
+$okIn    = [WgtRow]@{ Name = 'Done'; Id = "WgtStudio.OkIn$PID"; Status = 'ok' }
+$savedLast = $script:lastQueue
+$installedItems.Add($failIn); $installedItems.Add($okIn)
+try {
+    $script:lastQueue = @{ Verb = 'Uninstall'; Rows = @($failIn, $failOut, $okIn); ArgsBuilder = { param($r) "x" }; Vars = @{}; OnDone = {} }
+    $retry = @(Get-RetryRows $installedItems)
+    if ($retry.Count -ne 1 -or $retry[0] -ne $failIn) { throw "da ripetere: $(@($retry | ForEach-Object { $_.Name }) -join ', '); atteso solo 'Failed, shown'" }
+    if (@(Get-RetryRows $items).Count -or @(Get-RetryRows $searchItems).Count) { throw "le righe da ripetere finiscono nella scheda sbagliata" }
+    # Dopo la ricarica automatica la riga e' un oggetto NUOVO con l'esito riportato: si ripete quello.
+    $failNew = [WgtRow]@{ Name = 'Failed, shown'; Id = $failIn.Id; Status = 'error' }
+    $installedItems[$installedItems.IndexOf($failIn)] = $failNew
+    $retry = @(Get-RetryRows $installedItems)
+    if ($retry.Count -ne 1 -or $retry[0] -ne $failNew) { throw "dopo la ricarica non si ripete la riga nuova" }
+    Update-RetryButton
+    if ($BtnRetryInstalled.Visibility -ne 'Visible' -or $BtnRetryInstalled.Content -notmatch '\(1\)') { throw "pulsante Retry di Installed: '$($BtnRetryInstalled.Content)' $($BtnRetryInstalled.Visibility)" }
+    if ($BtnRetryUpdates.Visibility -eq 'Visible' -or $BtnRetryInstall.Visibility -eq 'Visible') { throw "Retry failed compare anche nelle altre schede" }
+    Set-AppBusy $true
+    if ($BtnRetryInstalled.IsEnabled) { throw "Retry failed resta attivo durante un'operazione" }
+    Set-AppBusy $false
+    [void]$installedItems.Remove($failNew)
+    Update-RetryButton
+    if ($BtnRetryInstalled.Visibility -eq 'Visible') { throw "senza falliti in elenco il pulsante Retry resta visibile" }
+}
+finally {
+    $script:lastQueue = $savedLast
+    foreach ($r in @($installedItems | Where-Object { $_.Id -in $failIn.Id, $okIn.Id })) { [void]$installedItems.Remove($r) }
+    Update-RetryButton
+}
+$retrySrc = Get-FunctionSource 'Start-RetryFailed'
+$posConfirm = $retrySrc.IndexOf('Show-AppDialog'); $posQueue = $retrySrc.IndexOf('Start-WinGetQueue')
+if ($posConfirm -lt 0 -or $posConfirm -gt $posQueue -or $retrySrc -notmatch 'MessageBoxResult\]::No') { throw "Retry failed riparte senza conferma con No predefinito" }
+
+# Salva e pulisci il log stanno nel menu del tasto destro sul log, con Copy e Select all che
+# un menu proprio toglierebbe a quello standard del TextBox.
+$logMenu = @($TxtLog.ContextMenu.Items | Where-Object { $_ -is [System.Windows.Controls.MenuItem] })
+if ((@($logMenu | ForEach-Object { $_.Header }) -join '|') -ne 'Copy|Select all|Save log...|Clear log') { throw "menu del log: $(@($logMenu | ForEach-Object { $_.Header }) -join '|')" }
+$logFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-logtest-$PID.txt"
+$TxtLog.Clear(); Write-Log ('log check ' + [char]0x00E8)
+try {
+    Write-LogFile $logFile
+    $saved = [IO.File]::ReadAllText($logFile)
+    if ($saved -notmatch ('log check ' + [char]0x00E8)) { throw "il log salvato non contiene il testo del log: '$saved'" }
+}
+finally { Remove-Item -LiteralPath $logFile -ErrorAction SilentlyContinue }
+$MenuClearLog.RaiseEvent((New-Object System.Windows.RoutedEventArgs([System.Windows.Controls.MenuItem]::ClickEvent)))
+if ($TxtLog.Text) { throw "Clear log non ha svuotato il log: '$($TxtLog.Text)'" }
+"OK report  riepilogo della coda, ripeti solo i falliti ancora in elenco, log salvato in UTF-8 e pulito dal menu"
+
 # 17) Elenco installati e filtro locale. Il caricamento vero solo con -Live; il filtro si
 # prova sempre, su righe finte: non deve dipendere da cosa e' installato sulla macchina.
 if ($script:installedLoaded) { throw "l'elenco risulta gia' caricato prima di aprire la scheda" }
@@ -1658,6 +1773,53 @@ foreach ($fx in $importFixtures) {
 if ($null -ne (Get-ImportPackageCount (Join-Path ([IO.Path]::GetTempPath()) "manca-$PID.json"))) { [void]$importFailures.Add('file inesistente accettato') }
 if ($importFailures.Count) { throw "conteggio dei file di import: $($importFailures -join '; ')" }
 "OK import  forma Sources/Packages, vuoti e malformati riconosciuti, nomi con [ ]"
+
+# 19b) Anteprima dell'import (issue #24): i pacchetti del file in una griglia dentro la conferma,
+# si toglie la spunta a cio' che non si vuole, e winget importa un file ridotto. Il file ridotto
+# tiene gli oggetto-pacchetto COSI' COME SONO: winget 1.29 ci salva --custom/--override, e cosi'
+# passano senza che l'app ne conosca i nomi. Una sorgente rimasta senza pacchetti si toglie.
+$ipFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-preview-$PID.json"
+[IO.File]::WriteAllText($ipFile, (@'
+{"$schema":"https://aka.ms/winget-packages.schema.2.0.json","CreationDate":"2026-10-14",
+ "Sources":[
+  {"SourceDetails":{"Name":"winget","Identifier":"Microsoft.Winget.Source_8wekyb3d8bbwe","Argument":"https://cdn.winget.microsoft.com/cache","Type":"Microsoft.PreIndexed.Package"},
+   "Packages":[{"PackageIdentifier":"7zip.7zip"},{"PackageIdentifier":"Notepad++.Notepad++","Version":"8.9","Custom":"/NoUpdater"}]},
+  {"SourceDetails":{"Name":"msstore","Identifier":"StoreEdgeFD","Argument":"https://storeedgefd.dsx.mp.microsoft.com/v9.0","Type":"Microsoft.Rest"},
+   "Packages":[{"PackageIdentifier":"9NCBCSZSJRSB"}]}]}
+'@))
+try {
+    $ip = Get-ImportPackages $ipFile
+    $ipIds = @($ip.Rows | ForEach-Object { "$($_.Id)@$($_.Source)" }) -join ','
+    if ($ipIds -ne '7zip.7zip@winget,Notepad++.Notepad++@winget,9NCBCSZSJRSB@msstore') { throw "righe dell'anteprima: $ipIds" }
+    if (@($ip.Rows | Where-Object { -not $_.Selected }).Count) { throw "l'anteprima non parte con tutto spuntato" }
+    if ($ip.Rows[1].Version -ne '8.9') { throw "versione fissata non mostrata: '$($ip.Rows[1].Version)'" }
+    if ($ip.Stored -ne 1) { throw "pacchetti con argomenti salvati: $($ip.Stored), atteso 1" }
+    $subFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-preview-sub-$PID.json"
+    try {
+        [IO.File]::WriteAllText($subFile, (New-ImportSubset $ip.Json @(1)))
+        if ((Get-ImportPackageCount $subFile) -ne 1) { throw "il file ridotto non contiene un solo pacchetto" }
+        $sub = Get-Content -LiteralPath $subFile -Raw | ConvertFrom-Json
+        if (@($sub.Sources).Count -ne 1 -or $sub.Sources[0].SourceDetails.Name -ne 'winget') { throw "la sorgente rimasta vuota (msstore) non e' stata tolta" }
+        $kept = @($sub.Sources[0].Packages)[0]
+        if ($kept.PackageIdentifier -ne 'Notepad++.Notepad++' -or $kept.Custom -ne '/NoUpdater' -or $kept.Version -ne '8.9') { throw "il pacchetto tenuto non e' intatto: $($kept | ConvertTo-Json -Compress)" }
+        if ($sub.'$schema' -ne 'https://aka.ms/winget-packages.schema.2.0.json') { throw "le proprieta' della radice non sono state tenute" }
+        if (@($ip.Json.Sources[0].Packages).Count -ne 2) { throw "New-ImportSubset ha modificato il file letto" }
+    }
+    finally { Remove-Item -LiteralPath $subFile -ErrorAction SilentlyContinue }
+}
+finally { Remove-Item -LiteralPath $ipFile -ErrorAction SilentlyContinue }
+if ($null -ne (Get-ImportPackages (Join-Path ([IO.Path]::GetTempPath()) "manca-$PID.json"))) { throw "anteprima di un file inesistente" }
+# La griglia sta DENTRO la conferma, che resta Yes/No con No predefinito; il file ridotto e'
+# un wgt_ in %TEMP%, che Clear-WinGetTempFiles spazza al prossimo avvio.
+if ($importSrc -notmatch '-Content') { throw "la conferma dell'import non mostra l'anteprima" }
+if ($importSrc -notmatch 'wgt_import_' -or $importSrc -notmatch 'New-ImportSubset') { throw "l'import non passa da un file ridotto wgt_ in %TEMP%" }
+$probe = New-Object System.Windows.Controls.TextBlock
+$dlg = New-AppDialog -Text 'with content' -Button ([System.Windows.MessageBoxButton]::YesNo) -Default ([System.Windows.MessageBoxResult]::No) -Content $probe
+if (-not $dlg.FindName('DlgBody').Children.Contains($probe)) { throw "New-AppDialog -Content non mette l'elemento nel popup" }
+if ($dlg.FindName('DlgText').Text -ne 'with content') { throw "con -Content il testo del popup si perde" }
+$ipGrid = New-ImportPreviewGrid (New-Object System.Collections.ObjectModel.ObservableCollection[object])
+if ($ipGrid.Columns.Count -lt 3 -or $ipGrid.Columns[0] -isnot [System.Windows.Controls.DataGridCheckBoxColumn]) { throw "griglia dell'anteprima senza colonna di spunta" }
+"OK preview anteprima con spunte, file ridotto con i pacchetti intatti, sorgenti vuote tolte"
 
 if (-not $realWinget) {
     "SKIP export  senza -Live o winget non presente"

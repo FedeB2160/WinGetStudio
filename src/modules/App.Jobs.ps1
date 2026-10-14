@@ -181,6 +181,8 @@ function Start-WinGetQueue {
     # trascina sulla successiva.
     $script:queueVerb   = $Verb
     $script:queueCancel = [hashtable]::Synchronized(@{ Requested = $false })
+    # Per Retry failed: la stessa coda si puo' rilanciare sulle sole righe fallite.
+    $script:lastQueue   = @{ Verb = $Verb; Rows = $Rows; ArgsBuilder = $ArgsBuilder; Vars = $Vars; OnDone = $OnDone }
 
     Set-AppBusy $true
 
@@ -212,7 +214,7 @@ function Start-WinGetQueue {
     }
 
     # [void]: il job non deve finire sulla pipeline del chiamante.
-    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet', 'Get-WinGetOutputTail', 'Invoke-UnelevatedTask', 'Test-ElevatedUserMismatch' -Vars $jobVars -Script {
+    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet', 'Get-WinGetOutputTail', 'Invoke-UnelevatedTask', 'Test-ElevatedUserMismatch', 'Get-QueueSummary' -Vars $jobVars -Script {
         Invoke-Expression "function Get-WinGetArgs { $argsFnBody }"
 
         $done    = 0
@@ -237,7 +239,7 @@ function Start-WinGetQueue {
                 if ($r.ExitCode -eq -1978335107) {
                     $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
                     if (Test-ElevatedUserMismatch) {
-                        LogUI "   winget refuses this as administrator, and the package belongs to $me, which is not the signed-in user: sign in as $me to uninstall it."
+                        LogUI "   winget refuses this as administrator, and the package belongs to $me, which is not the signed-in user: sign in as $me to $($verb.ToLower()) it."
                     }
                     else {
                         LogUI "   winget refuses this as administrator: retrying without elevation..."
@@ -272,7 +274,77 @@ function Start-WinGetQueue {
                 UI { $progress.Value = $done }
             }
         }
-        if ($stopped) { LogUI "$verb cancelled after $done of $($rows.Count) packages; the rest were left untouched." }
-        else          { LogUI "$verb complete ($done/$($rows.Count))." }
+        if ($stopped) { LogUI "$verb cancelled after $done of $($rows.Count) packages; the rest were left untouched: $(Get-QueueSummary $rows)." }
+        else          { LogUI "$verb complete: $(Get-QueueSummary $rows)." }
     })
+}
+
+# Esito di una coda in una riga, contato dalle righe stesse: "5 ok, 1 with warnings, 2 failed,
+# 3 not run". Warning = riavvio richiesto o gia' installato (Get-UpdateStatus); not run = mai
+# partiti, cioe' annullati. I conteggi a zero non si scrivono.
+function Get-QueueSummary([object[]]$Rows) {
+    $parts = foreach ($p in @(@('ok', 'ok'), @('warning', 'with warnings'), @('error', 'failed'), @('', 'not run'))) {
+        $n = @($Rows | Where-Object { "$($_.Status)" -eq $p[0] }).Count
+        if ($n -gt 0) { "$n $($p[1])" }
+    }
+    @($parts) -join ', '
+}
+
+# Esito delle righe per ID, da riportare sulla lista riletta a coda finita: la ricarica crea
+# righe NUOVE, e senza questo la colonna Result e Retry failed sparirebbero (issue #24).
+function Get-RowOutcome([object[]]$Rows) {
+    $map = @{}
+    foreach ($r in $Rows) { if ($r.Status -and $r.Status -ne 'updating') { $map[$r.Id] = @($r.Status, $r.StatusDetail) } }
+    $map
+}
+
+function Set-RowOutcome([object[]]$Rows, [hashtable]$Outcome) {
+    if (-not $Outcome) { return }
+    foreach ($r in $Rows) {
+        $o = $Outcome[$r.Id]
+        if ($o) { $r.Status = $o[0]; $r.StatusDetail = $o[1] }
+    }
+}
+
+# Righe da ripetere in un elenco: quelle con un ID fallito nell'ultima coda e l'esito ancora
+# 'error'. Per ID e non per oggetto: dopo la ricarica automatica le righe sono nuove, con
+# l'esito riportato da Set-RowOutcome. Una riga sparita dall'elenco (un aggiornamento riuscito
+# in un secondo momento, un pacchetto rimosso) non c'e' piu' da ripetere.
+function Get-RetryRows($Collection) {
+    $q = $script:lastQueue
+    if (-not $q) { return @() }
+    $failed = @($q.Rows | Where-Object { $_.Status -eq 'error' } | ForEach-Object { $_.Id })
+    if (-not $failed.Count) { return @() }
+    @($Collection | Where-Object { $_.Status -eq 'error' -and $failed -contains $_.Id })
+}
+
+# Un Retry failed per scheda, in alto a destra: visibile solo dove c'e' qualcosa da ripetere,
+# spento mentre winget lavora. Lo richiama Set-AppBusy (registrato in Start-App).
+function Update-RetryButton {
+    foreach ($pair in @(@($BtnRetryUpdates, $items), @($BtnRetryInstall, $searchItems), @($BtnRetryInstalled, $installedItems))) {
+        $n = @(Get-RetryRows $pair[1]).Count
+        $pair[0].Content    = "Retry failed ($n)"
+        $pair[0].Visibility = if ($n -gt 0) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+        $pair[0].IsEnabled  = -not $script:isBusy
+    }
+}
+
+# Ripete l'ultima coda sulle sole righe fallite dell'elenco, con gli stessi argomenti, variabili
+# e OnDone (quindi anche la ricarica a coda finita). Il blocco "lista vecchia" della scheda
+# Updates NON si applica: esiste perche' ripetere righe RIUSCITE dipingerebbe errori falsi, e qui
+# si ripetono solo le fallite, che non hanno cambiato nulla. Conferma con No predefinito: puo'
+# essere una disinstallazione.
+function Start-RetryFailed($Collection) {
+    $q = $script:lastQueue
+    $rows = @(Get-RetryRows $Collection)
+    if ($rows.Count -eq 0) { return }
+    $names = @($rows | Select-Object -First 12 | ForEach-Object { "  - $($_.Name)" }) -join "`n"
+    $more  = if ($rows.Count -gt 12) { "`n  ... and $($rows.Count - 12) more" } else { '' }
+    $answer = Show-AppDialog -Text ("Retry the $($q.Verb.ToLower()) of $($rows.Count) package$(if ($rows.Count -ne 1) { 's' }) that failed?`n`n" + $names + $more) `
+        -Title 'Retry failed' `
+        -Button ([System.Windows.MessageBoxButton]::YesNo) `
+        -Image ([System.Windows.MessageBoxImage]::Question) `
+        -Default ([System.Windows.MessageBoxResult]::No)
+    if ($answer -ne [System.Windows.MessageBoxResult]::Yes) { return }
+    Start-WinGetQueue -Rows $rows -Verb $q.Verb -ArgsBuilder $q.ArgsBuilder -Vars $q.Vars -OnDone $q.OnDone
 }

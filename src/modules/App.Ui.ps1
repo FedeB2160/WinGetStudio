@@ -13,6 +13,26 @@ function Write-Log([string]$msg) {
     $TxtLog.ScrollToEnd()
 }
 
+# Salva il log su file. Scelta del file e scrittura separate, come per l'export: un dialog non
+# si pilota da un test headless. UTF-8 con BOM, cosi' anche un editor vecchio legge le accentate.
+function Save-Log {
+    $dlg = New-Object Microsoft.Win32.SaveFileDialog
+    $dlg.Title    = 'Save the log'
+    $dlg.Filter   = 'Text file (*.txt)|*.txt|All files (*.*)|*.*'
+    $dlg.FileName = "wingetstudio-log-$((Get-Date).ToString('yyyy-MM-dd-HHmm')).txt"
+    $dlg.InitialDirectory = [Environment]::GetFolderPath('Desktop')
+    if ($dlg.ShowDialog() -ne $true) { return }
+    Write-LogFile $dlg.FileName
+}
+
+function Write-LogFile([string]$Path) {
+    try {
+        [IO.File]::WriteAllText($Path, $TxtLog.Text, [Text.Encoding]::UTF8)
+        Write-Log "Log saved to $Path"
+    }
+    catch { Write-Log "Could not save the log: $($_.Exception.Message)" }
+}
+
 # Tempo di avvio per il log: dall'avvio del processo alla finestra disegnata, diviso fra il prima
 # del codice dell'app (host dell'exe, scansione antivirus) e l'app stessa. Senza l'inizio dello
 # script (test, sorgente caricata a mano) solo il totale.
@@ -60,10 +80,14 @@ $script:dialogXaml = @'
             </Grid.ColumnDefinitions>
             <TextBlock x:Name="DlgIcon" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28"
                        Margin="0,0,16,0" VerticalAlignment="Top"/>
-            <TextBox x:Name="DlgText" Grid.Column="1" IsReadOnly="True" TextWrapping="Wrap"
-                     MaxHeight="480" VerticalScrollBarVisibility="Auto"
-                     BorderThickness="0" Background="Transparent" Padding="0"
-                     VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
+            <!-- DlgBody: il testo e, se il chiamante lo passa (-Content), un elemento sotto,
+                 come la griglia dell'anteprima dell'import. -->
+            <StackPanel x:Name="DlgBody" Grid.Column="1" VerticalAlignment="Center">
+                <TextBox x:Name="DlgText" IsReadOnly="True" TextWrapping="Wrap"
+                         MaxHeight="480" VerticalScrollBarVisibility="Auto"
+                         BorderThickness="0" Background="Transparent" Padding="0"
+                         Foreground="{DynamicResource FgBrush}"/>
+            </StackPanel>
         </Grid>
         <Border Grid.Row="1" Background="{DynamicResource HeaderBgBrush}" Padding="16,12"
                 BorderBrush="{DynamicResource CtrlBorderBrush}" BorderThickness="0,1,0,0">
@@ -132,6 +156,7 @@ function New-AppDialog {
         [System.Windows.MessageBoxButton]$Button = 'OK',
         [System.Windows.MessageBoxImage]$Image = 'None',
         [System.Windows.MessageBoxResult]$Default = 'None',
+        [System.Windows.UIElement]$Content,
         [switch]$Links
     )
     $dlg = [Windows.Markup.XamlReader]::Load((New-Object System.Xml.XmlNodeReader ([xml]$script:dialogXaml)))
@@ -147,6 +172,7 @@ function New-AppDialog {
         [void]$dlgText.Parent.Children.Add($rtb)
         $dlgText.Visibility = [System.Windows.Visibility]::Collapsed
     }
+    if ($Content) { [void]$dlg.FindName('DlgBody').Children.Add($Content) }
     Add-LinkHandler $dlg
     # Owner solo a finestra visibile: su una finestra mai mostrata WPF lancia un'eccezione.
     if ($window.IsVisible) {
@@ -231,9 +257,10 @@ function Show-AppDialog {
         [System.Windows.MessageBoxButton]$Button = 'OK',
         [System.Windows.MessageBoxImage]$Image = 'None',
         [System.Windows.MessageBoxResult]$Default = 'None',
+        [System.Windows.UIElement]$Content,
         [switch]$Links
     )
-    try { $dlg = New-AppDialog -Text $Text -Title $Title -Button $Button -Image $Image -Default $Default -Links:$Links }
+    try { $dlg = New-AppDialog -Text $Text -Title $Title -Button $Button -Image $Image -Default $Default -Content $Content -Links:$Links }
     catch {
         # Ripiego sulla MessageBox di sistema: un messaggio non deve perdersi proprio quando
         # qualcosa e' guasto (tema o XAML).
