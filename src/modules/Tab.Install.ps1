@@ -40,6 +40,7 @@ function Set-InstallBusy([bool]$busy) {
     # scorrevole mentre l'installazione va avanti.
     if ($busy) { [void]$GridSearch.CommitEdit() }
     $GridSearch.IsReadOnly = $busy
+    $MenuDetailsSearch.IsEnabled = -not $busy
     if ($busy) { $BtnInstall.IsEnabled = $false } else { Refresh-InstallState }
 }
 
@@ -162,7 +163,10 @@ function Install-Rows([object[]]$Rows) {
         param($r)
         # Match esatto sull'ID. --disable-interactivity e' obbligatorio: senza console
         # (exe -noConsole) un prompt di winget resterebbe in attesa per sempre.
-        "install --id `"$($r.Id)`" -e --silent --disable-interactivity --accept-source-agreements --accept-package-agreements$scopeArg"
+        # --source della riga: senza, winget cerca l'ID in TUTTE le sorgenti, Store compreso,
+        # che passa dalla rete. Vuota quando la ricerca non l'ha stampata: allora come prima.
+        $sourceArg = if ($r.Source) { " --source `"$($r.Source)`"" } else { '' }
+        "install --id `"$($r.Id)`" -e$sourceArg --silent --disable-interactivity --accept-source-agreements --accept-package-agreements$scopeArg"
     } -OnDone {
         Set-AppBusy $false
         # L'elenco della scheda Updates e' stato calcolato prima di queste installazioni.
@@ -243,6 +247,8 @@ function Initialize-InstallTab {
         $row = $GridSearch.SelectedItem
         if ($row) { Install-Rows @($row) }
     })
+    # Dettagli dal catalogo della sorgente della riga: il pacchetto non e' installato.
+    $MenuDetailsSearch.Add_Click({ if ($GridSearch.SelectedItem) { Show-PackageDetails $GridSearch.SelectedItem $false } })
 
     Register-GridRefresh $GridSearch 'Refresh-InstallState'
 }

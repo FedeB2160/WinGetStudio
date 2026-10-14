@@ -125,7 +125,7 @@ Write-Host "`n4) Parsing di un output winget con DUE tabelle" -ForegroundColor C
 # Riga della griglia: al parser serve solo un tipo con le proprieta' assegnabili.
 if (-not ('WgtRow' -as [type])) {
     Add-Type -TypeDefinition 'public class WgtRow {
-        public bool Selected, Pinned; public string Name, Version, Available, Id, Status, StatusDetail; }'
+        public bool Selected, Pinned; public string Name, Version, Available, Id, Source, Status, StatusDetail; }'
 }
 # Stub di winget: Invoke-WinGetRead avvia un ESEGUIBILE con Process.Start, quindi lo stub e'
 # un .cmd vero, non una funzione. Stampa il file di fixture cosi' com'e' (byte per byte, come
@@ -298,6 +298,82 @@ Only One Only.One 1.0     winget Blocking
 '@
 $r = Get-WinGetPins
 Check "pin list con una riga (trovato '$(@($r.Rows) -join ',')')" (@($r.Rows).Count -eq 1 -and @($r.Rows)[0] -eq 'Only.One')
+
+Write-Host "`n6f) Sorgente di ogni riga" -ForegroundColor Cyan
+# La sorgente serve a installare dalla riga scelta (--source) e a leggerne i dettagli dal
+# catalogo giusto. Le colonne variano: senza MS Store la ricerca gira con --source winget e
+# winget non stampa la colonna Origine; con lo Store l'Origine e' l'ultima, ma la colonna
+# Corrispondenza puo' esserci o no, e i suoi valori ("Tag: 7zip") contengono sempre ':'.
+Set-Stub @'
+Nome    Id             Versione Corrispondenza
+----------------------------------------------
+7-Zip   7zip.7zip      26.04    Moniker: 7zip
+NanaZip M2Team.NanaZip 7.0.1843 Tag: 7zip
+'@
+$r = @((Get-WinGetSearch 'fixture' $false).Rows)
+Check "senza Store la sorgente e' winget ($(@($r | ForEach-Object { $_.Source }) -join ','))" ($r.Count -eq 2 -and @($r | Where-Object { $_.Source -ne 'winget' }).Count -eq 0)
+$r = @((Get-WinGetSearch 'fixture' $true).Rows)
+Check "con lo Store un 'Tag: x' non e' una sorgente ($(@($r | ForEach-Object { "'$($_.Source)'" }) -join ','))" ($r.Count -eq 2 -and @($r | Where-Object { $_.Source }).Count -eq 0)
+Set-Stub @'
+Nome    Id           Versione Corrispondenza Origine
+----------------------------------------------------
+7-Zip   7zip.7zip    26.04    Moniker: 7zip  winget
+Spotify 9NCBCSZSJRSB Unknown                 msstore
+'@
+$r = @((Get-WinGetSearch 'fixture' $true).Rows)
+Check "con lo Store l'ultima colonna e' la sorgente ($(@($r | ForEach-Object { $_.Source }) -join ','))" ($r.Count -eq 2 -and $r[0].Source -eq 'winget' -and $r[1].Source -eq 'msstore')
+Set-Stub @'
+Name     Id       Version
+-------------------------
+Only One Only.One 1.0
+'@
+$r = @((Get-WinGetSearch 'fixture' $true).Rows)
+Check "con lo Store e 3 colonne la sorgente resta vuota ('$($r[0].Source)')" ($r.Count -eq 1 -and -not $r[0].Source)
+# list: Disponibile compare solo se qualcosa ha un aggiornamento, quindi la sorgente e'
+# l'ultima colonna, non la quarta. Le righe ARP non ne hanno.
+Set-Stub @'
+Nome           Id                             Versione     Disponibile Origine
+------------------------------------------------------------------------------
+1Password      AgileBits.1Password            > 8.12.36.40             winget
+Android Studio ARP\Machine\X64\Android Studio 2026.1
+7-Zip          7zip.7zip                      26.03        26.04       winget
+'@
+$r = @((Get-WinGetInstalled).Rows)
+Check "list a 5 colonne: sorgente dall'ultima ($(@($r | ForEach-Object { "'$($_.Source)'" }) -join ','))" `
+      ($r.Count -eq 3 -and $r[0].Source -eq 'winget' -and -not $r[1].Source -and $r[2].Source -eq 'winget')
+Set-Stub @'
+Nome  Id        Versione Disponibile Origine
+--------------------------------------------
+7-Zip 7zip.7zip 26.03    26.04       winget
+'@
+$r = @((Get-WinGetUpgrades).Rows)
+Check "upgrade: sorgente winget ('$($r[0].Source)')" ($r.Count -eq 1 -and $r[0].Source -eq 'winget')
+
+Write-Host "`n6g) Dettagli di un pacchetto: il testo di winget, comandi giusti" -ForegroundColor Cyan
+# Le etichette di show e list --details sono tradotte ("Editore:", "Licenza:"): l'app mostra il
+# testo cosi' com'e' (ADR 0021). Qui si verifica quali comandi partono, con lo stub che ristampa
+# i propri argomenti.
+Invoke-Expression (Get-FunctionText 'Get-WinGetDetails')
+$argsStub = Join-Path $stubDir 'args.cmd'
+[IO.File]::WriteAllText($argsStub, "@echo off`r`necho %*`r`n")
+$savedPath = $wingetPath; $wingetPath = $argsStub
+$d = Get-WinGetDetails 'Pkg.Id' 'winget' $true
+$wingetPath = $savedPath
+Check "installato con sorgente: list --details e show --source ($($d -replace "`r?`n", ' / '))" `
+      ($d -match 'list --id Pkg\.Id -e --details' -and $d -match 'show --id Pkg\.Id -e --source winget' -and
+       $d.IndexOf('list --id') -lt $d.IndexOf('show --id'))
+$wingetPath = $argsStub
+$d = Get-WinGetDetails 'ARP\Machine\X64\Foo' '' $true
+$wingetPath = $savedPath
+Check "installato senza sorgente (ARP): solo list --details" ($d -match 'list --id' -and $d -notmatch 'show --id')
+$wingetPath = $argsStub
+$d = Get-WinGetDetails '9NCBCSZSJRSB' 'msstore' $false
+$wingetPath = $savedPath
+Check "dal catalogo: solo show --source msstore" ($d -match 'show --id 9NCBCSZSJRSB -e --source msstore' -and $d -notmatch 'list --id')
+# Spinner e frame \r di winget piu' vecchi: resta l'ultimo segmento, l'indentazione si tiene.
+Set-Stub "  -`r  \`rTrovato 7-Zip [7zip.7zip]`r`nVersione: 26.04`r`nTag:`r`n  zip`r`n"
+$d = Get-WinGetDetails '7zip.7zip' 'winget' $false
+Check "testo pulito, indentazione intatta" ($d -match '(?m)^Trovato 7-Zip' -and $d -match '(?m)^  zip$' -and $d -notmatch '(?m)^\s*[-\\|/]\s*$')
 
 Write-Host "`n6d) Coda dell'output per log e messaggi" -ForegroundColor Cyan
 Invoke-Expression (Get-FunctionText 'Get-WinGetOutputTail')

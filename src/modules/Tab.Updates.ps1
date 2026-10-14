@@ -71,6 +71,7 @@ function Set-UpdatesBusy([bool]$busy) {
     # risponde "riprova fra un attimo" e' un rifiuto, non un blocco.
     $MenuPinUpdates.IsEnabled   = -not $busy
     $MenuUnpinUpdates.IsEnabled = -not $busy
+    $MenuDetailsUpdates.IsEnabled = -not $busy
     # Il pulsante Update diventa Cancel SOLO se la coda in corso e' la nostra: un export o
     # un'installazione dall'altra scheda alzano lo stesso stato occupato, e offrire di
     # annullarli da qui sarebbe una bugia.
@@ -250,6 +251,7 @@ function Initialize-UpdatesTab {
     # una riga pinnata ha la spunta disabilitata e non potrebbe piu' essere sbloccata).
     $MenuPinUpdates.Add_Click({   Set-PackagePin @($Grid.SelectedItems) $true })
     $MenuUnpinUpdates.Add_Click({ Set-PackagePin @($Grid.SelectedItems) $false })
+    $MenuDetailsUpdates.Add_Click({ if ($Grid.SelectedItem) { Show-PackageDetails $Grid.SelectedItem $true } })
 
     # Contatore ed etichette si ricalcolano quando l'utente spunta o despunta: il come sta in
     # Register-GridRefresh (App.Ui.ps1), uguale per tutte e tre le griglie.

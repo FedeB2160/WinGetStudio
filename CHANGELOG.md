@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Details** in the right-click menu of all three lists: the package as winget describes it (description, publisher, homepage, licence, release notes) and, for an installed one, its scope, installer type and location. The text is winget's own, in the language of Windows.
+- The search results show the **source** of each package, and installing passes it to winget, so a package found in the winget catalogue no longer makes winget ask the Microsoft Store too.
+
 ## v1.12.0
 
 WinGet Studio now looks after winget itself, uninstalls the per-user programs it used to refuse, and every message follows the theme.

@@ -170,7 +170,10 @@ function Invoke-WinGetRead([string[]]$Arguments, [int]$MaxColumns = 0) {
 }
 
 # Ricerca nel catalogo. Colonne: Nome | Id | Versione | [Corrispondenza] | [Origine] —
-# si usano solo le prime tre, le altre compaiono o no a seconda del risultato.
+# le ultime due compaiono o no a seconda del risultato.
+# Sorgente della riga: senza Store si cerca con --source winget e winget non stampa Origine,
+# quindi e' winget. Con lo Store e' l'ultima colonna, se c'e': i valori di Corrispondenza
+# ("Tag: 7zip", "Moniker: 7zip") contengono sempre ':', i nomi delle sorgenti mai.
 #
 # --source winget: interroga il solo indice LOCALE (~0.4s). Con msstore la stessa ricerca
 #   va in rete e passa a ~5s, troppo per aggiornare l'elenco mentre si digita.
@@ -192,7 +195,8 @@ function Get-WinGetSearch([string]$Query, [bool]$IncludeStore = $false, [int]$Co
 
     $results = New-Object System.Collections.ArrayList
     foreach ($f in $read.Rows) {
-        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2] })
+        $source = if (-not $IncludeStore) { 'winget' } elseif ($f.Count -ge 4 -and $f[-1] -notmatch ':') { $f[-1] } else { '' }
+        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2]; Source = $source })
     }
     $read.Rows = $results.ToArray()
     return $read
@@ -212,8 +216,10 @@ function Get-WinGetPins {
     return $read
 }
 
-# Inventario dei pacchetti installati. Colonne: Nome | Id | Versione | [Origine].
-# ATTENZIONE: la quarta colonna qui e' Origine, NON "Disponibile" come in upgrade.
+# Inventario dei pacchetti installati. Colonne: Nome | Id | Versione | [Disponibile] | [Origine].
+# ATTENZIONE: Disponibile compare solo se qualche pacchetto ha un aggiornamento, quindi la
+# sorgente e' l'ULTIMA colonna, non la quarta. Senza alcuna sorgente non c'e' nemmeno
+# Disponibile (gli aggiornamenti vengono dalle sorgenti): con 4 colonne la quarta e' Origine.
 # Include anche cio' che non e' stato installato con winget: quei pacchetti hanno un Id
 # di tipo "ARP\Machine\X64\Nome Prodotto" (con spazi dentro, del tutto legittimi) e
 # Origine vuota.
@@ -224,7 +230,8 @@ function Get-WinGetInstalled {
     foreach ($f in $read.Rows) {
         # "> 8.12.30.21" -> "8.12.30.21": il ">" segnala che esiste un aggiornamento, e di
         # quello si occupa la scheda Updates.
-        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = ($f[2] -replace '^>\s*', '') })
+        $source = if ($f.Count -ge 4) { $f[-1] } else { '' }
+        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = ($f[2] -replace '^>\s*', ''); Source = $source })
     }
     $read.Rows = $results.ToArray()
     return $read
@@ -242,8 +249,30 @@ function Get-WinGetUpgrades([bool]$IncludeUnknown = $false) {
     $results = New-Object System.Collections.ArrayList
     foreach ($f in $read.Rows) {
         if ($f.Count -lt 4) { continue }   # senza la colonna Disponibile non e' un upgrade
-        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2]; Available = $f[3] })
+        $source = if ($f.Count -ge 5) { $f[4] } else { '' }
+        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2]; Available = $f[3]; Source = $source })
     }
     $read.Rows = $results.ToArray()
     return $read
+}
+
+# Dettagli di un pacchetto: il TESTO di winget, non campi estratti. Le etichette di show e
+# list --details sono tradotte ("Editore:", "Licenza:"), e leggerle vorrebbe dire un parser
+# per lingua (ADR 0021). Una o due letture in sequenza, dentro lo stesso job:
+#   -Installed: list --details, cio' che e' installato (ambito, tipo, posizione)
+#   -Source:    show dal catalogo di quella sorgente (descrizione, editore, licenza);
+#               senza sorgente (righe ARP) il catalogo non conosce il pacchetto
+# Di ogni riga resta l'ultimo segmento \r (frame di avanzamento dei winget piu' vecchi) e si
+# scartano le righe di solo spinner; l'indentazione resta, show la usa per i gruppi.
+function Get-WinGetDetails([string]$Id, [string]$Source, [bool]$Installed) {
+    $reads = @()
+    if ($Installed) { $reads += , @('list', '--id', $Id, '-e', '--details', '--accept-source-agreements', '--disable-interactivity') }
+    if ($Source)    { $reads += , @('show', '--id', $Id, '-e', '--source', $Source, '--accept-source-agreements', '--disable-interactivity') }
+    $parts = foreach ($a in $reads) {
+        $out = (Invoke-WinGetRead -Arguments $a).Output
+        $lines = @($out -split "`r`n|`n" | ForEach-Object { ($_ -split "`r")[-1].TrimEnd() } |
+                   Where-Object { $_ -and $_ -notmatch '^\s*[-\\|/]\s*$' })
+        $lines -join "`r`n"
+    }
+    ($parts | Where-Object { $_ }) -join "`r`n`r`n"
 }

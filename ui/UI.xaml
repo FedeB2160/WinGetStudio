@@ -827,6 +827,11 @@
                                   HorizontalGridLinesBrush="{DynamicResource BorderBrush2}"
                                   ColumnHeaderStyle="{StaticResource GridHeader}"
                                   CellStyle="{StaticResource GridCell}">
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem x:Name="MenuDetailsSearch" Header="Details of highlighted package"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
                             <DataGrid.Columns>
                                 <DataGridCheckBoxColumn Header="SEL." Width="46"
                                     ElementStyle="{StaticResource ThemedCheckBox}"
@@ -835,6 +840,9 @@
                                 <DataGridTextColumn Header="NAME"    Width="2*"   IsReadOnly="True" Binding="{Binding Name}"/>
                                 <DataGridTextColumn Header="VERSION" Width="1.2*" IsReadOnly="True" Binding="{Binding Version}"/>
                                 <DataGridTextColumn Header="ID"      Width="2.4*" IsReadOnly="True" Binding="{Binding Id}"/>
+                                <!-- Con MS Store spuntato i risultati vengono da due sorgenti, e
+                                     l'installazione usa quella della riga. -->
+                                <DataGridTextColumn Header="SOURCE"  Width="80"   IsReadOnly="True" Binding="{Binding Source}"/>
                                 <DataGridTemplateColumn Header="RESULT" Width="70"
                                                         CellTemplate="{StaticResource ResultCell}"/>
                             </DataGrid.Columns>
@@ -915,6 +923,7 @@
                                   CellStyle="{StaticResource GridCell}">
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem x:Name="MenuDetailsInstalled" Header="Details of highlighted package"/>
                                     <MenuItem x:Name="MenuPinInstalled"   Header="Pin highlighted (block upgrades)"/>
                                     <MenuItem x:Name="MenuUnpinInstalled" Header="Remove pin from highlighted"/>
                                 </ContextMenu>
@@ -1009,6 +1018,7 @@
                                  con le spunte il pin non si potrebbe piu' togliere. -->
                             <DataGrid.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem x:Name="MenuDetailsUpdates" Header="Details of highlighted package"/>
                                     <MenuItem x:Name="MenuPinUpdates"   Header="Pin highlighted (block upgrades)"/>
                                     <MenuItem x:Name="MenuUnpinUpdates" Header="Remove pin from highlighted"/>
                                 </ContextMenu>

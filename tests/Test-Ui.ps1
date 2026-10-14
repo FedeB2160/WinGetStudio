@@ -612,8 +612,9 @@ foreach ($t in $TabMain.Items) {
 # griglia si scorre, il log si legge. Prima le spunte erano bloccate (IsReadOnly) ma
 # sembravano ancora cliccabili, e le voci Pin restavano accese per poi rifiutare.
 Set-AppBusy $true
-foreach ($m in $MenuPinUpdates, $MenuUnpinUpdates, $MenuPinInstalled, $MenuUnpinInstalled) {
-    if ($m.IsEnabled) { throw "una voce di pin resta attiva durante un'operazione" }
+foreach ($m in $MenuPinUpdates, $MenuUnpinUpdates, $MenuPinInstalled, $MenuUnpinInstalled,
+               $MenuDetailsUpdates, $MenuDetailsInstalled, $MenuDetailsSearch) {
+    if ($m.IsEnabled) { throw "una voce di menu ($($m.Name)) resta attiva durante un'operazione" }
 }
 if (-not $Grid.IsReadOnly) { throw "le spunte restano modificabili durante un'operazione" }
 # Le griglie NON si disabilitano: disabilitate non rispondono piu' a rotellina, scrollbar e
@@ -622,8 +623,9 @@ foreach ($g in $Grid, $GridSearch, $GridInstalled) {
     if (-not $g.IsEnabled) { throw "una griglia e' stata disabilitata: non si scorrerebbe piu'" }
 }
 Set-AppBusy $false
-foreach ($m in $MenuPinUpdates, $MenuUnpinUpdates, $MenuPinInstalled, $MenuUnpinInstalled) {
-    if (-not $m.IsEnabled) { throw "a operazione finita una voce di pin resta spenta" }
+foreach ($m in $MenuPinUpdates, $MenuUnpinUpdates, $MenuPinInstalled, $MenuUnpinInstalled,
+               $MenuDetailsUpdates, $MenuDetailsInstalled, $MenuDetailsSearch) {
+    if (-not $m.IsEnabled) { throw "a operazione finita una voce di menu ($($m.Name)) resta spenta" }
 }
 if ($Grid.IsReadOnly) { throw "a operazione finita le spunte restano bloccate" }
 
@@ -1425,6 +1427,56 @@ else {
 # app aggiorna con upgrade --id, dove lo ignora (UpdateFlow.cpp: includePinned = m_isSinglePackage).
 if ((Get-FunctionSource 'Set-PackagePin') -notmatch "'add --blocking'") { throw "i pin dell'app non sono blocking" }
 "OK pinblk  i pin aggiunti dall'app sono blocking"
+
+# 16d) Sorgente e dettagli (issue #24, ADR 0021). La ricerca mostra da quale sorgente viene
+# ogni riga e l'installazione la passa a winget: senza, "install --id" interroga anche lo
+# Store, in rete. I dettagli sono il testo di winget mostrato cosi' com'e', letto con UN job
+# dietro lo stato occupato: winget non deve mai girare due volte (ADR 0003).
+if ($uiText -notmatch '<DataGridTextColumn Header="SOURCE"[^>]*Binding="\{Binding Source\}"') { throw "la ricerca non mostra la colonna SOURCE" }
+$installSrc = Get-FunctionSource 'Install-Rows'
+if ($installSrc -notmatch '--source' -or $installSrc -notmatch 'if \(\$r\.Source\)') { throw "l'installazione non passa --source della riga, o lo passa anche vuoto" }
+foreach ($pair in @(@($GridSearch, $MenuDetailsSearch), @($GridInstalled, $MenuDetailsInstalled), @($Grid, $MenuDetailsUpdates))) {
+    if (-not $pair[1] -or -not $pair[0].ContextMenu -or -not $pair[0].ContextMenu.Items.Contains($pair[1])) {
+        throw "manca la voce Details nel menu contestuale di $($pair[0].Name)"
+    }
+}
+$detSrc = Get-FunctionSource 'Show-PackageDetails'
+$posBusy = $detSrc.IndexOf('Test-WinGetBusy'); $posJob = $detSrc.IndexOf('Start-BackgroundJob')
+if ($posBusy -lt 0 -or $posBusy -gt $posJob) { throw "i dettagli partono senza controllare che winget sia libero" }
+if ($detSrc -notmatch "Set-AppBusy \`$true" -or $detSrc -notmatch "Set-AppBusy \`$false") { throw "i dettagli non prendono e rilasciano lo stato occupato" }
+if ($detSrc -notmatch "'Get-WinGetDetails'" -or $detSrc -notmatch "'Invoke-WinGetRead'") { throw "il job dei dettagli non riceve le funzioni che chiama" }
+# Ciclo vero con uno stub che ristampa gli argomenti, e il popup intercettato.
+$detStub = Join-Path ([IO.Path]::GetTempPath()) "wgt-detstub-$PID.cmd"
+[IO.File]::WriteAllText($detStub, "@echo off`r`necho %*`r`n")
+$savedWinget = $wingetPath; $wingetPath = $detStub
+$savedDialog = ${function:Show-AppDialog}
+$script:detText = $null
+function Show-AppDialog { param([string]$Text, [string]$Title) $script:detText = "$Title|$Text" }
+try {
+    Show-PackageDetails ([WgtRow]@{ Name = 'Pkg'; Id = 'Pkg.Id'; Source = 'winget' }) $true
+    if (-not $script:isBusy) { throw "i dettagli non alzano lo stato occupato mentre winget legge" }
+    if (-not (Wait-For { $null -ne $script:detText } 30)) { throw "i dettagli non sono mai arrivati al popup" }
+    if ($script:detText -notmatch 'list --id Pkg\.Id -e --details' -or $script:detText -notmatch 'show --id Pkg\.Id -e --source winget') {
+        throw "testo dei dettagli inatteso: $script:detText"
+    }
+    if ($script:detText -notmatch '^Pkg') { throw "il titolo del popup non nomina il pacchetto: $script:detText" }
+    if ($script:isBusy) { throw "a dettagli mostrati lo stato occupato non e' stato rilasciato" }
+}
+finally {
+    $wingetPath = $savedWinget
+    Set-Item function:Show-AppDialog $savedDialog
+    Remove-Item -LiteralPath $detStub -ErrorAction SilentlyContinue
+}
+# Il testo di show e' lungo (tag, installer): il popup deve scorrere invece di allungarsi.
+$dlgText = (New-AppDialog -Text ("riga`n" * 200)).FindName('DlgText')
+if ($dlgText.VerticalScrollBarVisibility -ne 'Auto' -or [double]::IsInfinity($dlgText.MaxHeight)) { throw "il testo lungo del popup non scorre" }
+"OK details sorgente in ricerca e install, dettagli in un job dietro lo stato occupato, popup a scorrimento"
+if ($realWinget) {
+    $savedWinget = $wingetPath; $wingetPath = $realWinget
+    try { $liveDet = Get-WinGetDetails '7zip.7zip' 'winget' $false } finally { $wingetPath = $savedWinget }
+    if ($liveDet -notmatch '7zip\.7zip' -or $liveDet -notmatch 'https?://') { throw "dettagli reali di 7zip.7zip inattesi: $liveDet" }
+    "OK details show reale su 7zip.7zip ($(@($liveDet -split "`r`n").Count) righe)"
+}
 
 # 17) Elenco installati e filtro locale. Il caricamento vero solo con -Live; il filtro si
 # prova sempre, su righe finte: non deve dipendere da cosa e' installato sulla macchina.

@@ -49,6 +49,7 @@ $script:dialogXaml = @'
             <TextBlock x:Name="DlgIcon" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28"
                        Margin="0,0,16,0" VerticalAlignment="Top"/>
             <TextBox x:Name="DlgText" Grid.Column="1" IsReadOnly="True" TextWrapping="Wrap"
+                     MaxHeight="480" VerticalScrollBarVisibility="Auto"
                      BorderThickness="0" Background="Transparent" Padding="0"
                      VerticalAlignment="Center" Foreground="{DynamicResource FgBrush}"/>
         </Grid>
@@ -179,6 +180,29 @@ function Show-AppDialog {
     # Esc o la X: la risposta prudente, cioe' No (oppure OK).
     if ($Button -eq [System.Windows.MessageBoxButton]::YesNo) { return [System.Windows.MessageBoxResult]::No }
     return [System.Windows.MessageBoxResult]::OK
+}
+
+# Dettagli di un pacchetto (ADR 0021): il testo di winget in un popup, letto in un job dietro
+# lo stato occupato, perche' e' un processo winget come gli altri (ADR 0003). -Installed
+# aggiunge list --details; la sorgente della riga decide se c'e' anche la parte di catalogo.
+# La riga passa da $script: perche' OnDone non vede le variabili di questa funzione (ADR 0008).
+function Show-PackageDetails([object]$Row, [bool]$Installed) {
+    if (Test-WinGetBusy) { return }
+    Set-AppBusy $true
+    $Progress.IsIndeterminate = $true
+    Write-Log "Reading the details of $($Row.Name) [$($Row.Id)]..."
+    $script:detailsRow = $Row
+    [void](Start-BackgroundJob -Functions 'Get-WinGetDetails', 'Invoke-WinGetRead', 'Get-WinGetTable' `
+        -Vars @{ wingetPath = $wingetPath; id = $Row.Id; source = $Row.Source; installed = $Installed } `
+        -Script { Get-WinGetDetails $id $source $installed } `
+        -OnDone {
+            param($result)
+            $Progress.IsIndeterminate = $false
+            Set-AppBusy $false
+            $text = (@($result) | Where-Object { $_ }) -join "`r`n"
+            if (-not $text) { $text = 'winget returned no details for this package.' }
+            Show-AppDialog -Text $text -Title "$($script:detailsRow.Name) - details" | Out-Null
+        })
 }
 
 # ------------------------------------------------------------------
