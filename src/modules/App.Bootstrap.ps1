@@ -176,13 +176,7 @@ function Start-App([switch]$NoShow) {
     # NB: l'app gira elevata, quindi il browser eredita l'elevazione. Aprirlo come utente
     # interattivo richiederebbe una ShellExecute impersonata: se diventa un problema, i link
     # diventano testo selezionabile.
-    $script:window.AddHandler(
-        [System.Windows.Documents.Hyperlink]::RequestNavigateEvent,
-        [System.Windows.Navigation.RequestNavigateEventHandler]{
-            param($s, $e)
-            try { Start-Process $e.Uri.AbsoluteUri } catch { Write-Log "Could not open $($e.Uri): $($_.Exception.Message)" }
-            $e.Handled = $true
-        })
+    Add-LinkHandler $script:window
 
     # Scorciatoie. PreviewKeyDown sulla FINESTRA e non sui controlli: in tunneling la finestra
     # vede il tasto per prima, mentre un DataGrid che ha il fuoco si mangerebbe F5 e Ctrl+F per
