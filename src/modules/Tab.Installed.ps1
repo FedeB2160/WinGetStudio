@@ -51,6 +51,7 @@ function Set-InstalledBusy([bool]$busy) {
     # Come nella scheda Updates: le voci di pin si spengono, la griglia resta scorrevole.
     $MenuPinInstalled.IsEnabled   = -not $busy
     $MenuUnpinInstalled.IsEnabled = -not $busy
+    $MenuDetailsInstalled.IsEnabled = -not $busy
     if ($busy) { $BtnUninstall.IsEnabled = $false } else { Refresh-InstalledState }
 }
 
@@ -177,6 +178,7 @@ function Initialize-InstalledTab {
     # Pin/Unpin sulle righe evidenziate, come nella scheda Updates.
     $MenuPinInstalled.Add_Click({   Set-PackagePin @($GridInstalled.SelectedItems) $true })
     $MenuUnpinInstalled.Add_Click({ Set-PackagePin @($GridInstalled.SelectedItems) $false })
+    $MenuDetailsInstalled.Add_Click({ if ($GridInstalled.SelectedItem) { Show-PackageDetails $GridInstalled.SelectedItem $true } })
 
     Register-GridRefresh $GridInstalled 'Refresh-InstalledState'
 

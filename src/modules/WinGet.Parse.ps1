@@ -169,13 +169,18 @@ function Invoke-WinGetRead([string[]]$Arguments, [int]$MaxColumns = 0) {
     }
 }
 
-# Ricerca nel catalogo. Colonne: Nome | Id | Versione | [Corrispondenza] | [Origine] —
-# si usano solo le prime tre, le altre compaiono o no a seconda del risultato.
+# Ricerca nel catalogo. Colonne: Nome | Id | Versione | [Corrispondenza] — si usano le prime
+# tre. Una sorgente per volta, quindi la sorgente di ogni riga e' quella interrogata.
 #
-# --source winget: interroga il solo indice LOCALE (~0.4s). Con msstore la stessa ricerca
-#   va in rete e passa a ~5s, troppo per aggiornare l'elenco mentre si digita.
+# --source winget: interroga il solo indice LOCALE (~0.4s). msstore va in rete (~5s), troppo
+#   per aggiornare l'elenco mentre si digita: lo Store si aggiunge solo su richiesta.
+# Con lo Store sono DUE ricerche, winget poi msstore, coi risultati in coda: dalla 1.29 winget
+#   non porta piu' in cima i risultati dello Store, e con un --count unico su tutte le sorgenti
+#   una parola comune lo lasciava fuori (misurato: "spotify" -> 33 winget, lo Store al 34esimo).
+#   Uno Store che non risponde non fa fallire la ricerca: restano i risultati winget e il
+#   motivo va nell'output, da cui la scheda Install mette nel log le righe "msstore".
 # --count: senza un tetto una query di 2-3 lettere torna oltre mille righe (misurato:
-#   "ab" -> 1288) e la griglia annega.
+#   "ab" -> 1288) e la griglia annega. Allo Store ne bastano 10.
 # 0x8A150014 (APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND) e' "nessuna corrispondenza": un
 #   risultato vuoto, non un errore. Solo qui: list e upgrade senza filtri elencano tutto
 #   l'installato e quel codice non lo producono. L'exit si normalizza a 32 bit senza segno
@@ -184,18 +189,26 @@ function Get-WinGetSearch([string]$Query, [bool]$IncludeStore = $false, [int]$Co
     if ([string]::IsNullOrWhiteSpace($Query)) {
         return [PSCustomObject]@{ Success = $true; Rows = [object[]]@(); ExitCode = 0; Output = '' }
     }
-    $wgArgs = @('search', $Query, '--count', "$Count", '--accept-source-agreements')
-    if (-not $IncludeStore) { $wgArgs += @('--source', 'winget') }
-    $read = Invoke-WinGetRead -Arguments $wgArgs
-    if ((([int64]$read.ExitCode) -band 0xFFFFFFFFL) -eq 0x8A150014L) { $read.Success = $true }
-    if (-not $read.Success) { return $read }
-
     $results = New-Object System.Collections.ArrayList
-    foreach ($f in $read.Rows) {
-        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2] })
+    $first = $null
+    foreach ($src in @(@('winget', $Count), @('msstore', 10))) {
+        if ($src[0] -eq 'msstore' -and -not $IncludeStore) { break }
+        $read = Invoke-WinGetRead -Arguments @('search', $Query, '--count', "$($src[1])", '--source', $src[0], '--accept-source-agreements')
+        if ((([int64]$read.ExitCode) -band 0xFFFFFFFFL) -eq 0x8A150014L) { $read.Success = $true }
+        if ($null -eq $first) {
+            $first = $read
+            if (-not $read.Success) { return $read }
+        }
+        elseif (-not $read.Success) {
+            $first.Output += "`r`nmsstore: " + (@(Get-WinGetOutputTail $read.Output 2) -join ' ')
+            continue
+        }
+        foreach ($f in $read.Rows) {
+            [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2]; Source = $src[0] })
+        }
     }
-    $read.Rows = $results.ToArray()
-    return $read
+    $first.Rows = $results.ToArray()
+    return $first
 }
 
 # ID dei pacchetti con un pin. Colonne: Nome | Id | Versione | Origine | Tipo di pin —
@@ -212,8 +225,10 @@ function Get-WinGetPins {
     return $read
 }
 
-# Inventario dei pacchetti installati. Colonne: Nome | Id | Versione | [Origine].
-# ATTENZIONE: la quarta colonna qui e' Origine, NON "Disponibile" come in upgrade.
+# Inventario dei pacchetti installati. Colonne: Nome | Id | Versione | [Disponibile] | [Origine].
+# ATTENZIONE: Disponibile compare solo se qualche pacchetto ha un aggiornamento, quindi la
+# sorgente e' l'ULTIMA colonna, non la quarta. Senza alcuna sorgente non c'e' nemmeno
+# Disponibile (gli aggiornamenti vengono dalle sorgenti): con 4 colonne la quarta e' Origine.
 # Include anche cio' che non e' stato installato con winget: quei pacchetti hanno un Id
 # di tipo "ARP\Machine\X64\Nome Prodotto" (con spazi dentro, del tutto legittimi) e
 # Origine vuota.
@@ -224,7 +239,8 @@ function Get-WinGetInstalled {
     foreach ($f in $read.Rows) {
         # "> 8.12.30.21" -> "8.12.30.21": il ">" segnala che esiste un aggiornamento, e di
         # quello si occupa la scheda Updates.
-        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = ($f[2] -replace '^>\s*', '') })
+        $source = if ($f.Count -ge 4) { $f[-1] } else { '' }
+        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = ($f[2] -replace '^>\s*', ''); Source = $source })
     }
     $read.Rows = $results.ToArray()
     return $read
@@ -242,8 +258,30 @@ function Get-WinGetUpgrades([bool]$IncludeUnknown = $false) {
     $results = New-Object System.Collections.ArrayList
     foreach ($f in $read.Rows) {
         if ($f.Count -lt 4) { continue }   # senza la colonna Disponibile non e' un upgrade
-        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2]; Available = $f[3] })
+        $source = if ($f.Count -ge 5) { $f[4] } else { '' }
+        [void]$results.Add([WgtRow]@{ Selected = $false; Name = $f[0]; Id = $f[1]; Version = $f[2]; Available = $f[3]; Source = $source })
     }
     $read.Rows = $results.ToArray()
     return $read
+}
+
+# Dettagli di un pacchetto: il TESTO di winget, non campi estratti. Le etichette di show e
+# list --details sono tradotte ("Editore:", "Licenza:"), e leggerle vorrebbe dire un parser
+# per lingua (ADR 0021). Una o due letture in sequenza, dentro lo stesso job:
+#   -Installed: list --details, cio' che e' installato (ambito, tipo, posizione)
+#   -Source:    show dal catalogo di quella sorgente (descrizione, editore, licenza);
+#               senza sorgente (righe ARP) il catalogo non conosce il pacchetto
+# Di ogni riga resta l'ultimo segmento \r (frame di avanzamento dei winget piu' vecchi) e si
+# scartano le righe di solo spinner; l'indentazione resta, show la usa per i gruppi.
+function Get-WinGetDetails([string]$Id, [string]$Source, [bool]$Installed) {
+    $reads = @()
+    if ($Installed) { $reads += , @('list', '--id', $Id, '-e', '--details', '--accept-source-agreements', '--disable-interactivity') }
+    if ($Source)    { $reads += , @('show', '--id', $Id, '-e', '--source', $Source, '--accept-source-agreements', '--disable-interactivity') }
+    $parts = foreach ($a in $reads) {
+        $out = (Invoke-WinGetRead -Arguments $a).Output
+        $lines = @($out -split "`r`n|`n" | ForEach-Object { ($_ -split "`r")[-1].TrimEnd() } |
+                   Where-Object { $_ -and $_ -notmatch '^\s*[-\\|/]\s*$' })
+        $lines -join "`r`n"
+    }
+    ($parts | Where-Object { $_ }) -join "`r`n`r`n"
 }

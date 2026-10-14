@@ -44,13 +44,14 @@ public class WgtRow : INotifyPropertyChanged {
         if (h != null) h(this, new PropertyChangedEventArgs(n));
     }
     private bool _selected, _pinned;
-    private string _name = "", _version = "", _available = "", _id = "", _status = "", _detail = "";
+    private string _name = "", _version = "", _available = "", _id = "", _source = "", _status = "", _detail = "";
     public bool Selected      { get { return _selected; }  set { _selected = value;  P("Selected"); } }
     public bool Pinned        { get { return _pinned; }    set { _pinned = value;    P("Pinned"); } }
     public string Name        { get { return _name; }      set { _name = value;      P("Name"); } }
     public string Version     { get { return _version; }   set { _version = value;   P("Version"); } }
     public string Available   { get { return _available; } set { _available = value; P("Available"); } }
     public string Id          { get { return _id; }        set { _id = value;        P("Id"); } }
+    public string Source      { get { return _source; }    set { _source = value;    P("Source"); } }
     public string Status      { get { return _status; }    set { _status = value;    P("Status"); } }
     public string StatusDetail{ get { return _detail; }    set { _detail = value;    P("StatusDetail"); } }
 }
@@ -150,6 +151,7 @@ function Start-App([switch]$NoShow) {
         'TxtInstalledCount', 'GridInstalled', 'TxtInstalledEmpty',
         'TxtInstalledInfo', 'BtnUninstall',
         'MenuPinUpdates', 'MenuUnpinUpdates', 'MenuPinInstalled', 'MenuUnpinInstalled',
+        'MenuDetailsSearch', 'MenuDetailsInstalled', 'MenuDetailsUpdates',
         'BtnExport', 'BtnImport',
         'CmbTheme', 'TxtThemeHint', 'TxtVersion', 'BtnCheckUpdate', 'BtnUpdateApp',
         'UpdateSpinner', 'TxtUpdateStatus', 'ChkAutoCheck', 'CmbTabStyle',
@@ -174,13 +176,7 @@ function Start-App([switch]$NoShow) {
     # NB: l'app gira elevata, quindi il browser eredita l'elevazione. Aprirlo come utente
     # interattivo richiederebbe una ShellExecute impersonata: se diventa un problema, i link
     # diventano testo selezionabile.
-    $script:window.AddHandler(
-        [System.Windows.Documents.Hyperlink]::RequestNavigateEvent,
-        [System.Windows.Navigation.RequestNavigateEventHandler]{
-            param($s, $e)
-            try { Start-Process $e.Uri.AbsoluteUri } catch { Write-Log "Could not open $($e.Uri): $($_.Exception.Message)" }
-            $e.Handled = $true
-        })
+    Add-LinkHandler $script:window
 
     # Scorciatoie. PreviewKeyDown sulla FINESTRA e non sui controlli: in tunneling la finestra
     # vede il tasto per prima, mentre un DataGrid che ha il fuoco si mangerebbe F5 e Ctrl+F per

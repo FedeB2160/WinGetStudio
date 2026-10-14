@@ -27,6 +27,7 @@ Update, install, uninstall, pin, export and import — all from one table with c
 
 - **Update** what has a newer version: tick, press **Update**, and each row shows its own outcome.
 - **Install** something new by searching as you type, from the winget catalogue and, if you want, the Microsoft Store.
+- **Details** of any package from the right-click menu: what it is, who publishes it, and where and how it is installed.
 - **List and uninstall** what is already on the machine, including programs installed without winget.
 - **Pin** what must not be touched, so updates skip it.
 - **Export / import** the whole package list to rebuild a machine.

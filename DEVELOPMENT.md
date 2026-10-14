@@ -259,5 +259,6 @@ Each decision that shapes the architecture has an Architecture Decision Record i
 - [ADR 0018](docs/adr/0018-retry-without-elevation-when-winget-refuses-administrator.md) — When winget refuses a per-user uninstall as administrator (`0x8A15007D`, issue #12), the queue repeats it as the same account without elevation, through a one-off scheduled task.
 - [ADR 0019](docs/adr/0019-installing-and-updating-winget.md) — Installing winget when it is missing (register, else GitHub with SHA-256), its version in Settings, and its update: by the Store where it can, by a GitHub button elsewhere.
 - [ADR 0020](docs/adr/0020-themed-dialogs.md) — Dialogs in the app's theme (`Show-AppDialog`): same enums as the MessageBox, default No kept, dimmed window behind, MessageBox only as fallback.
+- [ADR 0021](docs/adr/0021-package-details-as-winget-text.md) — Package details are winget's own text (`show`, `list --details`), never parsed: its labels are translated. Every row carries its source; install passes it.
 
 The rule: **a decision that shapes the architecture gets a new numbered ADR**, written from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md); a superseded or withdrawn ADR is kept and its number never reused. **A spec in `docs\superpowers\specs\` is deleted once it is implemented**, after its decisions have been moved into an ADR.
