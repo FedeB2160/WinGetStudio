@@ -147,7 +147,10 @@ function Start-RepairSelected {
 
     Start-WinGetQueue -Rows $sel -Verb 'Repair' -ArgsBuilder {
         param($r)
-        "repair --id `"$($r.Id)`" -e --silent --disable-interactivity --accept-source-agreements --accept-package-agreements"
+        # --source della riga: senza, winget cerca il pacchetto in TUTTE le sorgenti, e uno Store
+        # che non risponde fermava la riparazione con 0x8A15003B (errore REST) prima di cominciare.
+        $sourceArg = if ($r.Source) { " --source `"$($r.Source)`"" } else { '' }
+        "repair --id `"$($r.Id)`" -e$sourceArg --silent --disable-interactivity --accept-source-agreements --accept-package-agreements"
     } -OnDone {
         Set-AppBusy $false
         Write-Log "Repair finished."
