@@ -228,6 +228,7 @@ function Start-App([switch]$NoShow) {
     # insieme alla scansione: l'unico che lancia winget e' Load-Upgrades (ADR 0003).
     # Senza winget, invece della scansione si propone di installarlo.
     $script:window.Add_ContentRendered({
+        Write-Log (Format-StartupTime ([Diagnostics.Process]::GetCurrentProcess().StartTime) $script:appStartedAt (Get-Date))
         Set-Theme
         Start-UpdateCheck
         if ($script:wingetPath) { Load-Upgrades; Start-WinGetCheck }
