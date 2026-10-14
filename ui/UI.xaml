@@ -777,41 +777,46 @@
                              allarghi, e lo spinner in coda puo' comparire e sparire senza
                              spostare niente. Prima, agganciato a destra, comparendo rubava 20px
                              al campo di ricerca. -->
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                            <!-- Il campo e il suo testo guida sovrapposto: WPF non ha un
-                                 placeholder nativo, quindi e' un TextBlock non cliccabile che
-                                 compare solo a campo vuoto. -->
-                            <Grid Width="380">
-                                <TextBox x:Name="TxtSearch" Height="26" VerticalContentAlignment="Center"/>
-                                <TextBlock Text="Package name or ID, at least 3 characters"
-                                           IsHitTestVisible="False" Margin="7,0,0,0"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource SubtleFgBrush}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Text, ElementName=TxtSearch}" Value="">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                            <Button x:Name="BtnSearch" Content="Search" Width="104" Height="26" Margin="8,0,0,0"/>
-                            <!-- Spunta ON = interroga anche il Microsoft Store. Vale solo per la
-                                 ricerca lanciata con Invio o col pulsante: msstore va in rete
-                                 (~5s misurati) e non regge l'aggiornamento a ogni tasto.
-                                 Accanto a Search perche' ne modifica il comportamento. -->
-                            <CheckBox x:Name="ChkStore" IsChecked="False"
-                                      VerticalAlignment="Center" Margin="12,0,0,0"
-                                      Content="MS Store" Style="{StaticResource ThemedCheckBox}"
-                                      ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"
-                                      Foreground="{DynamicResource FgBrush}"/>
-                            <Control x:Name="SearchSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
-                                     Margin="12,0,0,0" Visibility="Collapsed"/>
-                        </StackPanel>
+                        <!-- Retry failed a destra: compare solo dopo una coda con errori in questa scheda. -->
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <StackPanel Orientation="Horizontal">
+                                <!-- Il campo e il suo testo guida sovrapposto: WPF non ha un
+                                     placeholder nativo, quindi e' un TextBlock non cliccabile che
+                                     compare solo a campo vuoto. -->
+                                <Grid Width="380">
+                                    <TextBox x:Name="TxtSearch" Height="26" VerticalContentAlignment="Center"/>
+                                    <TextBlock Text="Package name or ID, at least 3 characters"
+                                               IsHitTestVisible="False" Margin="7,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource SubtleFgBrush}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Text, ElementName=TxtSearch}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                                <Button x:Name="BtnSearch" Content="Search" Width="104" Height="26" Margin="8,0,0,0"/>
+                                <!-- Spunta ON = interroga anche il Microsoft Store. Vale solo per la
+                                     ricerca lanciata con Invio o col pulsante: msstore va in rete
+                                     (~5s misurati) e non regge l'aggiornamento a ogni tasto.
+                                     Accanto a Search perche' ne modifica il comportamento. -->
+                                <CheckBox x:Name="ChkStore" IsChecked="False"
+                                          VerticalAlignment="Center" Margin="12,0,0,0"
+                                          Content="MS Store" Style="{StaticResource ThemedCheckBox}"
+                                          ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"
+                                          Foreground="{DynamicResource FgBrush}"/>
+                                <Control x:Name="SearchSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                         Margin="12,0,0,0" Visibility="Collapsed"/>
+                            </StackPanel>
+                            <Button x:Name="BtnRetryInstall" Content="Retry failed" Height="26" HorizontalAlignment="Right" Padding="12,0" Visibility="Collapsed"
+                                    ToolTip="Run the last operation again on the packages in this list where it failed"/>
+                        </Grid>
 
                         <!-- Risultati della ricerca: stessa struttura e stessi stili della griglia
                              degli aggiornamenti, senza la colonna "Available". -->
@@ -880,34 +885,39 @@
                             <RowDefinition Height="Auto"/>   <!-- action bar -->
                         </Grid.RowDefinitions>
 
-                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                            <Button x:Name="BtnRefreshInstalled" Content="Refresh" Width="104" Height="26"/>
-                            <!-- Filtro locale sull'elenco gia' caricato: non richiama winget.
-                                 Con qualche centinaio di pacchetti installati (misurati: 339 su
-                                 questa macchina) scorrere a mano non e' praticabile. -->
-                            <Grid Width="300" Margin="8,0,0,0">
-                                <TextBox x:Name="TxtFilter" Height="26" VerticalContentAlignment="Center"/>
-                                <TextBlock Text="Filter by name or ID"
-                                           IsHitTestVisible="False" Margin="7,0,0,0"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource SubtleFgBrush}">
-                                    <TextBlock.Style>
-                                        <Style TargetType="TextBlock">
-                                            <Setter Property="Visibility" Value="Collapsed"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding Text, ElementName=TxtFilter}" Value="">
-                                                    <Setter Property="Visibility" Value="Visible"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </TextBlock.Style>
-                                </TextBlock>
-                            </Grid>
-                            <Control x:Name="InstalledSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
-                                     Margin="12,0,0,0" Visibility="Collapsed"/>
-                            <TextBlock x:Name="TxtInstalledCount" VerticalAlignment="Center" Margin="12,0,0,0"
-                                       FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
-                        </StackPanel>
+                        <!-- Retry failed a destra: compare solo dopo una coda con errori in questa scheda. -->
+                        <Grid Grid.Row="0" Margin="0,0,0,8">
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="BtnRefreshInstalled" Content="Refresh" Width="104" Height="26"/>
+                                <!-- Filtro locale sull'elenco gia' caricato: non richiama winget.
+                                     Con qualche centinaio di pacchetti installati (misurati: 339 su
+                                     questa macchina) scorrere a mano non e' praticabile. -->
+                                <Grid Width="300" Margin="8,0,0,0">
+                                    <TextBox x:Name="TxtFilter" Height="26" VerticalContentAlignment="Center"/>
+                                    <TextBlock Text="Filter by name or ID"
+                                               IsHitTestVisible="False" Margin="7,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource SubtleFgBrush}">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Text, ElementName=TxtFilter}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                                <Control x:Name="InstalledSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
+                                         Margin="12,0,0,0" Visibility="Collapsed"/>
+                                <TextBlock x:Name="TxtInstalledCount" VerticalAlignment="Center" Margin="12,0,0,0"
+                                           FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
+                            </StackPanel>
+                            <Button x:Name="BtnRetryInstalled" Content="Retry failed" Height="26" HorizontalAlignment="Right" Padding="12,0" Visibility="Collapsed"
+                                    ToolTip="Run the last operation again on the packages in this list where it failed"/>
+                        </Grid>
 
                         <DataGrid x:Name="GridInstalled" Grid.Row="1"
                                   AutoGenerateColumns="False" CanUserAddRows="False"
@@ -996,6 +1006,8 @@
                                       Foreground="{DynamicResource FgBrush}"/>
                             <Control x:Name="TopSpinner" Width="20" Height="20" Style="{StaticResource Spinner}"
                                      DockPanel.Dock="Left" Margin="10,0,0,0" Visibility="Collapsed"/>
+                            <Button x:Name="BtnRetryUpdates" Content="Retry failed" Height="26" Padding="12,0" DockPanel.Dock="Right" Visibility="Collapsed"
+                                    ToolTip="Run the last operation again on the packages in this list where it failed"/>
                             <TextBlock x:Name="TxtAvailable" VerticalAlignment="Center" Margin="12,0,0,0"
                                        FontWeight="SemiBold" Foreground="{DynamicResource FgBrush}"/>
                         </DockPanel>
@@ -1311,15 +1323,8 @@
              righe che rendeva elastiche lasciavano una fascia vuota fra il riquadro delle
              schede e la barra di avanzamento, e il log e' un pannello di servizio che sta
              bene dove sta. -->
-        <!-- Intestazione del log: a destra, dopo una coda con errori, ripete solo le righe
-             fallite (Start-RetryFailed). Salva e pulisci stanno nel menu del tasto destro. -->
-        <DockPanel Grid.Row="2" Margin="0,4,0,2" LastChildFill="True">
-            <Button x:Name="BtnRetryFailed" Content="Retry failed" DockPanel.Dock="Right" Height="22" Padding="10,0"
-                    Visibility="Collapsed"
-                    ToolTip="Run the last operation again on the packages where it failed"/>
-            <TextBlock Text="Log:" FontWeight="Bold" VerticalAlignment="Bottom"
-                       Foreground="{DynamicResource FgBrush}"/>
-        </DockPanel>
+        <TextBlock Grid.Row="2" Text="Log:" Margin="0,4,0,2" FontWeight="Bold"
+                   Foreground="{DynamicResource FgBrush}"/>
 
         <!-- Log (condiviso da tutte le schede) -->
         <!-- Il menu proprio sostituisce quello standard del TextBox: Copy e Select all vanno

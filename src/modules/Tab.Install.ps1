@@ -169,9 +169,10 @@ function Install-Rows([object[]]$Rows) {
         "install --id `"$($r.Id)`" -e$sourceArg --silent --disable-interactivity --accept-source-agreements --accept-package-agreements$scopeArg"
     } -OnDone {
         Set-AppBusy $false
-        # L'elenco della scheda Updates e' stato calcolato prima di queste installazioni.
+        # Updates e Installed sono stati letti prima di queste installazioni: si rileggono da
+        # soli appena si aprono. I risultati della ricerca restano, col loro esito.
         Set-UpdatesStale
-        Write-Log "The Updates list may be out of date now: press Check to rescan."
+        Set-InstalledStale
     }
 }
 

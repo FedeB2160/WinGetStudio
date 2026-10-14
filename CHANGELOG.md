@@ -3,7 +3,7 @@
 ## Unreleased
 
 - **Import** shows the packages in the file before installing them, all ticked, so you can leave some out. What you keep is imported exactly as exported, installer arguments saved by winget 1.29 included.
-- Every operation on a list ends with a summary in the log, such as *5 ok, 1 with warnings, 2 failed*, and **Retry failed** above the log runs it again on just the packages where it failed.
+- **Lists refresh themselves after an operation.** No more *press Check* or *press Refresh*: the tab's own list is read again, each row keeps its ✅ or ❌, and lists changed from another tab refresh when you open them. The log ends with a summary, such as *5 ok, 1 with warnings, 2 failed*, and **Retry failed**, at the top right of the tab, runs the operation again on just the packages where it failed.
 - Right-click the log to **save** it to a text file or **clear** it.
 - **Details** in the right-click menu of all three lists: the package as winget describes it (description, publisher, homepage, licence, release notes) and, for an installed one, its scope, installer type and location. The text is winget's own, in the language of Windows, and its web addresses open with a click.
 - The search results show the **source** of each package, and installing passes it to winget, so a package found in the winget catalogue no longer makes winget ask the Microsoft Store too. With **MS Store** ticked, the Store is searched on its own and its results are listed after the winget ones: since winget 1.29 they could fall past the 25-result limit and never appear (searching *spotify* found 33 winget packages and the Store app 34th).
