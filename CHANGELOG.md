@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Repair** in the Installed tab runs the installer of the ticked packages again, after a confirmation. winget can repair MSI and MSIX packages, and others only when their manifest says how; for the rest the row says *repair not supported* instead of an error code.
+- Every operation on a list ends with a summary in the log, such as *5 ok, 1 with warnings, 2 failed*, and **Retry failed** above the log runs it again on just the packages where it failed.
+- **Save log...** writes the log to a text file.
+
 - **Details** in the right-click menu of all three lists: the package as winget describes it (description, publisher, homepage, licence, release notes) and, for an installed one, its scope, installer type and location. The text is winget's own, in the language of Windows.
 - The search results show the **source** of each package, and installing passes it to winget, so a package found in the winget catalogue no longer makes winget ask the Microsoft Store too.
 

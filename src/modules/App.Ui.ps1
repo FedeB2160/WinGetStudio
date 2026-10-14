@@ -13,6 +13,26 @@ function Write-Log([string]$msg) {
     $TxtLog.ScrollToEnd()
 }
 
+# Salva il log su file. Scelta del file e scrittura separate, come per l'export: un dialog non
+# si pilota da un test headless. UTF-8 con BOM, cosi' anche un editor vecchio legge le accentate.
+function Save-Log {
+    $dlg = New-Object Microsoft.Win32.SaveFileDialog
+    $dlg.Title    = 'Save the log'
+    $dlg.Filter   = 'Text file (*.txt)|*.txt|All files (*.*)|*.*'
+    $dlg.FileName = "wingetstudio-log-$((Get-Date).ToString('yyyy-MM-dd-HHmm')).txt"
+    $dlg.InitialDirectory = [Environment]::GetFolderPath('Desktop')
+    if ($dlg.ShowDialog() -ne $true) { return }
+    Write-LogFile $dlg.FileName
+}
+
+function Write-LogFile([string]$Path) {
+    try {
+        [IO.File]::WriteAllText($Path, $TxtLog.Text, [Text.Encoding]::UTF8)
+        Write-Log "Log saved to $Path"
+    }
+    catch { Write-Log "Could not save the log: $($_.Exception.Message)" }
+}
+
 # Messaggio per una lettura winget fallita, su UNA riga (log e riquadri vuoti): exit e le
 # ultime due righe significative, dove winget mette la causa. Stessa regola della coda.
 function Format-WinGetReadError([string]$Command, $Result) {

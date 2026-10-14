@@ -27,6 +27,7 @@ function Refresh-InstalledState {
     $shown = @($script:installedView).Count
 
     $BtnUninstall.IsEnabled = (-not $script:isBusy) -and ($sel -gt 0)
+    $BtnRepair.IsEnabled    = $BtnUninstall.IsEnabled
 
     $TxtInstalledCount.Text =
         if ($total -eq 0)      { "" }
@@ -52,7 +53,7 @@ function Set-InstalledBusy([bool]$busy) {
     $MenuPinInstalled.IsEnabled   = -not $busy
     $MenuUnpinInstalled.IsEnabled = -not $busy
     $MenuDetailsInstalled.IsEnabled = -not $busy
-    if ($busy) { $BtnUninstall.IsEnabled = $false } else { Refresh-InstalledState }
+    if ($busy) { $BtnUninstall.IsEnabled = $false; $BtnRepair.IsEnabled = $false } else { Refresh-InstalledState }
 }
 
 # Una riga passa il filtro? Confronto su nome e ID, senza distinzione di maiuscole.
@@ -113,6 +114,46 @@ function Load-Installed {
         })
 }
 
+# Le righe in coda per una conferma: i primi 12 nomi, quanti altri, e quanti il filtro ne sta
+# nascondendo (si agisce anche su quelli, quindi va detto). La usano disinstalla e ripara.
+function Get-InstalledSelectionText([object[]]$sel) {
+    $shownNames = @($sel | Select-Object -First 12 | ForEach-Object { "  - $($_.Name)" })
+    $more = if ($sel.Count -gt 12) { "`n  ... and $($sel.Count - 12) more" } else { '' }
+    $hidden = @($sel | Where-Object { -not (Test-InstalledMatch $_) }).Count
+    $hiddenNote = if ($hidden -gt 0) { "`n`n$hidden of them are currently hidden by the filter." } else { '' }
+    ($shownNames -join "`n") + $more + $hiddenNote
+}
+
+# Ripara le righe spuntate: winget rilancia l'installer di ognuna. Stessa conferma della
+# disinstallazione, perche' anche qui si eseguono installer con privilegi di amministratore. Il
+# rifiuto da amministratore sui pacchetti per-utente (0x8A15007D) lo ripete la coda senza
+# elevazione come per uninstall (ADR 0018); il "non supportato" lo traduce la coda.
+function Start-RepairSelected {
+    $sel = @($installedItems | Where-Object { $_.Selected })
+    if ($sel.Count -eq 0) { return }
+
+    $answer = Show-AppDialog -Text ("Repair $($sel.Count) package$(if ($sel.Count -ne 1) { 's' })?`n`n" +
+        (Get-InstalledSelectionText $sel) +
+        "`n`nA repair runs each package's installer again. winget can repair MSI and MSIX packages; " +
+        "other installers only when their manifest says how, and the rest end with 'repair not supported'.") `
+        -Title 'Confirm repair' `
+        -Button ([System.Windows.MessageBoxButton]::YesNo) `
+        -Image ([System.Windows.MessageBoxImage]::Warning) `
+        -Default ([System.Windows.MessageBoxResult]::No)
+    if ($answer -ne [System.Windows.MessageBoxResult]::Yes) {
+        Write-Log "Repair cancelled."
+        return
+    }
+
+    Start-WinGetQueue -Rows $sel -Verb 'Repair' -ArgsBuilder {
+        param($r)
+        "repair --id `"$($r.Id)`" -e --silent --disable-interactivity --accept-source-agreements --accept-package-agreements"
+    } -OnDone {
+        Set-AppBusy $false
+        Write-Log "Repair finished."
+    }
+}
+
 function Start-UninstallSelected {
     $sel = @($installedItems | Where-Object { $_.Selected })
     if ($sel.Count -eq 0) { return }
@@ -120,14 +161,9 @@ function Start-UninstallSelected {
     # CONFERMA OBBLIGATORIA: la disinstallazione non si annulla. L'elenco riporta i nomi
     # REALI in coda, compresi quelli che il filtro sta nascondendo — altrimenti si
     # potrebbe rimuovere un pacchetto che non e' nemmeno a schermo.
-    $shownNames = @($sel | Select-Object -First 12 | ForEach-Object { "  - $($_.Name)" })
-    $more = if ($sel.Count -gt 12) { "`n  ... and $($sel.Count - 12) more" } else { '' }
-    $hidden = @($sel | Where-Object { -not (Test-InstalledMatch $_) }).Count
-    $hiddenNote = if ($hidden -gt 0) { "`n`n$hidden of them are currently hidden by the filter." } else { '' }
-
     # Default su No: un Invio distratto non deve disinstallare nulla.
     $answer = Show-AppDialog -Text ("Uninstall $($sel.Count) package$(if ($sel.Count -ne 1) { 's' })?`n`n" +
-        ($shownNames -join "`n") + $more + $hiddenNote +
+        (Get-InstalledSelectionText $sel) +
         "`n`nThis cannot be undone.") `
         -Title 'Confirm uninstall' `
         -Button ([System.Windows.MessageBoxButton]::YesNo) `
@@ -174,6 +210,7 @@ function Initialize-InstalledTab {
 
     $BtnRefreshInstalled.Add_Click({ Load-Installed })
     $BtnUninstall.Add_Click({ Start-UninstallSelected })
+    $BtnRepair.Add_Click({ Start-RepairSelected })
 
     # Pin/Unpin sulle righe evidenziate, come nella scheda Updates.
     $MenuPinInstalled.Add_Click({   Set-PackagePin @($GridInstalled.SelectedItems) $true })

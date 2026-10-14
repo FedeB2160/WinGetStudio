@@ -181,6 +181,8 @@ function Start-WinGetQueue {
     # trascina sulla successiva.
     $script:queueVerb   = $Verb
     $script:queueCancel = [hashtable]::Synchronized(@{ Requested = $false })
+    # Per Retry failed: la stessa coda si puo' rilanciare sulle sole righe fallite.
+    $script:lastQueue   = @{ Verb = $Verb; Rows = $Rows; ArgsBuilder = $ArgsBuilder; Vars = $Vars; OnDone = $OnDone }
 
     Set-AppBusy $true
 
@@ -212,7 +214,7 @@ function Start-WinGetQueue {
     }
 
     # [void]: il job non deve finire sulla pipeline del chiamante.
-    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet', 'Get-WinGetOutputTail', 'Invoke-UnelevatedTask', 'Test-ElevatedUserMismatch' -Vars $jobVars -Script {
+    [void](Start-BackgroundJob -OnDone $OnDone -Functions 'Get-UpdateStatus', 'Invoke-WinGet', 'Get-WinGetOutputTail', 'Invoke-UnelevatedTask', 'Test-ElevatedUserMismatch', 'Get-QueueSummary' -Vars $jobVars -Script {
         Invoke-Expression "function Get-WinGetArgs { $argsFnBody }"
 
         $done    = 0
@@ -237,7 +239,7 @@ function Start-WinGetQueue {
                 if ($r.ExitCode -eq -1978335107) {
                     $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
                     if (Test-ElevatedUserMismatch) {
-                        LogUI "   winget refuses this as administrator, and the package belongs to $me, which is not the signed-in user: sign in as $me to uninstall it."
+                        LogUI "   winget refuses this as administrator, and the package belongs to $me, which is not the signed-in user: sign in as $me to $($verb.ToLower()) it."
                     }
                     else {
                         LogUI "   winget refuses this as administrator: retrying without elevation..."
@@ -253,11 +255,22 @@ function Start-WinGetQueue {
                     'warning' { LogUI "   WARNING (exit $code): $name" }
                     default {
                         LogUI "   ERROR (exit $code): $name"
-                        # Ultime DUE righe significative dell'output winget: quando
-                        # l'installer fallisce, winget stampa il percorso del suo log
-                        # DOPO il messaggio d'errore, quindi l'ultima riga da sola
-                        # riportava solo il path e nascondeva la causa (Get-WinGetOutputTail).
-                        foreach ($l in (Get-WinGetOutputTail $r.Output 2)) { LogUI "      $l" }
+                        # Riparazione non possibile per questo pacchetto (0x8A150079 nessuna
+                        # informazione di riparazione, 0x8A15007A non applicabile, 0x8A15007C
+                        # tecnologia d'installazione senza riparazione): e' la regola, non un
+                        # guasto, e si dice in chiaro invece del codice.
+                        $u = ([int64]$code) -band 0xFFFFFFFFL
+                        if ($u -eq 0x8A150079L -or $u -eq 0x8A15007AL -or $u -eq 0x8A15007CL) {
+                            UI { $item.StatusDetail = "exit ${code}: repair not supported" }
+                            LogUI "      winget cannot repair this package: its installer does not support repair."
+                        }
+                        else {
+                            # Ultime DUE righe significative dell'output winget: quando
+                            # l'installer fallisce, winget stampa il percorso del suo log
+                            # DOPO il messaggio d'errore, quindi l'ultima riga da sola
+                            # riportava solo il path e nascondeva la causa (Get-WinGetOutputTail).
+                            foreach ($l in (Get-WinGetOutputTail $r.Output 2)) { LogUI "      $l" }
+                        }
                     }
                 }
             }
@@ -272,7 +285,57 @@ function Start-WinGetQueue {
                 UI { $progress.Value = $done }
             }
         }
-        if ($stopped) { LogUI "$verb cancelled after $done of $($rows.Count) packages; the rest were left untouched." }
-        else          { LogUI "$verb complete ($done/$($rows.Count))." }
+        if ($stopped) { LogUI "$verb cancelled after $done of $($rows.Count) packages; the rest were left untouched: $(Get-QueueSummary $rows)." }
+        else          { LogUI "$verb complete: $(Get-QueueSummary $rows)." }
     })
+}
+
+# Esito di una coda in una riga, contato dalle righe stesse: "5 ok, 1 with warnings, 2 failed,
+# 3 not run". Warning = riavvio richiesto o gia' installato (Get-UpdateStatus); not run = mai
+# partiti, cioe' annullati. I conteggi a zero non si scrivono.
+function Get-QueueSummary([object[]]$Rows) {
+    $parts = foreach ($p in @(@('ok', 'ok'), @('warning', 'with warnings'), @('error', 'failed'), @('', 'not run'))) {
+        $n = @($Rows | Where-Object { "$($_.Status)" -eq $p[0] }).Count
+        if ($n -gt 0) { "$n $($p[1])" }
+    }
+    @($parts) -join ', '
+}
+
+# Righe da ripetere: le fallite dell'ultima coda che sono ANCORA nel loro elenco. Dopo una nuova
+# scansione l'elenco contiene oggetti nuovi e quelli vecchi, non piu' a schermo, escono da soli:
+# nessun aggancio nelle scansioni.
+function Get-RetryRows {
+    $q = $script:lastQueue
+    if (-not $q) { return @() }
+    @($q.Rows | Where-Object {
+        $_.Status -eq 'error' -and ($items.Contains($_) -or $installedItems.Contains($_) -or $searchItems.Contains($_))
+    })
+}
+
+# Il pulsante Retry failed nell'intestazione del log: visibile solo se c'e' qualcosa da
+# ripetere, spento mentre winget lavora. Lo richiama Set-AppBusy (registrato in Start-App).
+function Update-RetryButton {
+    $n = @(Get-RetryRows).Count
+    $BtnRetryFailed.Content    = "Retry failed ($n)"
+    $BtnRetryFailed.Visibility = if ($n -gt 0) { [System.Windows.Visibility]::Visible } else { [System.Windows.Visibility]::Collapsed }
+    $BtnRetryFailed.IsEnabled  = -not $script:isBusy
+}
+
+# Ripete l'ultima coda sulle sole righe fallite, con gli stessi argomenti, variabili e OnDone.
+# Il blocco "lista vecchia fino al Check" della scheda Updates NON si applica: esiste perche'
+# ripetere righe RIUSCITE dipingerebbe errori falsi, e qui si ripetono solo le fallite, che non
+# hanno cambiato nulla. Conferma con No predefinito: puo' essere una disinstallazione.
+function Start-RetryFailed {
+    $q = $script:lastQueue
+    $rows = @(Get-RetryRows)
+    if ($rows.Count -eq 0) { return }
+    $names = @($rows | Select-Object -First 12 | ForEach-Object { "  - $($_.Name)" }) -join "`n"
+    $more  = if ($rows.Count -gt 12) { "`n  ... and $($rows.Count - 12) more" } else { '' }
+    $answer = Show-AppDialog -Text ("Retry the $($q.Verb.ToLower()) of $($rows.Count) package$(if ($rows.Count -ne 1) { 's' }) that failed?`n`n" + $names + $more) `
+        -Title 'Retry failed' `
+        -Button ([System.Windows.MessageBoxButton]::YesNo) `
+        -Image ([System.Windows.MessageBoxImage]::Question) `
+        -Default ([System.Windows.MessageBoxResult]::No)
+    if ($answer -ne [System.Windows.MessageBoxResult]::Yes) { return }
+    Start-WinGetQueue -Rows $rows -Verb $q.Verb -ArgsBuilder $q.ArgsBuilder -Vars $q.Vars -OnDone $q.OnDone
 }

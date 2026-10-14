@@ -80,3 +80,16 @@ a request arriving between two queues does not carry over.
    machine in a state nobody can describe.
 3. **A `$script:` flag for cancellation** — does not work: the runspace has its own scope and
    would not see it.
+
+## Note 2026-10-14 — summary and Retry failed
+
+- **Summary.** The queue ends with one line counted from its rows: "5 ok, 1 with warnings, 2 failed, 3
+  not run". It replaces "complete (n/n)", which said how many ran but not how they went.
+- **Retry failed.** `Start-WinGetQueue` remembers its verb, rows, `ArgsBuilder`, `-Vars` and `OnDone`
+  in `$script:lastQueue`. A **Retry failed (N)** button above the log runs the same queue again on the
+  rows that failed, after a Yes/No confirmation with No as the default, through `Start-WinGetQueue`,
+  so the single choke point still holds.
+  - Only rows still in their list count. After a rescan the list holds new objects, so the old ones
+    drop out without any hook in the scans.
+  - The Updates lock until the next **Check** does not apply to a retry. The lock exists because
+    running *successful* rows again paints false errors, and failed rows changed nothing.

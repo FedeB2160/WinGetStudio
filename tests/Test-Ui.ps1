@@ -992,6 +992,12 @@ else {
     $ran = @($probeRows | Where-Object { $_.Status }).Count
     if ($ran -ge 5) { throw "l'annullamento non ha fermato la coda: eseguiti $ran su 5" }
     if ($TxtLog.Text -notmatch 'cancelled') { throw "l'annullamento non e' finito nel log" }
+    # Il riepilogo conta il pacchetto in volo (fallito: l'ID non esiste) e quelli mai partiti;
+    # il fallito, ancora in elenco, si puo' ripetere.
+    if ($TxtLog.Text -notmatch "cancelled after .*: (\d+ failed, )?$(5 - $ran) not run\.") { throw "riepilogo della coda annullata assente o sbagliato" }
+    if ($BtnRetryFailed.Visibility -ne 'Visible' -or $BtnRetryFailed.Content -notmatch "\($(@($probeRows | Where-Object { $_.Status -eq 'error' }).Count)\)") {
+        throw "dopo una coda con errori Retry failed non compare: '$($BtnRetryFailed.Content)' $($BtnRetryFailed.Visibility)"
+    }
 
     # 4) a coda finita: pulsante di nuovo Update, ma bloccato fino al Check
     if ($BtnUpdate.Content -ne 'Update') { throw "a coda finita il pulsante dice '$($BtnUpdate.Content)'" }
@@ -1477,6 +1483,82 @@ if ($realWinget) {
     if ($liveDet -notmatch '7zip\.7zip' -or $liveDet -notmatch 'https?://') { throw "dettagli reali di 7zip.7zip inattesi: $liveDet" }
     "OK details show reale su 7zip.7zip ($(@($liveDet -split "`r`n").Count) righe)"
 }
+
+# 16e) Riparazione (issue #24): stessa coda e stessa conferma della disinstallazione, perche'
+# rilancia l'installer di ogni pacchetto. winget ripara MSI e MSIX, gli altri solo se il
+# manifest lo dice: il rifiuto deve arrivare leggibile, non come un codice.
+$repairSrc = Get-FunctionSource 'Start-RepairSelected'
+$posConfirm = $repairSrc.IndexOf('Show-AppDialog'); $posQueue = $repairSrc.IndexOf('Start-WinGetQueue')
+if ($posConfirm -lt 0 -or $posConfirm -gt $posQueue) { throw "la riparazione parte senza conferma" }
+if ($repairSrc -notmatch 'MessageBoxResult\]::No' -or $repairSrc -notmatch 'MessageBoxButton\]::YesNo') { throw "la conferma della riparazione non e' Yes/No con No predefinito" }
+if ($repairSrc -notmatch 'repair --id `"\$\(\$r\.Id\)`" -e --silent --disable-interactivity') { throw "riga di comando della riparazione inattesa" }
+$queueSrc = Get-FunctionSource 'Start-WinGetQueue'
+foreach ($code in '0x8A150079', '0x8A15007A', '0x8A15007C') {
+    if ($queueSrc -notmatch $code) { throw "il rifiuto di riparare $code non ha un messaggio leggibile" }
+}
+if ($queueSrc -match 'to uninstall it') { throw "il messaggio 'firma come...' parla di disinstallazione anche per la riparazione" }
+$repRow = [WgtRow]@{ Name = 'Repair fixture'; Id = "WgtStudio.RepairFixture$PID"; Selected = $true }
+$installedItems.Add($repRow)
+try {
+    Refresh-InstalledState
+    if (-not $BtnRepair.IsEnabled) { throw "con una riga spuntata Repair resta spento" }
+    Set-AppBusy $true
+    if ($BtnRepair.IsEnabled) { throw "Repair resta attivo durante un'operazione" }
+    Set-AppBusy $false
+    if (-not $BtnRepair.IsEnabled) { throw "a operazione finita Repair resta spento" }
+}
+finally { [void]$installedItems.Remove($repRow); Refresh-InstalledState }
+if ($BtnRepair.IsEnabled) { throw "senza righe spuntate Repair e' attivo" }
+"OK repair  conferma prima della coda, rifiuti leggibili, pulsante legato a spunte e stato occupato"
+
+# 16f) Esito della coda, ripeti i falliti, salva il log. Il riepilogo conta dalle righe
+# stesse; i falliti da ripetere sono quelli dell'ultima coda ANCORA in elenco: dopo una nuova
+# scansione gli oggetti vecchi non si vedono piu' e non vanno rilanciati.
+$sumRows = @(
+    [WgtRow]@{ Id = 'a'; Status = 'ok' }, [WgtRow]@{ Id = 'b'; Status = 'ok' },
+    [WgtRow]@{ Id = 'c'; Status = 'warning' }, [WgtRow]@{ Id = 'd'; Status = 'error' },
+    [WgtRow]@{ Id = 'e'; Status = '' })
+$sum = Get-QueueSummary $sumRows
+if ($sum -ne '2 ok, 1 with warnings, 1 failed, 1 not run') { throw "riepilogo della coda: '$sum'" }
+if ((Get-QueueSummary @([WgtRow]@{ Status = 'ok' })) -ne '1 ok') { throw "il riepilogo non omette i conteggi a zero" }
+if ($queueSrc -notmatch 'Get-QueueSummary' -or $queueSrc -notmatch "'Get-QueueSummary'") { throw "la coda non scrive il riepilogo, o il job non riceve la funzione" }
+
+$failIn  = [WgtRow]@{ Name = 'Failed, shown'; Id = "WgtStudio.FailIn$PID"; Status = 'error' }
+$failOut = [WgtRow]@{ Name = 'Failed, rescanned away'; Id = "WgtStudio.FailOut$PID"; Status = 'error' }
+$okIn    = [WgtRow]@{ Name = 'Done'; Id = "WgtStudio.OkIn$PID"; Status = 'ok' }
+$savedLast = $script:lastQueue
+$installedItems.Add($failIn); $installedItems.Add($okIn)
+try {
+    $script:lastQueue = @{ Verb = 'Uninstall'; Rows = @($failIn, $failOut, $okIn); ArgsBuilder = { param($r) "x" }; Vars = @{}; OnDone = {} }
+    $retry = @(Get-RetryRows)
+    if ($retry.Count -ne 1 -or $retry[0] -ne $failIn) { throw "da ripetere: $(@($retry | ForEach-Object { $_.Name }) -join ', '); atteso solo 'Failed, shown'" }
+    Update-RetryButton
+    if ($BtnRetryFailed.Visibility -ne 'Visible' -or $BtnRetryFailed.Content -notmatch '\(1\)') { throw "pulsante Retry: '$($BtnRetryFailed.Content)' $($BtnRetryFailed.Visibility)" }
+    Set-AppBusy $true
+    if ($BtnRetryFailed.IsEnabled) { throw "Retry failed resta attivo durante un'operazione" }
+    Set-AppBusy $false
+    [void]$installedItems.Remove($failIn)
+    Update-RetryButton
+    if ($BtnRetryFailed.Visibility -eq 'Visible') { throw "senza falliti in elenco il pulsante Retry resta visibile" }
+}
+finally {
+    $script:lastQueue = $savedLast
+    [void]$installedItems.Remove($failIn); [void]$installedItems.Remove($okIn)
+    Update-RetryButton
+}
+$retrySrc = Get-FunctionSource 'Start-RetryFailed'
+$posConfirm = $retrySrc.IndexOf('Show-AppDialog'); $posQueue = $retrySrc.IndexOf('Start-WinGetQueue')
+if ($posConfirm -lt 0 -or $posConfirm -gt $posQueue -or $retrySrc -notmatch 'MessageBoxResult\]::No') { throw "Retry failed riparte senza conferma con No predefinito" }
+
+$logFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-logtest-$PID.txt"
+$TxtLog.Clear(); Write-Log ('log check ' + [char]0x00E8)
+try {
+    Write-LogFile $logFile
+    $saved = [IO.File]::ReadAllText($logFile)
+    if ($saved -notmatch ('log check ' + [char]0x00E8)) { throw "il log salvato non contiene il testo del log: '$saved'" }
+}
+finally { Remove-Item -LiteralPath $logFile -ErrorAction SilentlyContinue }
+"OK report  riepilogo della coda, ripeti solo i falliti ancora in elenco, log salvato in UTF-8"
 
 # 17) Elenco installati e filtro locale. Il caricamento vero solo con -Live; il filtro si
 # prova sempre, su righe finte: non deve dipendere da cosa e' installato sulla macchina.

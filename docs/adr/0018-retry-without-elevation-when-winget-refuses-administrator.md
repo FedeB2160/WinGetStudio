@@ -93,3 +93,11 @@ used another administrator account. That part was wrong:
 6. **`-LogonType S4U`** (runs whether the account is signed in or not, without a window) — it runs in
    session 0, where an uninstaller that shows a dialog would wait forever unseen, and S4U tasks get
    no network credentials.
+
+## Note 2026-10-14 — repair
+
+Repair ([issue #24](https://github.com/FedeB2160/WinGetStudio/issues/24)) goes through the same queue,
+and winget refuses `repair` of a per-user `exe`, `inno`, `nullsoft`, `burn` or `portable` package as
+administrator with the same `0x8A15007D` (`ShellExecuteInstallerHandler.cpp`). The retry is
+verb-agnostic, so repair gets it with no extra code. The message for a mismatched account now names
+the queue's verb instead of always saying "uninstall".

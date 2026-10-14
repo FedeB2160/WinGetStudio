@@ -954,6 +954,9 @@
                         <DockPanel Grid.Row="2" Margin="0,8,0,0">
                             <Button x:Name="BtnUninstall" Content="Uninstall" Width="104" Height="26"
                                     DockPanel.Dock="Left" IsEnabled="False"/>
+                            <Button x:Name="BtnRepair" Content="Repair" Width="104" Height="26"
+                                    DockPanel.Dock="Left" Margin="8,0,0,0" IsEnabled="False"
+                                    ToolTip="Run the installer of the ticked packages again to repair them. winget can repair MSI and MSIX packages, and others only when their manifest says how."/>
                             <!-- Export/Import a destra, staccati da Uninstall: agiscono sulla
                                  macchina intera, non sulle righe selezionate. -->
                             <Button x:Name="BtnImport" Content="Import..." Width="104" Height="26"
@@ -1311,8 +1314,17 @@
              righe che rendeva elastiche lasciavano una fascia vuota fra il riquadro delle
              schede e la barra di avanzamento, e il log e' un pannello di servizio che sta
              bene dove sta. -->
-        <TextBlock Grid.Row="2" Text="Log:" Margin="0,4,0,2" FontWeight="Bold"
-                   Foreground="{DynamicResource FgBrush}"/>
+        <!-- Intestazione del log: a destra salva il log e, dopo una coda con errori, ripete solo
+             le righe fallite (Start-RetryFailed). -->
+        <DockPanel Grid.Row="2" Margin="0,4,0,2" LastChildFill="True">
+            <Button x:Name="BtnSaveLog" Content="Save log..." DockPanel.Dock="Right" Height="22" Padding="10,0"
+                    ToolTip="Save the log to a text file"/>
+            <Button x:Name="BtnRetryFailed" Content="Retry failed" DockPanel.Dock="Right" Height="22" Padding="10,0"
+                    Margin="0,0,8,0" Visibility="Collapsed"
+                    ToolTip="Run the last operation again on the packages where it failed"/>
+            <TextBlock Text="Log:" FontWeight="Bold" VerticalAlignment="Bottom"
+                       Foreground="{DynamicResource FgBrush}"/>
+        </DockPanel>
 
         <!-- Log (condiviso da tutte le schede) -->
         <TextBox x:Name="TxtLog" Grid.Row="3"
