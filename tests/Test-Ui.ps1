@@ -765,6 +765,16 @@ foreach ($dash in '&#8212;', [char]0x2014, [char]0x2013) {
     if ($uiMarkup.Contains([string]$dash)) { throw "trattino lungo nel testo dell'interfaccia: '$dash'" }
 }
 "OK dash    nessun trattino lungo nel testo a schermo"
+# Tempo di avvio nel log: dall'avvio del processo alla finestra disegnata, diviso fra il prima
+# dello script (host dell'exe, scansione antivirus) e il codice dell'app. Serve a misurare
+# dove va l'attesa all'apertura invece di indovinarlo.
+$t0 = [datetime]'2026-10-14T10:00:00'
+$st = Format-StartupTime $t0 $t0.AddSeconds(8.4) $t0.AddSeconds(10.1)
+if ($st -ne 'Ready in 10.1 s: 8.4 s before the app''s code started (exe host, antivirus scan), 1.7 s in the app.') { throw "riga di avvio: '$st'" }
+if ((Format-StartupTime $t0 $null $t0.AddSeconds(2)) -ne 'Ready in 2.0 s.') { throw "riga di avvio senza inizio dello script" }
+if ((Get-FunctionSource 'Start-App') -notmatch '(?s)Add_ContentRendered\(\{.*Format-StartupTime') { throw "l'avvio non scrive il suo tempo nel log" }
+if ((Get-Content (Join-Path $root 'src\main.ps1') -Raw) -notmatch '(?m)^\$script:appStartedAt = Get-Date') { throw "main.ps1 non segna quando parte lo script" }
+"OK startup riga del tempo di avvio, divisa fra host dell'exe e app"
 # I link aprono il browser: WPF non lo fa da solo, serve un handler.
 if ((Get-FunctionSource 'Start-App') -notmatch 'Add-LinkHandler \$script:window' -or (Get-FunctionSource 'Add-LinkHandler') -notmatch 'RequestNavigateEvent') {
     throw "nessun handler per i link: cliccarli non aprirebbe nulla"
