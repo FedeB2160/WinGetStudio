@@ -2,7 +2,10 @@
 
 ## Unreleased
 
-- **Import** shows the packages in the file before installing them, all ticked, so you can leave some out. What you keep is imported exactly as exported, installer arguments saved by winget 1.29 included.
+- **Import** shows the packages in the file before installing them, all ticked, so you can leave some out. Installer arguments saved by winget 1.29 (`--custom`, `--override`) are left out unless you tick the box under the list: an import file can come from anyone, and they would reach the installer as administrator.
+- **Self-update checks who signed the download.** Besides the checksum GitHub publishes, the new exe or installer must be signed with the WinGet Studio certificate, or it is discarded; a release with no checksum is no longer run unverified. The download waits in a folder only administrators can write, instead of the user's temp folder.
+- **Results of an install or update are right again.** The list of exit codes that count as warnings was off by one: a failed installation (*restart and try again*) or one you cancelled showed as a warning and was skipped by **Retry failed**, while *already installed* and *the PC will restart* showed as failures.
+- winget is no longer run with arguments containing `%`, which the command line would expand: such a package or file path is refused, and the log says why.
 - **Lists refresh themselves after an operation.** No more *press Check* or *press Refresh*: the tab's own list is read again, each row keeps its ✅ or ❌, and lists changed from another tab refresh when you open them. The log ends with a summary, such as *5 ok, 1 with warnings, 2 failed*, and **Retry failed**, at the top right of the tab, runs the operation again on just the packages where it failed.
 - Right-click the log to **save** it to a text file or **clear** it.
 - **Details** in the right-click menu of all three lists: the package as winget describes it (description, publisher, homepage, licence, release notes) and, for an installed one, its scope, installer type and location. The text is winget's own, in the language of Windows, and its web addresses open with a click.

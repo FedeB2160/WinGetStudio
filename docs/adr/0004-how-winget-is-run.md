@@ -1,9 +1,9 @@
 # ADR 0004 — How winget is run
 
 - **Status:** Accepted
-- **Date:** 2026-08-04 (in place since v1.9.0 or earlier; the resolved path and the quote guard came in v1.10.0, UTF-8 decoding of reads and the temp sweep in v1.10.3)
+- **Date:** 2026-08-04 (in place since v1.9.0 or earlier; the resolved path and the quote guard came in v1.10.0, UTF-8 decoding of reads and the temp sweep in v1.10.3; the `%` guard, `/v:off` and the corrected exit codes on 2026-10-21, unreleased)
 - **Depends on:** ADR 0002, ADR 0003, ADR 0008
-- **Referenced by:** ADR 0005, ADR 0006, ADR 0018 (the same command line, run without elevation)
+- **Referenced by:** ADR 0005, ADR 0006, ADR 0018 (the same command line, run without elevation), ADR 0022 (the sweep of `%SystemRoot%\Temp`)
 
 ## Context
 
@@ -60,11 +60,27 @@ each caller interpolates the package Id between quotes. Ids come from the catalo
 display names written by whoever authored the installer, and this process is elevated. An odd
 number of double quotes throws instead of running.
 
+**So is any `%`.** `cmd` expands `%VAR%` even between quotes, and does it *after* the quotes were
+counted. A non-elevated process can create a per-user ARP entry with `%X%` in its name and a user
+environment variable `X` holding quotes and `&`; uninstalling that entry from the app would run the
+rest as administrator. The scenario is deduced, not reproduced, and an Id or a path with `%` is rare,
+so the line is refused with a message in the log — as UniGetUI does. **`/v:off`** goes on the `cmd`
+line for the same reason: `HKCU\Software\Microsoft\Command Processor\DelayedExpansion`, which a
+non-elevated process can set, would make `cmd` expand `!VAR!` too, and the switch wins over the
+registry.
+
+**The exit code of a write becomes ok, warning or error** in `Get-UpdateStatus`. Warnings are
+`0x8A150109` (reboot required to finish), `0x8A15010B` (reboot initiated), `0x8A15010D` (already
+installed), `3010` and `1641`; anything else non-zero is an error. Up to v1.12.0 the list was shifted
+by one, so a failed or cancelled installation (`0x8A15010A`, `0x8A15010C`) showed as a warning, Retry
+failed skipped it, and "already installed" showed as an error. The names were checked with
+`winget error <code>` on winget 1.29.380, and `Test-InvokeWinGet.ps1` asserts each code.
+
 **Leftover output files are swept at startup** by `Clear-WinGetTempFiles`, with
 `[IO.File]::Delete`: the FileSystem provider can fail to resolve a `%TEMP%` in 8.3 form
 (`C:\Users\FB5FE~1.BOR\…`), and `-LiteralPath` does not help. A file still in use waits for the
-next launch. The setup downloaded by the self-update uses the same `wgt_` prefix and is swept the
-same way (ADR 0013).
+next launch. The folder the self-update downloads to uses the same `wgt_` prefix, in
+`%SystemRoot%\Temp`, and is swept the same way (ADR 0022).
 
 ## Consequences
 
@@ -74,8 +90,10 @@ same way (ADR 0013).
 - Output is UTF-8 everywhere, console or not.
 
 **To watch**
-- The quote guard does **not** cover `%VAR%` expansion by `cmd`, which is a different problem; it
-  should not be believed complete.
+- The guard covers what `cmd` does to the line it is handed: odd quotes, `%VAR%` and, through
+  `/v:off`, `!VAR!`. Up to v1.12.0 it covered quotes only. The `%` refusal is broad on purpose: a
+  package whose Id or a file whose path contains `%` cannot be updated, installed, exported or
+  imported from the app, and the log says why.
 - Forgetting `wingetPath` in a job's `-Vars` fails quietly as an empty read; `Test-Ui.ps1`
   checks the rule (ADR 0016).
 

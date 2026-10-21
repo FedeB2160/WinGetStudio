@@ -117,7 +117,7 @@ The inventory of what is on the machine, loaded the first time you open the tab.
 1. The **filter box** narrows the list by name or ID as you type.
 2. Tick rows and press **Uninstall**. A confirmation lists exactly what will be removed, and defaults to *No*: a stray <kbd>Enter</kbd> cannot delete anything.
    - If the filter is hiding a package you had ticked, both the counter and the confirmation say so, so nothing is removed off screen.
-3. **Export...** saves the list of installed packages to a `.json` file. **Import...** installs the packages a file describes: the quick way to set up a new machine.
+3. **Export...** saves the list of installed packages to a `.json` file. **Import...** installs the packages a file describes: the quick way to set up a new machine. It first lists them, all ticked, so you can leave some out. Installer arguments winget saved in the file (`--custom`, `--override`) are left out unless you tick the box under the list: the file may come from anyone, and they would reach the installer as administrator.
 
 Packages you installed without winget appear here too, with IDs like `ARP\Machine\X64\Android Studio`, and can be uninstalled like any other. winget refuses to uninstall some per-user programs from an elevated app; WinGet Studio then repeats the uninstall without elevation, and a console window shows while it runs.
 
@@ -176,7 +176,7 @@ Its own tab, at the very right end of the strip: what the app does function by f
 
 ## Automatic updates
 
-At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the Settings tab, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, and the file is verified against the checksum published with the release.
+At startup the app checks GitHub for a newer release. If there is one, an **Update to vX.Y.Z** button appears in the Settings tab, and the log says so. Nothing is downloaded until you ask: the button explains what will be downloaded and from where, and the file is verified against the checksum published with the release. It must also be signed with the WinGet Studio certificate, or it is discarded without running.
 
 - A copy installed with the setup runs the new installer, which closes WinGet Studio, updates it and reopens it.
 - A portable copy replaces itself and restarts.

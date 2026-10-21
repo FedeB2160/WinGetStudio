@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-04 (v1.9.0; the winget-portable guard came in v1.10.1, the four install channels in v1.11.0)
 - **Depends on:** ADR 0001, ADR 0002, ADR 0003, ADR 0012
-- **Referenced by:** ADR 0014, ADR 0015, ADR 0019 (the same check, for winget)
+- **Referenced by:** ADR 0014, ADR 0015, ADR 0019 (the same check, for winget), ADR 0022 (the signer check and the protected download folder)
 
 ## Context
 
@@ -60,14 +60,17 @@ missing that file offers no update, and a manual check says which file is missin
 it before anything runs. The `installed` channel **refuses** a release with no digest — the setup
 runs as administrator. The `portable` channel downloads anyway but says, in the confirmation, that the
 file cannot be verified. The confirmation is Yes/No, defaults to No, names the file, size and URL, and
-comes before anything is downloaded.
+comes before anything is downloaded. **Since ADR 0022** every channel also checks that the file is
+signed with the key of `assets\WinGetStudio-codesign.cer`, and downloads to a folder in
+`%SystemRoot%\Temp` that only Administrators and SYSTEM can write.
 
 **Replacing the running exe (`portable`).** Rename the running exe to `.old`, move the download into
 its place, start it (its `requireAdministrator` manifest brings its own UAC prompt, ADR 0002) and close
 the window. If the rename succeeded and the move did not, the `.old` is put back. `Clear-OldExe`
 removes the `.old` at the next startup, best effort. No external updater.
 
-**Running the setup (`installed`).** Download to `%TEMP%` as `wgt_<tag>_WinGetStudio_Setup.exe`, then
+**Running the setup (`installed`).** Download to `%TEMP%` as `wgt_<tag>_WinGetStudio_Setup.exe`
+(since ADR 0022, to `%SystemRoot%\Temp\wgt_update_<guid>\WinGetStudio_Setup.exe`), then
 start it with `/SILENT /CLOSEAPPLICATIONS /relaunch=1 /LOG="<temp>\WinGetStudio-update.log"`, log the
 log path, close the window. The app is already elevated, so there is no second UAC prompt. Inno closes
 the app, replaces it and relaunches it (ADR 0014); on failure the wizard shows the error and the app is

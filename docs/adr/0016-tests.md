@@ -24,8 +24,9 @@ is no single-test selector.
   the real modules through the AST, so it tests production code rather than a copy. It checks that the
   wait is bound to the process (a detached child holding stdout must not hang it), that the exit code is
   available, that output is read back as UTF-8, that leftover temp files are swept, that the unelevated
-  path hands the same command line to its scheduled task (through a stand-in, ADR 0018), and it parses
-  four fixtures (ADR 0006). It needs no admin rights, installs nothing, and calls `winget --version` only
+  path hands the same command line to its scheduled task (through a stand-in, ADR 0018), that odd
+  quotes and `%` are refused on both paths, that each exit code maps to ok, warning or error (ADR 0004),
+  and it parses four fixtures (ADR 0006). It needs no admin rights, installs nothing, and calls `winget --version` only
   when winget exists.
 - **`tests\Test-Ui.ps1`** — runs with `-STA` and **mounts the real app in a hidden window**: `Start-App
   -NoShow` builds the window without displaying it.
@@ -57,7 +58,9 @@ manual gate before a release.
 - **Installer and self-update** (ADR 0013, ADR 0014): `Get-InstallChannel` on its four channels from fake
   paths; `Get-LatestRelease` choosing by name from an asset list where the setup sorts first; the
   `installed` channel refusing an asset with no digest; the setup name consistent and sorting after
-  `WinGetStudio.exe`; the `.iss` `AppId` being a GUID.
+  `WinGetStudio.exe`; the `.iss` `AppId` being a GUID; the signer rule on fake signatures and on
+  `cmd.exe`, the pinned thumbprint equal to the `.cer`'s, and the download folder's protected ACL
+  (ADR 0022).
 
 **Windows CI** (`.github\workflows\ci.yml`, GitHub-hosted `windows-2022`) on every pull request and push
 to `main`: both suites offline, then installs Inno Setup 6.7.1, builds the exe and the setup, fails if
