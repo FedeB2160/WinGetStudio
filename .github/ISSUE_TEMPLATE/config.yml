@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Troubleshooting
+    url: https://github.com/FedeB2160/WinGetStudio/blob/main/docs/TROUBLESHOOTING.md
+    about: Unknown publisher warnings, antivirus alerts, winget errors and other problems that are not bugs in WinGet Studio.
+  - name: Report a security vulnerability
+    url: https://github.com/FedeB2160/WinGetStudio/security/advisories/new
+    about: Privately, never in a public issue. See SECURITY.md.

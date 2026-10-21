@@ -152,7 +152,7 @@ A change that takes more than one sitting is planned in `docs\superpowers\plans\
 
 The discipline that goes with it:
 
-- One branch for the whole plan, `feature/vX.Y.Z`, with `main` left on what is published.
+- One branch for the whole plan, named after the kind of change (`feat/`, `fix/`, `perf/`, `docs/`, `chore/`, with the issue number when there is one; `release/vX.Y.Z` for a release), with `main` left on what is published.
 - **One commit per task**, not per step. Each carries the code, the tests, the `README.md` and `DEVELOPMENT.md` lines that task invalidates, and one line under `## Unreleased` in the changelog. Documentation and code do not travel separately: a README describing yesterday's button is worse than no README.
 - **Both suites green before every commit.** The Windows CI repeats them on every pull request, but offline: the live run (`-Live`) stays a manual gate before a release.
 - Push after each commit. If the session dies, the work is already out.

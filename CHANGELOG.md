@@ -7,6 +7,7 @@
 - Right-click the log to **save** it to a text file or **clear** it.
 - **Details** in the right-click menu of all three lists: the package as winget describes it (description, publisher, homepage, licence, release notes) and, for an installed one, its scope, installer type and location. The text is winget's own, in the language of Windows, and its web addresses open with a click.
 - The search results show the **source** of each package, and installing passes it to winget, so a package found in the winget catalogue no longer makes winget ask the Microsoft Store too. With **MS Store** ticked, the Store is searched on its own and its results are listed after the winget ones: since winget 1.29 they could fall past the 25-result limit and never appear (searching *spotify* found 33 winget packages and the Store app 34th).
+- The project is open to contributions: [CONTRIBUTING.md](CONTRIBUTING.md) explains how to report a bug, propose a feature and send a pull request, with forms for bug reports and feature requests. Security problems are reported privately ([SECURITY.md](SECURITY.md)), and there is a [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## v1.12.0
 

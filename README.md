@@ -196,3 +196,5 @@ The **App Installer (winget)** entry in Settings shows the installed version of 
 See **[DEVELOPMENT.md](DEVELOPMENT.md)**: project layout, how the single-file exe is built from the modules, signing, publishing a release, the test suite, and the design decisions worth knowing before changing the code.
 
 Version history is in **[CHANGELOG.md](CHANGELOG.md)**. Problems that are not bugs, and what to do about them, are in **[Troubleshooting](docs/TROUBLESHOOTING.md)**.
+
+To report a bug, propose a feature or send a pull request, see **[CONTRIBUTING.md](CONTRIBUTING.md)**. Security problems are reported privately: **[SECURITY.md](SECURITY.md)**.
