@@ -123,13 +123,28 @@ The signing itself is `src\sign.ps1 -Path <file> -Thumbprint <thumbprint>`: `bui
 
 The certificate is self-signed, `CN=WinGet Studio`, valid to 2031: `Get-AuthenticodeSignature` reports `UnknownError` and SmartScreen says "unknown publisher". **This is expected and does not mean the signature is missing.** To make it trusted, import `assets\WinGetStudio-codesign.cer` (no private key in it) into *Trusted Root Certification Authorities*: per user with `Import-Certificate -CertStoreLocation Cert:\CurrentUser\Root`, or machine-wide by GPO in a domain. Understand what you are doing first: anything signed with that certificate becomes trusted for whoever imports it.
 
+### Renewing the certificate
+
+The certificate expires on 2031-08-04. Renew it **before** then, on the machine that holds the key, as a new self-signed certificate **over the same private key**: the self-update pins the public key, not the certificate (→ [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md)), so every copy keeps updating. A new key would need a bridge release instead. Not rehearsed yet: try it well ahead of the date.
+
+```powershell
+$old = Get-Item Cert:\CurrentUser\My\139AD24ECA430A310495641A8FBBA66D305FA57D
+$rsa = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($old)
+$req = New-Object Security.Cryptography.X509Certificates.CertificateRequest 'CN=WinGet Studio', $rsa, ([Security.Cryptography.HashAlgorithmName]::SHA256), ([Security.Cryptography.RSASignaturePadding]::Pkcs1)
+$eku = New-Object Security.Cryptography.OidCollection; [void]$eku.Add((New-Object Security.Cryptography.Oid '1.3.6.1.5.5.7.3.3'))
+$req.CertificateExtensions.Add((New-Object Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension $eku, $false))
+$new = $req.CreateSelfSigned([DateTimeOffset]::Now, [DateTimeOffset]::Now.AddYears(5))
+```
+
+Then put the new certificate, with its key, into `Cert:\CurrentUser\My`, export its public half over `assets\WinGetStudio-codesign.cer` (`Export-Certificate -Type CERT`), and run `Test-Ui.ps1`: it fails if the public key in the `.cer` is no longer the pinned one, which would mean the key changed. `build.ps1` picks the certificate by the thumbprint of the new `.cer` with no other change. Back up the `.pfx` (with a password) outside the repository, in two places.
+
 **Private keys never belong in the repo** — `.gitignore` blocks `*.pfx`, `*.p12` and `*.snk`. What the signature does and does not prove, and why builds are not reproducible: → [ADR 0012](docs/adr/0012-signing.md).
 
 ## Publishing a release
 
 The update check reads the **latest** release of the repo, so publishing one is what makes an update reachable.
 
-1. Bump `$AppVersion` in `src\main.ps1` and rebuild — on the machine that holds the signing key, with Inno Setup installed, so both files come out signed. **Never publish an unsigned build, or one signed with another certificate:** every copy in the field checks that the download is signed by the key of `assets\WinGetStudio-codesign.cer` and refuses it otherwise (→ [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md)). `Get-AuthenticodeSignature dist\*.exe` must show the thumbprint `139AD24ECA430A310495641A8FBBA66D305FA57D` on both files.
+1. Bump `$AppVersion` in `src\main.ps1` and rebuild — on the machine that holds the signing key, with Inno Setup installed, so both files come out signed. **Never publish an unsigned build, or one signed with another certificate:** every copy in the field checks that the download is signed by the key of `assets\WinGetStudio-codesign.cer` and refuses it otherwise (→ [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md)). `Get-AuthenticodeSignature dist\*.exe` must show the signer `CN=WinGet Studio` on both files, and `Test-Ui.ps1` run with them in `dist\` checks them against the pinned key.
 2. Update `CHANGELOG.md`, commit, push.
 3. Tag: `git tag v1.10.1 && git push origin v1.10.1`. **Tag and `$AppVersion` must agree.**
 4. On GitHub → **Releases** → *Draft a new release*, pick the tag, paste the changelog entry, and attach **both** `dist\WinGetStudio.exe` and `dist\WinGetStudio_Setup.exe` as assets.
@@ -260,6 +275,6 @@ Each decision that shapes the architecture has an Architecture Decision Record i
 - [ADR 0019](docs/adr/0019-installing-and-updating-winget.md) — Installing winget when it is missing (register, else GitHub with SHA-256), its version in Settings, and its update: by the Store where it can, by a GitHub button elsewhere.
 - [ADR 0020](docs/adr/0020-themed-dialogs.md) — Dialogs in the app's theme (`Show-AppDialog`): same enums as the MessageBox, default No kept, dimmed window behind, MessageBox only as fallback.
 - [ADR 0021](docs/adr/0021-package-details-as-winget-text.md) — Package details are winget's own text (`show`, `list --details`), never parsed: its labels are translated. Every row carries its source; install passes it.
-- [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md) — The self-update accepts only files signed with the published key (thumbprint pinned, `Valid` or `UnknownError`), downloaded to a folder in `%SystemRoot%\Temp` that only Administrators and SYSTEM can write.
+- [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md) — The self-update accepts only files signed with the published key (public key pinned, checked through `WinVerifyTrust` because PowerShell's `UnknownError` hides altered signatures), downloaded to a folder in `%SystemRoot%\Temp` that only Administrators and SYSTEM can write.
 
 The rule: **a decision that shapes the architecture gets a new numbered ADR**, written from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md); a superseded or withdrawn ADR is kept and its number never reused. **A spec in `docs\superpowers\specs\` is deleted once it is implemented**, after its decisions have been moved into an ADR.

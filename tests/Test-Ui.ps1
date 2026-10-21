@@ -307,7 +307,9 @@ if ($posDef -lt 0 -or $posCheck -lt 0 -or $posDef -gt $posCheck) {
 # 8) Le righe notificano WPF da sole? Senza INotifyPropertyChanged servirebbe
 # $Grid.Items.Refresh() a ogni cambio di stato: quello rigenera la vista e riporta lo
 # scroll in cima, cioe' il blocco dell'elenco durante l'aggiornamento.
-$cs = [regex]::Match($code, "(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@").Groups[1].Value
+# Per nome: non e' l'unico Add-Type -TypeDefinition dell'app (WgtTrust, App.Update.ps1).
+$cs = @([regex]::Matches($code, "(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@") | ForEach-Object { $_.Groups[1].Value } |
+        Where-Object { $_ -match '\bclass WgtRow\b' })[0]
 if (-not $cs) { throw "definizione C# di WgtRow non trovata nello script" }
 if (-not ('WgtRow' -as [type])) { Add-Type -TypeDefinition $cs }
 $fired = New-Object System.Collections.ArrayList
@@ -1933,36 +1935,72 @@ if ((Get-FunctionSource 'Start-UpdateCheck') -notmatch 'Get-InstallChannel') { t
 "OK assets  asset per nome e canale; setup verificato, rilancio, uscita pulita se non parte"
 
 # Firma (ADR 0022): il digest arriva da GitHub come il file, quindi si controlla anche che il
-# firmatario sia la NOSTRA chiave, in ogni canale. Valid dove il .cer e' fra le radici attendibili,
-# UnknownError altrove (radice self-signed, ADR 0012); nient'altro, e mai con un altro firmatario.
-$cerThumb = (New-Object Security.Cryptography.X509Certificates.X509Certificate2 (Join-Path $root 'assets\WinGetStudio-codesign.cer')).Thumbprint
-if ($UpdateSignerThumbprint -ne $cerThumb) { throw "il thumbprint fissato ($UpdateSignerThumbprint) non e' quello di assets\WinGetStudio-codesign.cer ($cerThumb)" }
-function New-FakeSignature([string]$Status, [string]$Thumb) {
-    [PSCustomObject]@{ Status = $Status; SignerCertificate = $(if ($Thumb) { [PSCustomObject]@{ Thumbprint = $Thumb } }) }
-}
+# firmatario abbia la NOSTRA chiave pubblica, in ogni canale. L'esito e' l'HRESULT di WinVerifyTrust:
+# 0 dove il .cer e' fra le radici attendibili, CERT_E_UNTRUSTEDROOT altrove (radice self-signed,
+# ADR 0012); nient'altro, e mai con un'altra chiave.
+$cerObj = New-Object Security.Cryptography.X509Certificates.X509Certificate2 (Join-Path $root 'assets\WinGetStudio-codesign.cer')
+$cerKey = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($cerObj.GetPublicKey())).Replace('-', '')
+if ($UpdateSignerKeySha256 -ne $cerKey) { throw "la chiave fissata ($UpdateSignerKeySha256) non e' quella di assets\WinGetStudio-codesign.cer ($cerKey)" }
+# cmd.exe e' firmato da Microsoft via catalogo: WinVerifyTrust sul file lo dice non firmato
+# (0x800B0100), ma il certificato (da Get-AuthenticodeSignature) serve come "un'altra chiave".
+$cmdTrust = Get-UpdateSignerTrust "$env:SystemRoot\System32\cmd.exe"
+if (-not $cmdTrust.Certificate) { throw "cmd.exe senza certificato del firmatario" }
 $sigCases = @(
-    @('Valid', $cerThumb, $true), @('UnknownError', $cerThumb, $true),
-    @('NotSigned', $cerThumb, $false), @('HashMismatch', $cerThumb, $false), @('NotTrusted', $cerThumb, $false),
-    @('Valid', ('0' * 40), $false), @('UnknownError', '', $false)
+    @(0, $cerObj, $true), @(0x800B0109, $cerObj, $true),
+    @(0x80096004, $cerObj, $false), @(0x80096003, $cerObj, $false), @(0x80096010, $cerObj, $false), @(0x800B0100, $cerObj, $false),
+    @(0, $cmdTrust.Certificate, $false), @(0x800B0109, $null, $false)
 )
 $sigBad = @(foreach ($c in $sigCases) {
-    if ((Test-UpdateSignature (New-FakeSignature $c[0] $c[1]) $UpdateSignerThumbprint) -ne $c[2]) { "$($c[0])/$(if ($c[1]) { $c[1].Substring(0, 4) } else { 'nessun firmatario' }) -> atteso $($c[2])" }
+    $t = [PSCustomObject]@{ Result = [int]$c[0]; Certificate = $c[1] }
+    if ((Test-UpdateSignature $t $UpdateSignerKeySha256) -ne $c[2]) { "0x$('{0:X8}' -f $c[0])/$(if ($c[1]) { $c[1].Subject } else { 'nessun firmatario' }) -> atteso $($c[2])" }
 })
 if ($sigBad) { throw "Test-UpdateSignature: $($sigBad -join '; ')" }
-if (Test-UpdateSignature (New-FakeSignature 'Valid' $cerThumb) '') { throw "senza thumbprint atteso la firma passa" }
-# Firme vere: cmd.exe e' Valid ma di Microsoft; l'exe compilato, se c'e' (non in CI), e' nostro.
-if (Test-UpdateSignature (Get-AuthenticodeSignature -LiteralPath "$env:SystemRoot\System32\cmd.exe") $UpdateSignerThumbprint) { throw "accettato un file firmato da Microsoft" }
+if (Test-UpdateSignature ([PSCustomObject]@{ Result = 0; Certificate = $cerObj }) '') { throw "senza chiave attesa la firma passa" }
+# Firme vere: cmd.exe e' di Microsoft, un file di testo non e' firmato.
+if (Test-UpdateSignature $cmdTrust $UpdateSignerKeySha256) { throw "accettato un file firmato da Microsoft" }
+if (Test-UpdateSignature (Get-UpdateSignerTrust (Join-Path $root 'README.md')) $UpdateSignerKeySha256) { throw "accettato un file non firmato" }
+# L'exe compilato, se c'e' (non in CI), e' nostro; una sua copia con un byte alterato no. E fra le
+# copie con la FIRMA alterata ce n'e' almeno una che PowerShell chiama UnknownError col nostro
+# firmatario, come una buona: e' la ragione per cui si guarda WinVerifyTrust e non Status.
 $distExe = Join-Path $root 'dist\WinGetStudio.exe'
-$distSig = if (Test-Path -LiteralPath $distExe) { Get-AuthenticodeSignature -LiteralPath $distExe }
-if ($distSig -and $distSig.SignerCertificate -and -not (Test-UpdateSignature $distSig $UpdateSignerThumbprint)) { throw "l'exe firmato in dist\ non passa la verifica ($($distSig.Status))" }
+$distOk = $false
+if ((Test-Path -LiteralPath $distExe) -and (Get-AuthenticodeSignature -LiteralPath $distExe).SignerCertificate) {
+    if (-not (Test-UpdateSignature (Get-UpdateSignerTrust $distExe) $UpdateSignerKeySha256)) { throw "l'exe firmato in dist\ non passa la verifica" }
+    $probeExe = Join-Path ([IO.Path]::GetTempPath()) "wgt-sigprobe-$PID.exe"
+    try {
+        $bytes = [IO.File]::ReadAllBytes($distExe)
+        $b2 = [byte[]]$bytes.Clone(); $b2[0x400] = $b2[0x400] -bxor 0xFF
+        [IO.File]::WriteAllBytes($probeExe, $b2)
+        if (Test-UpdateSignature (Get-UpdateSignerTrust $probeExe) $UpdateSignerKeySha256) { throw "accettata una copia dell'exe con un byte del codice alterato" }
+        $opt  = [BitConverter]::ToInt32($bytes, 0x3C) + 24
+        $dirs = $opt + $(if ([BitConverter]::ToUInt16($bytes, $opt) -eq 0x20b) { 112 } else { 96 })
+        $secOff = [BitConverter]::ToInt32($bytes, $dirs + 32); $secLen = [BitConverter]::ToInt32($bytes, $dirs + 36)
+        $trap = $false
+        for ($i = $secOff + 8; $i -lt $secOff + $secLen -and -not $trap; $i += 37) {
+            $b2 = [byte[]]$bytes.Clone(); $b2[$i] = $b2[$i] -bxor 0x5A
+            [IO.File]::WriteAllBytes($probeExe, $b2)
+            $ps = Get-AuthenticodeSignature -LiteralPath $probeExe
+            $t  = Get-UpdateSignerTrust $probeExe
+            if ("$($ps.Status)" -eq 'UnknownError' -and $ps.SignerCertificate.Thumbprint -eq $cerObj.Thumbprint -and $t.Result -ne [int]0x800B0109) {
+                $trap = $true
+                if (Test-UpdateSignature $t $UpdateSignerKeySha256) { throw "accettata una firma alterata (0x$('{0:X8}' -f $t.Result))" }
+            }
+        }
+        if (-not $trap) { throw "nessuna firma alterata che PowerShell chiami UnknownError: la prova non prova nulla" }
+        $distOk = $true
+    }
+    finally { Remove-Item -LiteralPath $probeExe -Force -ErrorAction SilentlyContinue }
+}
 $updSrc = Get-FunctionSource 'Start-SelfUpdate'
-if ($updSrc -notmatch 'Get-AuthenticodeSignature' -or $updSrc -notmatch 'Test-UpdateSignature \$sig \$signer' -or $updSrc -notmatch "-Functions 'Test-UpdateSignature'") {
+if ($updSrc -notmatch 'Get-UpdateSignerTrust \$dest' -or $updSrc -notmatch 'Test-UpdateSignature \$sig \$signer' -or $updSrc -notmatch "-Functions 'Get-UpdateSignerTrust', 'Test-UpdateSignature'") {
     throw "Start-SelfUpdate non verifica la firma del file scaricato"
 }
-if ($updSrc.IndexOf('Get-AuthenticodeSignature') -gt $updSrc.IndexOf('-OnDone')) { throw "la firma si verifica dopo il job, non prima di eseguire" }
+if ($updSrc.IndexOf('Get-UpdateSignerTrust $dest') -gt $updSrc.IndexOf('-OnDone')) { throw "la firma si verifica dopo il job, non prima di eseguire" }
+# Firma che non torna: un popup con il link alle release, perche' il log non lo legge nessuno.
+if ($updSrc -notmatch '(?s)HashOk\)\s*\{\s*Show-AppDialog.*?releases/latest.*?-Links') { throw "una firma rifiutata non spiega all'utente come aggiornare a mano" }
 # portable: copia e non spostamento, o il nuovo exe si porterebbe l'ACL della cartella protetta.
 if ($updSrc -notmatch 'Copy-Item -LiteralPath \$tmp -Destination \$exe' -or $updSrc -match 'Move-Item -LiteralPath \$tmp') { throw "portable: il nuovo exe va copiato al suo posto, non spostato" }
-"OK sign    firmatario fissato al .cer (Valid o UnknownError), altri e non firmati rifiutati$(if (-not $distSig -or -not $distSig.SignerCertificate) { '; SKIP exe firmato in dist\' })"
+"OK sign    chiave del .cer fissata, WinVerifyTrust 0 o radice non attendibile, altri e non firmati rifiutati$(if ($distOk) { '; exe di dist\ accettato, copie alterate rifiutate' } else { '; SKIP exe firmato in dist\' })"
 
 # Cartella del download (ADR 0022): in %SystemRoot%\Temp, dove un utente non puo' rinominarla, con
 # un'ACL propria (non ereditata) solo per Administrators e SYSTEM, e OWNER RIGHTS senza permessi

@@ -67,9 +67,14 @@ for a self-signed certificate on a machine that does not trust it.
 - No signing key ever reaches CI: CI artifacts are unsigned test builds (ADR 0016). Releases are
   signed locally, on the machine that holds the key.
 - **A release must be signed with this key.** The self-update accepts only files whose signer has
-  the thumbprint of `assets\WinGetStudio-codesign.cer` (ADR 0022): an unsigned build, or one signed
-  through `$env:WINGETSTUDIO_CERT_THUMBPRINT` with another certificate, still builds but reaches no
-  copy in the field. Switching certificate needs a release that accepts both thumbprints first.
+  the public key of `assets\WinGetStudio-codesign.cer` (ADR 0022): an unsigned build, or one signed
+  through `$env:WINGETSTUDIO_CERT_THUMBPRINT` with another key, still builds but reaches no copy in
+  the field. Switching to a new key needs a release that accepts both keys first.
+- **Renew before 2031-08-04 with the same key.** A new self-signed certificate over the existing
+  private key keeps every copy updating with no bridge release, because the self-update pins the key,
+  not the certificate. The procedure is in DEVELOPMENT.md (*Renewing the certificate*); it has not been
+  rehearsed yet. Keep a backup of the `.pfx`, protected by a password, outside the repository: without
+  the key the only way forward is a new key and a bridge release.
 
 ## Alternatives considered
 

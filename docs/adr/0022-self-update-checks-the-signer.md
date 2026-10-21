@@ -26,20 +26,40 @@ the machine that holds it, and it never reaches GitHub or CI (ADR 0012, ADR 0016
 ## Decision
 
 **Every channel checks the Authenticode signer**, after the hash, inside the download job:
-`Get-AuthenticodeSignature` on the file, then `Test-UpdateSignature` (`App.Update.ps1`). It accepts
-the file only when **both** hold:
+`Get-UpdateSignerTrust` on the file, then `Test-UpdateSignature` (`App.Update.ps1`). It accepts the
+file only when **both** hold:
 
-- the status is `Valid` (the `.cer` was imported into the trusted roots) or `UnknownError` (it was not:
-  the self-signed root is untrusted, ADR 0012). `NotSigned`, `HashMismatch`, `NotTrusted` and every
-  other status are refused;
-- the signer's thumbprint is `$UpdateSignerThumbprint`, the thumbprint of
-  `assets\WinGetStudio-codesign.cer`, written into the module because the exe does not carry the
-  `.cer`. `Test-Ui.ps1` fails if the two differ.
+- **`WinVerifyTrust` returns `0`** (the `.cer` was imported into the trusted roots) **or
+  `CERT_E_UNTRUSTEDROOT`** (`0x800B0109`: everything verified, but the self-signed root is not trusted,
+  ADR 0012). Any other result is refused: a bad digest, a signature or countersignature that does not
+  verify, no signature, a certificate expired without a timestamp. The call is a small P/Invoke
+  (`WgtTrust`, compiled with `Add-Type` the first time an update runs, so startup does not pay for it),
+  with no revocation check and no network retrieval: the self-signed root has nothing to check.
+- **the SHA-256 of the signer's public key** is `$UpdateSignerKeySha256`, the key of
+  `assets\WinGetStudio-codesign.cer`, written into the module because the exe does not carry the `.cer`.
+  `Test-Ui.ps1` fails if the two differ.
 
-`UnknownError` is also PowerShell's catch-all status (a file that cannot carry a signature returns it,
-with no signer), which is why it is never accepted without the thumbprint. The `installed` channel
-still refuses a release with no digest; the `portable` one now has the signature to fall back on, and
-the confirmation says the download is checked against the signature only.
+**Why `WinVerifyTrust` and not `Get-AuthenticodeSignature`'s `Status`.** For PowerShell `UnknownError`
+is the catch-all status, and the untrusted self-signed root is reported through it. A test on a copy
+of a signed release (2026-10-21), altering one byte at a time inside its signature, found hundreds of
+broken variants — certificate signature not verifying, countersignature invalid, damaged ASN.1 —
+still reported as `UnknownError` **with our certificate as signer**: indistinguishable, by status and
+signer, from the good file. The first version of this check, in the same branch, accepted them.
+`WinVerifyTrust` tells them apart by code; on the same copies it accepted only variants it verifies as
+signed, where the changed bytes lie outside what the signature covers. `Test-Ui.ps1` repeats the
+experiment wherever a signed exe sits in `dist\`.
+
+**Why the public key and not the certificate's thumbprint.** The private key is what makes a signature
+impossible to forge: a certificate that merely contains our public key cannot sign anything that
+verifies against it. The thumbprint, a hash of the whole certificate, ties the check to its validity
+dates as well, so the renewal the certificate needs before it expires on 2031-08-04 would have locked
+every copy out. Renewing with **the same key** (ADR 0012) changes the thumbprint and leaves the key,
+so copies keep accepting with no bridge release.
+
+The `installed` channel still refuses a release with no digest; the `portable` one now has the
+signature to fall back on, and the confirmation says the download is checked against the signature
+only. **When the signature does not match**, the log says so and a dialog tells the user the update was
+not installed and links to the latest release, for an update by hand.
 
 **The download goes to `%SystemRoot%\Temp\wgt_update_<guid>`** (`New-UpdateDownloadDir`), created
 in one call with its own protected ACL — inheritance off, Full Control for Administrators
@@ -69,13 +89,19 @@ cannot be listed, and the sweep skips it.
 **To watch**
 - **Every release must be signed with the key of `assets\WinGetStudio-codesign.cer`.** An unsigned
   build (made on a machine without the key, ADR 0012), or one signed through
-  `$env:WINGETSTUDIO_CERT_THUMBPRINT` with another certificate, is refused by every copy in the field.
-- **Changing certificate takes two releases**: first one, signed with the old key, that accepts both
-  thumbprints; then the ones signed with the new key. A copy that accepts only the old thumbprint can
-  never update past the switch on its own.
-- `Test-Ui.ps1` checks the signature rule on fake signatures and on `cmd.exe` (signed by Microsoft);
-  the signed exe in `dist\` is checked only where it exists, which is never in CI. The full update
-  path is still tested by hand (ADR 0016).
+  `$env:WINGETSTUDIO_CERT_THUMBPRINT` with another key, is refused by every copy in the field. The fix
+  is to sign it with the right key and replace the release assets: copies accept it at the next check.
+- **A new key takes a bridge release**: first one, signed with the old key, that accepts both keys;
+  then the ones signed with the new key. The self-update looks only at the *latest* release, so a copy
+  that does not reach the bridge while it is the latest stays behind and has to be updated by hand —
+  the dialog says where. Expiry does not need this (renew with the same key); only a lost or stolen key
+  does, and for a stolen one the lock-out is the point. Keep a backup of the `.pfx` outside the
+  repository.
+- Copies up to v1.12.0 check no signature at all and are never locked out by this.
+- `Test-Ui.ps1` checks the rule on given results and certificates, on `cmd.exe` (signed by Microsoft
+  through a catalog, which `WinVerifyTrust` on the file alone reports as unsigned) and on a text file;
+  the signed exe in `dist\` and its altered copies only where it exists, which is never in CI. The full
+  update path is still tested by hand (ADR 0016).
 - The Inno Setup log (`%TEMP%\WinGetStudio-update.log`) stays in the user's `%TEMP%`.
 
 ## Alternatives considered
@@ -88,3 +114,10 @@ cannot be listed, and the sweep skips it.
 3. **The digest alone** — the previous rule: it does not survive a compromised release channel.
 4. **Accepting `Valid` only** — turned down: on every machine that has not imported the `.cer`, which
    is almost all of them, our own releases would be refused.
+5. **`Valid` or `UnknownError` from `Get-AuthenticodeSignature`, plus the signer** — the first version
+   on this branch, turned down before release: altered signatures come out as `UnknownError` with our
+   signer too.
+6. **The certificate's thumbprint** — the first version on this branch, turned down for the public key:
+   same protection, but the 2031 renewal would have needed a bridge release.
+7. **Installing anyway, on the SHA-256 alone, when the signer does not match** — turned down: file and
+   digest come from the same place, which is the gap this decision closes.

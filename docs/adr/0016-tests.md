@@ -58,8 +58,9 @@ manual gate before a release.
 - **Installer and self-update** (ADR 0013, ADR 0014): `Get-InstallChannel` on its four channels from fake
   paths; `Get-LatestRelease` choosing by name from an asset list where the setup sorts first; the
   `installed` channel refusing an asset with no digest; the setup name consistent and sorting after
-  `WinGetStudio.exe`; the `.iss` `AppId` being a GUID; the signer rule on fake signatures and on
-  `cmd.exe`, the pinned thumbprint equal to the `.cer`'s, and the download folder's protected ACL
+  `WinGetStudio.exe`; the `.iss` `AppId` being a GUID; the signer rule on given `WinVerifyTrust`
+  results and certificates, on `cmd.exe` and on altered copies of the signed exe in `dist\` where it
+  exists, the pinned public key equal to the `.cer`'s, and the download folder's protected ACL
   (ADR 0022).
 
 **Windows CI** (`.github\workflows\ci.yml`, GitHub-hosted `windows-2022`) on every pull request and push

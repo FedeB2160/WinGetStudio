@@ -26,19 +26,73 @@ $SelfPackageId = 'FedeB2160.WinGetStudio'
 $InnoAppId      = '{80A0A054-6278-4145-AD5A-2B3C4853019F}'
 $SetupAssetName = 'WinGetStudio_Setup.exe'
 
-# Thumbprint del certificato di assets\WinGetStudio-codesign.cer (ADR 0012): un aggiornamento
-# firmato da altri non si esegue (ADR 0022). Scritto qui perche' nell'exe il .cer non c'e';
-# Test-Ui verifica che coincida con quello del file.
-$UpdateSignerThumbprint = '139AD24ECA430A310495641A8FBBA66D305FA57D'
+# SHA-256 della CHIAVE PUBBLICA del certificato di assets\WinGetStudio-codesign.cer (ADR 0012): un
+# aggiornamento firmato con un'altra chiave non si esegue (ADR 0022). La chiave e non il thumbprint
+# del certificato: alla scadenza (2031) si rifa' il certificato con la stessa chiave, e le copie in
+# giro continuano ad accettare senza una release ponte. Scritto qui perche' nell'exe il .cer non
+# c'e'; Test-Ui verifica che coincida con quello del file.
+$UpdateSignerKeySha256 = 'C585E5232F0901A3F204EA86B85D30A25ABE0F4833463462A3BDBA59AC753CAA'
 
-# Il file e' firmato con la NOSTRA chiave? $Signature e' il risultato di Get-AuthenticodeSignature.
-# Valid dove il .cer e' stato importato fra le radici attendibili, UnknownError altrove (radice
-# self-signed, ADR 0012): entrambi vanno, ma solo col nostro firmatario. UnknownError e' anche lo
-# stato di ripiego di PowerShell, e senza il thumbprint non dimostrerebbe nulla: un file non
-# firmabile, per esempio, torna UnknownError senza firmatario. NotSigned, HashMismatch e il resto no.
-function Test-UpdateSignature($Signature, [string]$Thumbprint) {
-    return ("$($Signature.Status)" -in 'Valid', 'UnknownError') -and
-           [bool]$Thumbprint -and $Signature.SignerCertificate.Thumbprint -eq $Thumbprint
+# Esito della verifica Authenticode di un file, come lo da' Windows: l'HRESULT di WinVerifyTrust
+# (0 = valida, 0x800B0109 = valida ma con radice non attendibile, cioe' la nostra self-signed) e il
+# certificato del firmatario. NON lo Status di Get-AuthenticodeSignature: per PowerShell
+# UnknownError e' lo stato di ripiego, e una firma alterata (firma del certificato o controfirma
+# non valide, ASN.1 rovinato) torna UnknownError col nostro firmatario esattamente come una buona.
+# Nessun controllo di revoca: la radice self-signed non ne ha, e cosi' non si va in rete.
+# Il tipo si compila solo qui, al primo aggiornamento: Add-Type all'avvio costerebbe tempo a tutti.
+function Get-UpdateSignerTrust([string]$Path) {
+    if (-not ('WgtTrust' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class WgtTrust {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct FileInfo { public uint cbStruct; public string pcwszFilePath; public IntPtr hFile; public IntPtr pgKnownSubject; }
+    [StructLayout(LayoutKind.Sequential)]
+    struct TrustData {
+        public uint cbStruct; public IntPtr pPolicyCallbackData; public IntPtr pSIPClientData; public uint dwUIChoice;
+        public uint fdwRevocationChecks; public uint dwUnionChoice; public IntPtr pFile; public uint dwStateAction;
+        public IntPtr hWVTStateData; public IntPtr pwszURLReference; public uint dwProvFlags; public uint dwUIContext;
+        public IntPtr pSignatureSettings;
+    }
+    [DllImport("wintrust.dll", CharSet = CharSet.Unicode)]
+    static extern int WinVerifyTrust(IntPtr hwnd, ref Guid action, ref TrustData data);
+    public static int Verify(string path) {
+        FileInfo fi = new FileInfo();
+        fi.cbStruct = (uint)Marshal.SizeOf(typeof(FileInfo));
+        fi.pcwszFilePath = path;
+        IntPtr pfi = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(FileInfo)));
+        try {
+            Marshal.StructureToPtr(fi, pfi, false);
+            TrustData td = new TrustData();
+            td.cbStruct = (uint)Marshal.SizeOf(typeof(TrustData));
+            td.dwUIChoice = 2;          // WTD_UI_NONE
+            td.dwUnionChoice = 1;       // WTD_CHOICE_FILE
+            td.pFile = pfi;
+            td.dwProvFlags = 0x1010;    // WTD_REVOCATION_CHECK_NONE | WTD_CACHE_ONLY_URL_RETRIEVAL
+            Guid action = new Guid("00AAC56B-CD44-11d0-8CC2-00C04FC295EE");   // WINTRUST_ACTION_GENERIC_VERIFY_V2
+            return WinVerifyTrust(IntPtr.Zero, ref action, ref td);
+        }
+        finally { Marshal.DestroyStructure(pfi, typeof(FileInfo)); Marshal.FreeHGlobal(pfi); }
+    }
+}
+'@
+    }
+    [PSCustomObject]@{
+        Result      = [WgtTrust]::Verify($Path)
+        Certificate = (Get-AuthenticodeSignature -LiteralPath $Path).SignerCertificate
+    }
+}
+
+# Il file e' firmato con la NOSTRA chiave? $Trust viene da Get-UpdateSignerTrust. Valida (0) dove il
+# .cer e' stato importato fra le radici attendibili, CERT_E_UNTRUSTEDROOT altrove (radice
+# self-signed, ADR 0012): entrambe vanno, e solo se la chiave pubblica del firmatario e' la nostra.
+# Ogni altro esito no: firma o digest non validi, file non firmato, certificato scaduto senza timestamp.
+function Test-UpdateSignature($Trust, [string]$KeySha256) {
+    if (-not $Trust -or -not $Trust.Certificate -or -not $KeySha256) { return $false }
+    if ($Trust.Result -notin 0, ([int]0x800B0109)) { return $false }
+    $key = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($Trust.Certificate.GetPublicKey())).Replace('-', '')
+    return $key -eq $KeySha256
 }
 
 # Cartella nuova per il download, che solo Administrators e SYSTEM possono scrivere (ADR 0022).
@@ -288,8 +342,8 @@ function Start-SelfUpdate {
     $script:updRel = $rel
     $script:updInstalled = $installed
 
-    [void](Start-BackgroundJob -Functions 'Test-UpdateSignature' `
-        -Vars @{ url = $rel.Url; dest = $tmp; expected = $rel.Sha256; signer = $UpdateSignerThumbprint } `
+    [void](Start-BackgroundJob -Functions 'Get-UpdateSignerTrust', 'Test-UpdateSignature' `
+        -Vars @{ url = $rel.Url; dest = $tmp; expected = $rel.Sha256; signer = $UpdateSignerKeySha256 } `
         -Script {
             try {
                 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -301,10 +355,10 @@ function Start-SelfUpdate {
                 $okHash = (-not $expected) -or ($hash -eq $expected.ToUpperInvariant())
                 # Poi la firma, in ogni canale: il digest arriva da GitHub come il file, quindi con
                 # l'account GitHub compromesso non protegge. La chiave privata non sta su GitHub.
-                $sig   = Get-AuthenticodeSignature -LiteralPath $dest
+                $sig   = Get-UpdateSignerTrust $dest
                 $okSig = Test-UpdateSignature $sig $signer
                 [PSCustomObject]@{ Ok = $okHash -and $okSig; HashOk = $okHash; Hash = $hash; Verified = [bool]$expected
-                                   Signature = "$($sig.Status)"; Signer = "$($sig.SignerCertificate.Subject)" }
+                                   Signature = '0x{0:X8}' -f $sig.Result; Signer = "$($sig.Certificate.Subject)" }
             }
             catch { [PSCustomObject]@{ Ok = $false; Error = $_.Exception.Message } }
         } `
@@ -322,6 +376,16 @@ function Start-SelfUpdate {
                 Write-Log "Update FAILED: $why."
                 if ($tmp) { Remove-Item -LiteralPath (Split-Path $tmp) -Recurse -Force -ErrorAction SilentlyContinue }
                 Set-AppBusy $false
+                # Firma che non torna: il log non lo legge nessuno, e chi resta qui (una release con un
+                # certificato nuovo, ADR 0022) deve sapere che puo' aggiornare a mano, e da dove.
+                if ($d -and -not $d.Error -and $d.HashOk) {
+                    Show-AppDialog -Text ("WinGet Studio could not confirm that this update was signed by its author, so it was not installed. " +
+                        "This happens when a release is signed with a new certificate, or when the file was altered.`n`n" +
+                        "You can get the latest version by hand from https://github.com/$UpdateRepo/releases/latest") `
+                        -Title 'Update not installed' `
+                        -Button ([System.Windows.MessageBoxButton]::OK) `
+                        -Image ([System.Windows.MessageBoxImage]::Warning) -Links | Out-Null
+                }
                 return
             }
             Write-Log $(if ($d.Verified) { "Download verified (SHA-256 matches, signed by WinGet Studio)." } else { "Download verified (signed by WinGet Studio; no checksum to compare)." })
