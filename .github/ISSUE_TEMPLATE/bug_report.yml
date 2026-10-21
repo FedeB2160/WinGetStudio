@@ -1,0 +1,85 @@
+name: Bug report
+description: Something does not work as the README describes.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please write in English.
+        Security problems go to [SECURITY.md](https://github.com/FedeB2160/WinGetStudio/blob/main/SECURITY.md), never here.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you start
+      options:
+        - label: I read [Troubleshooting](https://github.com/FedeB2160/WinGetStudio/blob/main/docs/TROUBLESHOOTING.md) and my problem is not there.
+          required: true
+        - label: I searched the existing issues, open and closed, and this is not a duplicate.
+          required: true
+        - label: It still happens on the latest release.
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: WinGet Studio version
+      description: Shown in the Settings tab, next to WinGet Studio.
+      placeholder: "1.12.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: channel
+    attributes:
+      label: How you installed it
+      options:
+        - Installer (WinGetStudio_Setup.exe)
+        - Portable (WinGetStudio.exe)
+        - winget (winget install FedeB2160.WinGetStudio)
+        - Running from source
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      description: Run `winver`, or open Settings > System > About.
+      placeholder: "Windows 11 Pro 24H2"
+    validations:
+      required: true
+  - type: input
+    id: winget
+    attributes:
+      label: winget version
+      description: The output of `winget --version`, also shown in the Settings tab next to App Installer.
+      placeholder: "v1.29.70"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: What you did, one step per line, starting from the app open.
+      placeholder: |
+        1. Open the Updates tab
+        2. Tick 7zip.7zip
+        3. Press Update
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+      description: Include the exact text of any error message.
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Right-click the log at the bottom of the window, choose Save log..., and paste the relevant part here. Remove anything you consider private.
+      render: text

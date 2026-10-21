@@ -1,0 +1,4 @@
+# Code owners: their approval is required before a pull request into main can be merged.
+# To add a reviewer, give them write access to the repository first, then list them here:
+#   * @FedeB2160 @their-account
+* @FedeB2160

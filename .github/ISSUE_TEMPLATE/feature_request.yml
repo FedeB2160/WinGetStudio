@@ -1,0 +1,33 @@
+name: Feature request
+description: Something WinGet Studio does not do and should.
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please write in English, and search the existing issues first: if the idea is already there, add to it instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and why the app gets in the way today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: How it could work, from the user's side. A sketch or a screenshot helps.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Workarounds you use now, or other ways to solve it that you considered.
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contributing
+      options:
+        - label: I would like to implement this myself (see [CONTRIBUTING.md](https://github.com/FedeB2160/WinGetStudio/blob/main/CONTRIBUTING.md)).
