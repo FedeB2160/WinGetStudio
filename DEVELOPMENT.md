@@ -125,18 +125,27 @@ The certificate is self-signed, `CN=WinGet Studio`, valid to 2031: `Get-Authenti
 
 ### Renewing the certificate
 
-The certificate expires on 2031-08-04. Renew it **before** then, on the machine that holds the key, as a new self-signed certificate **over the same private key**: the self-update pins the public key, not the certificate (→ [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md)), so every copy keeps updating. A new key would need a bridge release instead. Not rehearsed yet: try it well ahead of the date.
+The certificate expires on 2031-08-04. Renew it **before** then, on the machine that holds the key, as a new self-signed certificate **over the same private key**: the self-update pins the public key, not the certificate (→ [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md)), so every copy keeps updating. A new key would need a bridge release instead. Run it in **Windows PowerShell 5.1** (`powershell.exe`, .NET Framework), like the build:
 
 ```powershell
 $old = Get-Item Cert:\CurrentUser\My\139AD24ECA430A310495641A8FBBA66D305FA57D
 $rsa = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($old)
 $req = New-Object Security.Cryptography.X509Certificates.CertificateRequest 'CN=WinGet Studio', $rsa, ([Security.Cryptography.HashAlgorithmName]::SHA256), ([Security.Cryptography.RSASignaturePadding]::Pkcs1)
 $eku = New-Object Security.Cryptography.OidCollection; [void]$eku.Add((New-Object Security.Cryptography.Oid '1.3.6.1.5.5.7.3.3'))
+$req.CertificateExtensions.Add((New-Object Security.Cryptography.X509Certificates.X509KeyUsageExtension ([Security.Cryptography.X509Certificates.X509KeyUsageFlags]::DigitalSignature), $true))
 $req.CertificateExtensions.Add((New-Object Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension $eku, $false))
+$req.CertificateExtensions.Add((New-Object Security.Cryptography.X509Certificates.X509SubjectKeyIdentifierExtension $req.PublicKey, $false))
 $new = $req.CreateSelfSigned([DateTimeOffset]::Now, [DateTimeOffset]::Now.AddYears(5))
+$pwd = Read-Host -AsSecureString 'Password for the .pfx'
+[IO.File]::WriteAllBytes("$HOME\WinGetStudio-codesign-renewed.pfx", $new.Export('Pfx', $pwd))
+$renewed = Import-PfxCertificate -FilePath "$HOME\WinGetStudio-codesign-renewed.pfx" -CertStoreLocation Cert:\CurrentUser\My -Password $pwd
+$renewed.HasPrivateKey          # must be True
+Export-Certificate -Cert $renewed -FilePath .\assets\WinGetStudio-codesign.cer -Type CERT
 ```
 
-Then put the new certificate, with its key, into `Cert:\CurrentUser\My`, export its public half over `assets\WinGetStudio-codesign.cer` (`Export-Certificate -Type CERT`), and run `Test-Ui.ps1`: it fails if the public key in the `.cer` is no longer the pinned one, which would mean the key changed. `build.ps1` picks the certificate by the thumbprint of the new `.cer` with no other change. Back up the `.pfx` (with a password) outside the repository, in two places.
+The extensions are the ones the current certificate has: key usage *digital signature* (critical), code signing, subject key identifier. **The certificate goes into the store through the `.pfx`**: `X509Store.Add($new)` stores it without the link to its private key (`HasPrivateKey` comes back `False`), and the build could not sign with it. The `.pfx` is also the backup: move it out of `$HOME`, outside the repository, in two places, with the password kept apart. Then run `Test-Ui.ps1`: it fails if the public key in the `.cer` is no longer the pinned one, which would mean the key changed. `build.ps1` picks the certificate by the thumbprint of the new `.cer` with no other change; remove the old certificate from the store only after a signed build has passed.
+
+Rehearsed on 2026-10-26 on a throwaway key of the same kind (CNG, *Microsoft Software Key Storage Provider*, exportable), never on the real one: the renewed certificate had a new thumbprint, the same public key and subject key identifier, the same extensions, and `Test-UpdateSignature` with the old pin accepted an exe signed with it, as well as one signed before the renewal, and refused one signed with another key.
 
 **Private keys never belong in the repo** — `.gitignore` blocks `*.pfx`, `*.p12` and `*.snk`. What the signature does and does not prove, and why builds are not reproducible: → [ADR 0012](docs/adr/0012-signing.md).
 

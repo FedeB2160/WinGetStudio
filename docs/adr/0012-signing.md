@@ -72,8 +72,9 @@ for a self-signed certificate on a machine that does not trust it.
   the field. Switching to a new key needs a release that accepts both keys first.
 - **Renew before 2031-08-04 with the same key.** A new self-signed certificate over the existing
   private key keeps every copy updating with no bridge release, because the self-update pins the key,
-  not the certificate. The procedure is in DEVELOPMENT.md (*Renewing the certificate*); it has not been
-  rehearsed yet. Keep a backup of the `.pfx`, protected by a password, outside the repository: without
+  not the certificate. The procedure is in DEVELOPMENT.md (*Renewing the certificate*), rehearsed on
+  2026-10-26 on a throwaway key of the same kind: same public key, new thumbprint, signatures accepted
+  by the pinned check before and after. Keep a backup of the `.pfx`, protected by a password, outside the repository: without
   the key the only way forward is a new key and a bridge release.
 
 ## Alternatives considered
