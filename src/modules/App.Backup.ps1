@@ -31,6 +31,10 @@ function Get-ImportPackageCount([string]$Path) {
     catch { return $null }
 }
 
+# Le proprieta' di un pacchetto che l'import tiene per default (New-ImportSubset): tutto il
+# resto sono argomenti per l'installer.
+$ImportPackageProps = 'PackageIdentifier', 'Version', 'Channel', 'Scope'
+
 # Pacchetti di un file di export per l'anteprima dell'import: una riga spuntata per pacchetto,
 # nell'ordine del file (New-ImportSubset sceglie per posizione: lo stesso ID puo' stare in due
 # sorgenti). Json e' il file letto, da cui si costruisce il file ridotto. Stored conta i
@@ -40,27 +44,39 @@ function Get-ImportPackageCount([string]$Path) {
 function Get-ImportPackages([string]$Path) {
     if ($null -eq (Get-ImportPackageCount $Path)) { return $null }
     $json = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
-    $known = 'PackageIdentifier', 'Version', 'Channel', 'Scope'
     $rows = New-Object System.Collections.ArrayList
     $stored = 0
     foreach ($s in $json.Sources) {
         foreach ($p in $s.Packages) {
             [void]$rows.Add([WgtRow]@{ Selected = $true; Name = $p.PackageIdentifier; Id = $p.PackageIdentifier
                                        Version = "$($p.Version)"; Source = "$($s.SourceDetails.Name)" })
-            if (@($p.PSObject.Properties.Name | Where-Object { $_ -notin $known }).Count) { $stored++ }
+            if (@($p.PSObject.Properties.Name | Where-Object { $_ -notin $ImportPackageProps }).Count) { $stored++ }
         }
     }
     [PSCustomObject]@{ Json = $json; Rows = $rows.ToArray(); Stored = $stored }
 }
 
 # Il file di export ridotto ai pacchetti in posizione $Keep (ordine di Get-ImportPackages), come
-# testo JSON. Gli oggetto-pacchetto restano QUELLI letti, con tutto cio' che contengono; radice
-# e sorgenti si copiano (il file letto non cambia) e una sorgente rimasta vuota si toglie.
+# testo JSON. Di ogni pacchetto si tengono solo le proprieta' di $ImportPackageProps: il file puo'
+# venire da chiunque, e gli argomenti che winget 1.29 ci salva (--custom, --override) arriverebbero
+# all'installer da un processo elevato. Una proprieta' assente resta assente: lo schema di winget
+# rifiuta un null. -KeepStored (la casella dell'anteprima) tiene l'oggetto-pacchetto com'e' letto.
+# Radice e sorgenti si copiano (il file letto non cambia) e una sorgente rimasta vuota si toglie.
 # -Depth 10: il default di ConvertTo-Json in PowerShell 5.1 e' 2 e troncherebbe i pacchetti.
-function New-ImportSubset([object]$Json, [int[]]$Keep) {
+function New-ImportSubset([object]$Json, [int[]]$Keep, [switch]$KeepStored) {
     $i = 0
     $sources = foreach ($s in $Json.Sources) {
-        $kept = @(foreach ($p in $s.Packages) { if ($Keep -contains $i) { $p }; $i++ })
+        $kept = @(foreach ($p in $s.Packages) {
+            if ($Keep -contains $i) {
+                if ($KeepStored) { $p }
+                else {
+                    $min = [ordered]@{}
+                    foreach ($n in $ImportPackageProps) { if ($p.PSObject.Properties[$n]) { $min[$n] = $p.$n } }
+                    [PSCustomObject]$min
+                }
+            }
+            $i++
+        })
         if ($kept.Count -gt 0) {
             $copy = $s.PSObject.Copy()
             $copy.Packages = $kept
@@ -110,6 +126,25 @@ function New-ImportPreviewGrid($Rows) {
     }
     $g.ItemsSource = $Rows
     $g
+}
+
+# Casella sotto la griglia dell'anteprima per tenere gli argomenti salvati, SPENTA: si sceglie di
+# riapplicarli, non di toglierli. $null se nessun pacchetto ne ha. Il testo va a capo entro la
+# larghezza della griglia: il template di ThemedCheckBox mette il contenuto in uno StackPanel
+# orizzontale, che non gli darebbe un limite.
+function New-ImportArgsBox([int]$Stored) {
+    if ($Stored -le 0) { return $null }
+    $t = New-Object System.Windows.Controls.TextBlock
+    $t.Text         = "Keep the installer arguments saved for $Stored package$(if ($Stored -ne 1) { 's' }) (--custom, --override)"
+    $t.TextWrapping = [System.Windows.TextWrapping]::Wrap
+    $t.MaxWidth     = 380
+    $b = New-Object System.Windows.Controls.CheckBox
+    $b.Style     = $window.FindResource('ThemedCheckBox')
+    $b.Content   = $t
+    $b.IsChecked = $false
+    $b.HorizontalAlignment = [System.Windows.HorizontalAlignment]::Left
+    $b.Margin    = New-Object System.Windows.Thickness 0, 10, 0, 0
+    $b
 }
 
 # Scelta del file, poi l'azione. Sono separate perche' un dialog non si puo' pilotare da
@@ -192,9 +227,19 @@ function Start-Import {
     # default resta No.
     $rows = New-Object System.Collections.ObjectModel.ObservableCollection[object]
     foreach ($r in $pkgs.Rows) { $rows.Add($r) }
-    $storedNote = if ($pkgs.Stored -gt 0) {
-        "`n`n$($pkgs.Stored) package$(if ($pkgs.Stored -ne 1) { 's carry' } else { ' carries' }) installer arguments saved at export; winget applies them again."
-    } else { '' }
+    # Argomenti salvati all'export: tolti per default, perche' il file puo' venire da chiunque e
+    # l'installer li riceverebbe da amministratore. La casella, spenta, li tiene.
+    $preview = New-ImportPreviewGrid $rows
+    $keepBox = New-ImportArgsBox $pkgs.Stored
+    $storedNote = ''
+    if ($keepBox) {
+        $storedNote = "`n`n$($pkgs.Stored) package$(if ($pkgs.Stored -ne 1) { 's carry' } else { ' carries' }) installer arguments " +
+            "saved in the file. They are left out unless you tick the box below: winget would pass them to the installer as administrator."
+        $panel = New-Object System.Windows.Controls.StackPanel
+        [void]$panel.Children.Add($preview)
+        [void]$panel.Children.Add($keepBox)
+        $preview = $panel
+    }
     $answer = Show-AppDialog -Text ("Install the ticked packages from this list?`n$file`n`n" +
         "Untick what you do not want. Packages already installed are skipped or upgraded; packages " +
         "no longer available in any source are ignored rather than failing the whole import." + $storedNote) `
@@ -202,7 +247,7 @@ function Start-Import {
         -Button ([System.Windows.MessageBoxButton]::YesNo) `
         -Image ([System.Windows.MessageBoxImage]::Warning) `
         -Default ([System.Windows.MessageBoxResult]::No) `
-        -Content (New-ImportPreviewGrid $rows)
+        -Content $preview
     if ($answer -ne [System.Windows.MessageBoxResult]::Yes) {
         Write-Log "Import cancelled."
         return
@@ -212,12 +257,16 @@ function Start-Import {
         Write-Log "Import cancelled: no package was ticked."
         return
     }
-    # Tutto spuntato: si importa il file com'e'. Altrimenti un file ridotto in %TEMP%, col prefisso
-    # wgt_ che Clear-WinGetTempFiles spazza al prossimo avvio; UTF-8 senza BOM, come lo scrive winget.
-    if ($keep.Count -lt $rows.Count) {
+    $keepStored = [bool]($keepBox -and $keepBox.IsChecked)
+    $dropStored = $pkgs.Stored -gt 0 -and -not $keepStored
+    # Tutto spuntato e niente da togliere: si importa il file com'e'. Altrimenti un file ridotto in
+    # %TEMP%, col prefisso wgt_ che Clear-WinGetTempFiles spazza al prossimo avvio; UTF-8 senza BOM,
+    # come lo scrive winget.
+    if ($keep.Count -lt $rows.Count -or $dropStored) {
         $sub = [IO.Path]::Combine([IO.Path]::GetTempPath(), "wgt_import_$([Guid]::NewGuid().ToString('N')).json")
-        [IO.File]::WriteAllText($sub, (New-ImportSubset $pkgs.Json $keep), (New-Object Text.UTF8Encoding $false))
-        Write-Log "Importing $($keep.Count) of the $count packages in $file."
+        [IO.File]::WriteAllText($sub, (New-ImportSubset $pkgs.Json $keep -KeepStored:$keepStored), (New-Object Text.UTF8Encoding $false))
+        if ($keep.Count -lt $rows.Count) { Write-Log "Importing $($keep.Count) of the $count packages in $file." }
+        if ($dropStored) { Write-Log "Installer arguments saved in $file were left out." }
         $file = $sub
     }
     Invoke-PackageImport $file $keep.Count
@@ -250,7 +299,7 @@ function Invoke-PackageImport([string]$file, [int]$count) {
             $r = @($result)[0]
             switch ($r.Status) {
                 'ok'      { Write-Log "Import done ($($r.Seconds)s)." }
-                'warning' { Write-Log "Import finished with warnings (exit $($r.Code)): a reboot may be required." }
+                'warning' { Write-Log "Import finished with warnings (exit $($r.Code)): a reboot may be required, or a package was already installed." }
                 default {
                     Write-Log "Import FAILED (exit $($r.Code))."
                     foreach ($l in (Get-WinGetOutputTail $r.Output 3)) { Write-Log "   $l" }

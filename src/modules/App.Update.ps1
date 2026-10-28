@@ -26,6 +26,95 @@ $SelfPackageId = 'FedeB2160.WinGetStudio'
 $InnoAppId      = '{80A0A054-6278-4145-AD5A-2B3C4853019F}'
 $SetupAssetName = 'WinGetStudio_Setup.exe'
 
+# SHA-256 della CHIAVE PUBBLICA del certificato di assets\WinGetStudio-codesign.cer (ADR 0012): un
+# aggiornamento firmato con un'altra chiave non si esegue (ADR 0022). La chiave e non il thumbprint
+# del certificato: alla scadenza (2031) si rifa' il certificato con la stessa chiave, e le copie in
+# giro continuano ad accettare senza una release ponte. Scritto qui perche' nell'exe il .cer non
+# c'e'; Test-Ui verifica che coincida con quello del file.
+$UpdateSignerKeySha256 = 'C585E5232F0901A3F204EA86B85D30A25ABE0F4833463462A3BDBA59AC753CAA'
+
+# Esito della verifica Authenticode di un file, come lo da' Windows: l'HRESULT di WinVerifyTrust
+# (0 = valida, 0x800B0109 = valida ma con radice non attendibile, cioe' la nostra self-signed) e il
+# certificato del firmatario. NON lo Status di Get-AuthenticodeSignature: per PowerShell
+# UnknownError e' lo stato di ripiego, e una firma alterata (firma del certificato o controfirma
+# non valide, ASN.1 rovinato) torna UnknownError col nostro firmatario esattamente come una buona.
+# Nessun controllo di revoca: la radice self-signed non ne ha, e cosi' non si va in rete.
+# Il tipo si compila solo qui, al primo aggiornamento: Add-Type all'avvio costerebbe tempo a tutti.
+function Get-UpdateSignerTrust([string]$Path) {
+    if (-not ('WgtTrust' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class WgtTrust {
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    struct FileInfo { public uint cbStruct; public string pcwszFilePath; public IntPtr hFile; public IntPtr pgKnownSubject; }
+    [StructLayout(LayoutKind.Sequential)]
+    struct TrustData {
+        public uint cbStruct; public IntPtr pPolicyCallbackData; public IntPtr pSIPClientData; public uint dwUIChoice;
+        public uint fdwRevocationChecks; public uint dwUnionChoice; public IntPtr pFile; public uint dwStateAction;
+        public IntPtr hWVTStateData; public IntPtr pwszURLReference; public uint dwProvFlags; public uint dwUIContext;
+        public IntPtr pSignatureSettings;
+    }
+    [DllImport("wintrust.dll", CharSet = CharSet.Unicode)]
+    static extern int WinVerifyTrust(IntPtr hwnd, ref Guid action, ref TrustData data);
+    public static int Verify(string path) {
+        FileInfo fi = new FileInfo();
+        fi.cbStruct = (uint)Marshal.SizeOf(typeof(FileInfo));
+        fi.pcwszFilePath = path;
+        IntPtr pfi = Marshal.AllocHGlobal(Marshal.SizeOf(typeof(FileInfo)));
+        try {
+            Marshal.StructureToPtr(fi, pfi, false);
+            TrustData td = new TrustData();
+            td.cbStruct = (uint)Marshal.SizeOf(typeof(TrustData));
+            td.dwUIChoice = 2;          // WTD_UI_NONE
+            td.dwUnionChoice = 1;       // WTD_CHOICE_FILE
+            td.pFile = pfi;
+            td.dwProvFlags = 0x1010;    // WTD_REVOCATION_CHECK_NONE | WTD_CACHE_ONLY_URL_RETRIEVAL
+            Guid action = new Guid("00AAC56B-CD44-11d0-8CC2-00C04FC295EE");   // WINTRUST_ACTION_GENERIC_VERIFY_V2
+            return WinVerifyTrust(IntPtr.Zero, ref action, ref td);
+        }
+        finally { Marshal.DestroyStructure(pfi, typeof(FileInfo)); Marshal.FreeHGlobal(pfi); }
+    }
+}
+'@
+    }
+    [PSCustomObject]@{
+        Result      = [WgtTrust]::Verify($Path)
+        Certificate = (Get-AuthenticodeSignature -LiteralPath $Path).SignerCertificate
+    }
+}
+
+# Il file e' firmato con la NOSTRA chiave? $Trust viene da Get-UpdateSignerTrust. Valida (0) dove il
+# .cer e' stato importato fra le radici attendibili, CERT_E_UNTRUSTEDROOT altrove (radice
+# self-signed, ADR 0012): entrambe vanno, e solo se la chiave pubblica del firmatario e' la nostra.
+# Ogni altro esito no: firma o digest non validi, file non firmato, certificato scaduto senza timestamp.
+function Test-UpdateSignature($Trust, [string]$KeySha256) {
+    if (-not $Trust -or -not $Trust.Certificate -or -not $KeySha256) { return $false }
+    if ($Trust.Result -notin 0, ([int]0x800B0109)) { return $false }
+    $key = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($Trust.Certificate.GetPublicKey())).Replace('-', '')
+    return $key -eq $KeySha256
+}
+
+# Cartella nuova per il download, che solo Administrators e SYSTEM possono scrivere (ADR 0022).
+# In %SystemRoot%\Temp e non in %TEMP%: li' l'utente ha il controllo completo della cartella padre,
+# quindi un suo processo non elevato potrebbe rinominare la nostra e metterne un'altra al suo posto
+# fra la verifica e l'avvio. In Windows\Temp gli utenti creano ma non elencano, non rinominano e
+# non cancellano cio' che non e' loro. Creata gia' con l'ACL, senza ereditare quella di Windows\Temp
+# (che lascia agli utenti aggiungere file). OWNER RIGHTS: se il proprietario fosse l'utente e non
+# Administrators, non avrebbe il WRITE_DAC implicito per riaprirsela. Prefisso wgt_: la spazza
+# Clear-WinGetTempFiles. $Parent e' un parametro per il test, che gira senza elevazione.
+function New-UpdateDownloadDir([string]$Parent = (Join-Path $env:SystemRoot 'Temp')) {
+    $dir = Join-Path $Parent "wgt_update_$([Guid]::NewGuid().ToString('N'))"
+    $acl = New-Object Security.AccessControl.DirectorySecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($r in @(@('S-1-5-32-544', 'FullControl'), @('S-1-5-18', 'FullControl'), @('S-1-3-4', 'ReadAndExecute'))) {
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule (
+            (New-Object Security.Principal.SecurityIdentifier $r[0]), $r[1], 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
+    }
+    [void][IO.Directory]::CreateDirectory($dir, $acl)
+    return $dir
+}
+
 function Test-IsSelfPackage($row) {
     if ($null -eq $row -or -not $row.Id) { return $false }
     # Confronto per CONTENUTO e non per uguaglianza: installato dal catalogo l'ID e'
@@ -226,18 +315,23 @@ function Start-SelfUpdate {
     $answer = Show-AppDialog -Text ($(if ($installed) { "Download the $($rel.Tag) installer and update WinGet Studio? It closes, updates and reopens.`n`n" }
           else { "Download $($rel.Tag) and restart WinGet Studio?`n`n" }) +
         "$($rel.Name) - $([int]($rel.Size / 1024)) KB`nFrom: $($rel.Url)`n`n" +
-        $(if ($rel.Sha256) { "The download is verified against the SHA-256 published with the release." }
-          else { "WARNING: this release publishes no checksum, so the download cannot be verified." })) `
+        $(if ($rel.Sha256) { "The download is checked against the SHA-256 published with the release, and must carry the WinGet Studio signature." }
+          else { "WARNING: this release publishes no checksum, so the download is checked against the WinGet Studio signature only." })) `
         -Title 'Update WinGet Studio' `
         -Button ([System.Windows.MessageBoxButton]::YesNo) `
         -Image ([System.Windows.MessageBoxImage]::Question) `
         -Default ([System.Windows.MessageBoxResult]::No)
     if ($answer -ne [System.Windows.MessageBoxResult]::Yes) { return }
 
+    # Una cartella che un processo non elevato non puo' toccare: il file verificato e' quello che
+    # si esegue (ADR 0022).
+    try { $tmp = Join-Path (New-UpdateDownloadDir) $rel.Name }
+    catch {
+        Write-Log "Update FAILED: the download folder could not be created: $($_.Exception.Message)"
+        return
+    }
     Set-AppBusy $true
     Write-Log "Downloading $($rel.Name) ..."
-    $tmp = if ($installed) { [IO.Path]::Combine([IO.Path]::GetTempPath(), "wgt_$($rel.Tag)_$($rel.Name)") }
-           else { Join-Path ([IO.Path]::GetTempPath()) "WinGetStudio-$($rel.Tag).exe" }
 
     # OnDone gira sul thread UI e NON vede le variabili locali di questa funzione: con
     # $exe, $tmp e $rel locali arrivavano vuote, e l'aggiornamento moriva su
@@ -248,7 +342,8 @@ function Start-SelfUpdate {
     $script:updRel = $rel
     $script:updInstalled = $installed
 
-    [void](Start-BackgroundJob -Vars @{ url = $rel.Url; dest = $tmp; expected = $rel.Sha256 } `
+    [void](Start-BackgroundJob -Functions 'Get-UpdateSignerTrust', 'Test-UpdateSignature' `
+        -Vars @{ url = $rel.Url; dest = $tmp; expected = $rel.Sha256; signer = $UpdateSignerKeySha256 } `
         -Script {
             try {
                 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
@@ -258,7 +353,12 @@ function Start-SelfUpdate {
                 # Il confronto e' il presidio principale: si sta per ESEGUIRE questo file.
                 # Senza checksum pubblicato non si puo' verificare, e lo si dice.
                 $okHash = (-not $expected) -or ($hash -eq $expected.ToUpperInvariant())
-                [PSCustomObject]@{ Ok = $okHash; Hash = $hash; Verified = [bool]$expected }
+                # Poi la firma, in ogni canale: il digest arriva da GitHub come il file, quindi con
+                # l'account GitHub compromesso non protegge. La chiave privata non sta su GitHub.
+                $sig   = Get-UpdateSignerTrust $dest
+                $okSig = Test-UpdateSignature $sig $signer
+                [PSCustomObject]@{ Ok = $okHash -and $okSig; HashOk = $okHash; Hash = $hash; Verified = [bool]$expected
+                                   Signature = '0x{0:X8}' -f $sig.Result; Signer = "$($sig.Certificate.Subject)" }
             }
             catch { [PSCustomObject]@{ Ok = $false; Error = $_.Exception.Message } }
         } `
@@ -269,17 +369,31 @@ function Start-SelfUpdate {
             $rel = $script:updRel
             $d = @($result)[0]
             if (-not $d -or -not $d.Ok) {
-                Write-Log "Update FAILED: $(if ($d.Error) { $d.Error } else { 'checksum mismatch, the download was discarded' })."
-                if ($tmp) { Remove-Item $tmp -Force -ErrorAction SilentlyContinue }
+                $why = if (-not $d) { 'the download job returned nothing' }
+                       elseif ($d.Error) { $d.Error }
+                       elseif (-not $d.HashOk) { 'checksum mismatch, the download was discarded' }
+                       else { "the download does not carry the WinGet Studio signature ($($d.Signature)$(if ($d.Signer) { ", signed by $($d.Signer)" })), it was discarded" }
+                Write-Log "Update FAILED: $why."
+                if ($tmp) { Remove-Item -LiteralPath (Split-Path $tmp) -Recurse -Force -ErrorAction SilentlyContinue }
                 Set-AppBusy $false
+                # Firma che non torna: il log non lo legge nessuno, e chi resta qui (una release con un
+                # certificato nuovo, ADR 0022) deve sapere che puo' aggiornare a mano, e da dove.
+                if ($d -and -not $d.Error -and $d.HashOk) {
+                    Show-AppDialog -Text ("WinGet Studio could not confirm that this update was signed by its author, so it was not installed. " +
+                        "This happens when a release is signed with a new certificate, or when the file was altered.`n`n" +
+                        "You can get the latest version by hand from https://github.com/$UpdateRepo/releases/latest") `
+                        -Title 'Update not installed' `
+                        -Button ([System.Windows.MessageBoxButton]::OK) `
+                        -Image ([System.Windows.MessageBoxImage]::Warning) -Links | Out-Null
+                }
                 return
             }
-            Write-Log $(if ($d.Verified) { "Download verified (SHA-256 matches)." } else { "Download complete (no checksum to verify against)." })
+            Write-Log $(if ($d.Verified) { "Download verified (SHA-256 matches, signed by WinGet Studio)." } else { "Download verified (signed by WinGet Studio; no checksum to compare)." })
 
             if ($script:updInstalled) {
                 # Il setup chiude l'app (Restart Manager), sostituisce i file e la riapre. Gia'
-                # elevati: nessun secondo UAC. Il file resta in %TEMP% e lo spazza
-                # Clear-WinGetTempFiles al prossimo avvio (prefisso wgt_).
+                # elevati: nessun secondo UAC. Il file resta nella cartella protetta in
+                # %SystemRoot%\Temp e la spazza Clear-WinGetTempFiles al prossimo avvio (prefisso wgt_).
                 $log = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'WinGetStudio-update.log')
                 Write-Log "Running $($rel.Name); if the update fails, its log is $log"
                 try {
@@ -298,7 +412,11 @@ function Start-SelfUpdate {
                 # Il file in esecuzione non si sovrascrive, ma si rinomina: dopo lo
                 # spostamento il suo percorso e' libero per il file nuovo.
                 Move-Item -LiteralPath $exe -Destination "$exe.old" -Force
-                Move-Item -LiteralPath $tmp -Destination $exe -Force
+                # Copia e non spostamento: sullo stesso volume il file spostato si porterebbe l'ACL
+                # della cartella protetta (solo Administrators e SYSTEM), ed Explorer, che non e'
+                # elevato, non potrebbe piu' aprirlo. La copia prende quella della cartella dell'exe;
+                # la cartella protetta la spazza Clear-WinGetTempFiles all'avvio che segue.
+                Copy-Item -LiteralPath $tmp -Destination $exe -Force
             }
             catch {
                 Write-Log "Update FAILED while replacing the executable: $($_.Exception.Message)"

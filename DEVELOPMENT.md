@@ -123,13 +123,37 @@ The signing itself is `src\sign.ps1 -Path <file> -Thumbprint <thumbprint>`: `bui
 
 The certificate is self-signed, `CN=WinGet Studio`, valid to 2031: `Get-AuthenticodeSignature` reports `UnknownError` and SmartScreen says "unknown publisher". **This is expected and does not mean the signature is missing.** To make it trusted, import `assets\WinGetStudio-codesign.cer` (no private key in it) into *Trusted Root Certification Authorities*: per user with `Import-Certificate -CertStoreLocation Cert:\CurrentUser\Root`, or machine-wide by GPO in a domain. Understand what you are doing first: anything signed with that certificate becomes trusted for whoever imports it.
 
+### Renewing the certificate
+
+The certificate expires on 2031-08-04. Renew it **before** then, on the machine that holds the key, as a new self-signed certificate **over the same private key**: the self-update pins the public key, not the certificate (→ [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md)), so every copy keeps updating. A new key would need a bridge release instead. Run it in **Windows PowerShell 5.1** (`powershell.exe`, .NET Framework), like the build:
+
+```powershell
+$old = Get-Item Cert:\CurrentUser\My\139AD24ECA430A310495641A8FBBA66D305FA57D
+$rsa = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($old)
+$req = New-Object Security.Cryptography.X509Certificates.CertificateRequest 'CN=WinGet Studio', $rsa, ([Security.Cryptography.HashAlgorithmName]::SHA256), ([Security.Cryptography.RSASignaturePadding]::Pkcs1)
+$eku = New-Object Security.Cryptography.OidCollection; [void]$eku.Add((New-Object Security.Cryptography.Oid '1.3.6.1.5.5.7.3.3'))
+$req.CertificateExtensions.Add((New-Object Security.Cryptography.X509Certificates.X509KeyUsageExtension ([Security.Cryptography.X509Certificates.X509KeyUsageFlags]::DigitalSignature), $true))
+$req.CertificateExtensions.Add((New-Object Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension $eku, $false))
+$req.CertificateExtensions.Add((New-Object Security.Cryptography.X509Certificates.X509SubjectKeyIdentifierExtension $req.PublicKey, $false))
+$new = $req.CreateSelfSigned([DateTimeOffset]::Now, [DateTimeOffset]::Now.AddYears(5))
+$pwd = Read-Host -AsSecureString 'Password for the .pfx'
+[IO.File]::WriteAllBytes("$HOME\WinGetStudio-codesign-renewed.pfx", $new.Export('Pfx', $pwd))
+$renewed = Import-PfxCertificate -FilePath "$HOME\WinGetStudio-codesign-renewed.pfx" -CertStoreLocation Cert:\CurrentUser\My -Password $pwd
+$renewed.HasPrivateKey          # must be True
+Export-Certificate -Cert $renewed -FilePath .\assets\WinGetStudio-codesign.cer -Type CERT
+```
+
+The extensions are the ones the current certificate has: key usage *digital signature* (critical), code signing, subject key identifier. **The certificate goes into the store through the `.pfx`**: `X509Store.Add($new)` stores it without the link to its private key (`HasPrivateKey` comes back `False`), and the build could not sign with it. The `.pfx` is also the backup: move it out of `$HOME`, outside the repository, in two places, with the password kept apart. Then run `Test-Ui.ps1`: it fails if the public key in the `.cer` is no longer the pinned one, which would mean the key changed. `build.ps1` picks the certificate by the thumbprint of the new `.cer` with no other change; remove the old certificate from the store only after a signed build has passed.
+
+Rehearsed on 2026-10-26 on a throwaway key of the same kind (CNG, *Microsoft Software Key Storage Provider*, exportable), never on the real one: the renewed certificate had a new thumbprint, the same public key and subject key identifier, the same extensions, and `Test-UpdateSignature` with the old pin accepted an exe signed with it, as well as one signed before the renewal, and refused one signed with another key.
+
 **Private keys never belong in the repo** — `.gitignore` blocks `*.pfx`, `*.p12` and `*.snk`. What the signature does and does not prove, and why builds are not reproducible: → [ADR 0012](docs/adr/0012-signing.md).
 
 ## Publishing a release
 
 The update check reads the **latest** release of the repo, so publishing one is what makes an update reachable.
 
-1. Bump `$AppVersion` in `src\main.ps1` and rebuild — on the machine that holds the signing key, with Inno Setup installed, so both files come out signed.
+1. Bump `$AppVersion` in `src\main.ps1` and rebuild — on the machine that holds the signing key, with Inno Setup installed, so both files come out signed. **Never publish an unsigned build, or one signed with another certificate:** every copy in the field checks that the download is signed by the key of `assets\WinGetStudio-codesign.cer` and refuses it otherwise (→ [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md)). `Get-AuthenticodeSignature dist\*.exe` must show the signer `CN=WinGet Studio` on both files, and `Test-Ui.ps1` run with them in `dist\` checks them against the pinned key.
 2. Update `CHANGELOG.md`, commit, push.
 3. Tag: `git tag v1.10.1 && git push origin v1.10.1`. **Tag and `$AppVersion` must agree.**
 4. On GitHub → **Releases** → *Draft a new release*, pick the tag, paste the changelog entry, and attach **both** `dist\WinGetStudio.exe` and `dist\WinGetStudio_Setup.exe` as assets.
@@ -242,7 +266,7 @@ Each decision that shapes the architecture has an Architecture Decision Record i
 - [ADR 0001](docs/adr/0001-one-exe-built-from-modules.md) — One exe built from modules: ps2exe's single input, the markers, `$moduleNames` and `$AppVersion` as single sources.
 - [ADR 0002](docs/adr/0002-always-elevated.md) — Always elevated, with what that costs for per-user packages.
 - [ADR 0003](docs/adr/0003-only-one-winget-process-at-a-time.md) — Only one winget process at a time: global busy state, `Test-WinGetBusy`, one queue choke point, cooperative cancel.
-- [ADR 0004](docs/adr/0004-how-winget-is-run.md) — How winget is run: output to file, `Process.Start`, UTF-8, one resolved path, quote guard, temp sweep.
+- [ADR 0004](docs/adr/0004-how-winget-is-run.md) — How winget is run: output to file, `Process.Start`, UTF-8, one resolved path, guards on quotes and `%` with `/v:off`, exit codes of writes, temp sweep.
 - [ADR 0005](docs/adr/0005-reads-return-a-result-not-a-list.md) — Reads return a result, not a list, so a failing winget never passes for an empty one.
 - [ADR 0006](docs/adr/0006-parsing-winget-tables-by-column-position.md) — Parsing winget's localized tables by column position, one table at a time.
 - [ADR 0007](docs/adr/0007-pins-are-blocking.md) — Pins are blocking, because a default pin does not stop `upgrade --id`.
@@ -251,7 +275,7 @@ Each decision that shapes the architecture has an Architecture Decision Record i
 - [ADR 0010](docs/adr/0010-themes.md) — Themes: `DynamicResource` only, same keys in both files, re-templated controls, measured contrast.
 - [ADR 0011](docs/adr/0011-window-layout.md) — Window layout: Settings and About as tabs, progress and log outside the tabs, tooltip and grid traps.
 - [ADR 0012](docs/adr/0012-signing.md) — Signing with the self-signed published key only, timestamped, one script for three files.
-- [ADR 0013](docs/adr/0013-self-update.md) — Self-update from the latest GitHub release, per install channel, verified by SHA-256.
+- [ADR 0013](docs/adr/0013-self-update.md) — Self-update from the latest GitHub release, per install channel, verified by SHA-256 (and by signer since ADR 0022).
 - [ADR 0014](docs/adr/0014-installer-alongside-the-portable-exe.md) — An Inno Setup installer alongside the unchanged portable exe.
 - [ADR 0015](docs/adr/0015-winget-package-portable-then-inno.md) — The winget package: portable up to 1.10.3, inno from 1.11.0, and how users migrate.
 - [ADR 0016](docs/adr/0016-tests.md) — Tests: two standalone scripts, offline by default, the real app mounted hidden, CI without a key.
@@ -260,5 +284,6 @@ Each decision that shapes the architecture has an Architecture Decision Record i
 - [ADR 0019](docs/adr/0019-installing-and-updating-winget.md) — Installing winget when it is missing (register, else GitHub with SHA-256), its version in Settings, and its update: by the Store where it can, by a GitHub button elsewhere.
 - [ADR 0020](docs/adr/0020-themed-dialogs.md) — Dialogs in the app's theme (`Show-AppDialog`): same enums as the MessageBox, default No kept, dimmed window behind, MessageBox only as fallback.
 - [ADR 0021](docs/adr/0021-package-details-as-winget-text.md) — Package details are winget's own text (`show`, `list --details`), never parsed: its labels are translated. Every row carries its source; install passes it.
+- [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md) — The self-update accepts only files signed with the published key (public key pinned, checked through `WinVerifyTrust` because PowerShell's `UnknownError` hides altered signatures), downloaded to a folder in `%SystemRoot%\Temp` that only Administrators and SYSTEM can write.
 
 The rule: **a decision that shapes the architecture gets a new numbered ADR**, written from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md); a superseded or withdrawn ADR is kept and its number never reused. **A spec in `docs\superpowers\specs\` is deleted once it is implemented**, after its decisions have been moved into an ADR.

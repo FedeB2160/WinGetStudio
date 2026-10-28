@@ -430,6 +430,14 @@ Check "apici sbilanciati rifiutati invece di eseguiti" $threw
 # E il caso normale non deve rompersi: gli apici bilanciati passano.
 $ok = Invoke-WinGet 'cmd.exe' '/c echo "bilanciato"'
 Check "apici bilanciati eseguiti (output '$($ok.Output.Trim())')" ($ok.Output -match 'bilanciato')
+# '%': cmd espande %VAR% anche fra apici e DOPO il conteggio degli apici. Con questa variabile
+# un "echo" diventerebbe due comandi; la riga si rifiuta prima di arrivare a cmd.
+$env:WGT_PCT_PROBE = 'x" & echo INIETTATO & rem "'
+$threw = $false; $msg = ''
+try { Invoke-WinGet 'cmd.exe' '/c echo "%WGT_PCT_PROBE%"' } catch { $threw = $true; $msg = $_.Exception.Message }
+Check "'%' rifiutato invece di espanso da cmd ($msg)" ($threw -and $msg -match "contain '%'")
+# !VAR!: l'espansione ritardata si accende anche da HKCU, quindi la si spegne sulla riga di cmd.
+Check "cmd con /v:off in entrambi i percorsi" (([regex]::Matches((Get-FunctionText 'Invoke-WinGet'), '/d /v:off /s /c')).Count -eq 2)
 
 Write-Host "`n8) Stesso comando senza elevazione" -ForegroundColor Cyan
 # winget rifiuta alcune operazioni da amministratore (0x8A15007D) e la coda le ripete come
@@ -451,13 +459,18 @@ $null = Invoke-WinGet 'cmd.exe' '/c echo diretto'
 Check "senza -Unelevated l'attivita' non entra in gioco" ($null -eq $script:taskArgs)
 $u = Invoke-WinGet 'cmd.exe' '/c echo senza-elevazione' -Unelevated
 Check "con -Unelevated la stessa riga passa dall'attivita', col titolo della finestra ($script:taskArgs)" `
-      ($script:taskArgs -match '^/d /s /c "title WinGet Studio & "cmd\.exe" /c echo senza-elevazione >".+\.out" 2>".+\.err""$')
+      ($script:taskArgs -match '^/d /v:off /s /c "title WinGet Studio & "cmd\.exe" /c echo senza-elevazione >".+\.out" 2>".+\.err""$')
 Check "output letto dai file come nel percorso normale ('$($u.Output.Trim())')" ($u.Output.Trim() -eq 'senza-elevazione')
 $e = Invoke-WinGet 'cmd.exe' '/c exit -1978335107' -Unelevated
 Check "exit code negativo intatto (=$($e.ExitCode))" ($e.ExitCode -eq -1978335107)
 $threw = $false
 try { Invoke-WinGet 'cmd.exe' '/c echo "sbilanciato' -Unelevated } catch { $threw = $true }
 Check "la guardia sugli apici vale anche senza elevazione" $threw
+# Qui l'attivita' finta c'e': se la guardia mancasse il comando girerebbe, non fallirebbe per altro.
+$script:taskArgs = $null; $threw = $false; $msg = ''
+try { Invoke-WinGet 'cmd.exe' '/c echo "%WGT_PCT_PROBE%"' -Unelevated } catch { $threw = $true; $msg = $_.Exception.Message }
+Check "'%' rifiutato anche senza elevazione, prima dell'attivita'" ($threw -and $msg -match "contain '%'" -and $null -eq $script:taskArgs)
+Remove-Item Env:\WGT_PCT_PROBE
 
 # L'attivita' vera: token filtrato (RunLevel Limited) nella sessione gia' aperta (Interactive),
 # avviabile anche a batteria, e cancellata comunque, anche quando winget fallisce.
@@ -465,6 +478,27 @@ $taskSrc = Get-FunctionText 'Invoke-UnelevatedTask'
 Check "LogonType Interactive e RunLevel Limited" ($taskSrc -match '-LogonType Interactive' -and $taskSrc -match '-RunLevel Limited')
 Check "avviabile e non fermata a batteria" ($taskSrc -match 'AllowStartIfOnBatteries' -and $taskSrc -match 'DontStopIfGoingOnBatteries')
 Check "Unregister-ScheduledTask in un finally" ($taskSrc -match '(?s)finally\s*\{[^}]*Unregister-ScheduledTask')
+
+Write-Host "`n9) Esito dai codici d'uscita" -ForegroundColor Cyan
+# Nomi da "winget error <codice>" (1.29.380). La lista era sfasata di uno: un'installazione non
+# riuscita o annullata risultava un avviso, e un "gia' installato" un errore. I literal esadecimali
+# a 8 cifre sono Int32 negativi, cioe' proprio l'exit code che winget restituisce.
+Invoke-Expression (Get-FunctionText 'Get-UpdateStatus')
+$codes = @(
+    @(0,          'ok',      'successo'),
+    @(0x8A150109, 'warning', 'INSTALL_REBOOT_REQUIRED_TO_FINISH'),
+    @(0x8A15010B, 'warning', 'INSTALL_REBOOT_INITIATED'),
+    @(0x8A15010D, 'warning', 'INSTALL_ALREADY_INSTALLED'),
+    @(3010,       'warning', 'ERROR_SUCCESS_REBOOT_REQUIRED'),
+    @(1641,       'warning', 'ERROR_SUCCESS_REBOOT_INITIATED'),
+    @(0x8A150108, 'error',   'INSTALL_CONTACT_SUPPORT'),
+    @(0x8A15010A, 'error',   'INSTALL_REBOOT_REQUIRED_FOR_INSTALL (installazione non riuscita)'),
+    @(0x8A15010C, 'error',   'INSTALL_CANCELLED_BY_USER')
+)
+foreach ($c in $codes) {
+    $got = Get-UpdateStatus $c[0]
+    Check ("{0} -> {1} ({2}, letto '{3}')" -f $c[2], $c[1], ('0x{0:X8}' -f $c[0]), $got) ($got -eq $c[1])
+}
 
 # ------------------------------------------------------------------
 Remove-Item -LiteralPath $stubDir -Recurse -Force -ErrorAction SilentlyContinue

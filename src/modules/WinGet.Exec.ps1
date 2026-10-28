@@ -30,11 +30,13 @@ function Get-UpdateStatus([int]$code) {
     # e' Int32 (0xFFFFFFFF = -1!), quindi si lavora in Int64 con suffisso L e si
     # normalizza al valore unsigned a 32 bit.
     $u = ([int64]$code) -band 0xFFFFFFFFL
+    # Nomi verificati con "winget error <codice>" (1.29.380). Fino alla 1.12.0 la lista era
+    # sfasata di uno: 0x8A150108 (CONTACT_SUPPORT), 0x8A15010A (REBOOT_REQUIRED_FOR_INSTALL,
+    # installazione NON riuscita) e 0x8A15010C (CANCELLED_BY_USER) sono errori veri.
     $benign = @(
-        0x8A150108L,  # REBOOT_REQUIRED_TO_FINISH
-        0x8A150109L,  # REBOOT_REQUIRED_FOR_INSTALL
-        0x8A15010AL,  # REBOOT_INITIATED
-        0x8A15010CL,  # ALREADY_INSTALLED
+        0x8A150109L,  # INSTALL_REBOOT_REQUIRED_TO_FINISH
+        0x8A15010BL,  # INSTALL_REBOOT_INITIATED
+        0x8A15010DL,  # INSTALL_ALREADY_INSTALLED
         3010L,        # ERROR_SUCCESS_REBOOT_REQUIRED
         1641L         # ERROR_SUCCESS_REBOOT_INITIATED
     )
@@ -53,9 +55,13 @@ function Clear-WinGetTempFiles {
         try { [IO.File]::Delete($f) } catch { }
     }
     # Anche le cartelle: quella del download di winget (WinGet.Setup.ps1) pesa 300 MB se il
-    # processo muore a meta'.
-    foreach ($d in [IO.Directory]::GetDirectories([IO.Path]::GetTempPath(), 'wgt_*')) {
-        try { [IO.Directory]::Delete($d, $true) } catch { }
+    # processo muore a meta'. In %SystemRoot%\Temp c'e' quella protetta dell'auto-aggiornamento
+    # (New-UpdateDownloadDir, ADR 0022); senza elevazione quella cartella non si elenca, e la si salta.
+    foreach ($root in [IO.Path]::GetTempPath(), (Join-Path $env:SystemRoot 'Temp')) {
+        try { $dirs = [IO.Directory]::GetDirectories($root, 'wgt_*') } catch { continue }
+        foreach ($d in $dirs) {
+            try { [IO.Directory]::Delete($d, $true) } catch { }
+        }
     }
 }
 
@@ -87,10 +93,16 @@ function Invoke-WinGet([string]$exePath, [string]$argLine, [scriptblock]$Tick, [
     # che cmd vede non e' quello che intendevamo, e cmd lo esegue lo stesso: meglio fermarsi.
     # Gli Id vengono dal catalogo winget e dal registro ARP, dove il nome lo scrive
     # l'installer — cioe' una terza parte — e questo processo gira elevato.
-    # NB: NON copre l'espansione di %VAR% che cmd fa sulla riga di comando. E' un problema
-    # diverso e questa guardia non va creduta completa.
     if ((($argLine.ToCharArray() | Where-Object { $_ -eq '"' }).Count % 2) -ne 0) {
         throw "winget arguments have unbalanced quotes, refusing to run: $argLine"
+    }
+    # Stesso motivo per '%': cmd espande %VAR% anche fra apici, e lo fa DOPO il conteggio qui
+    # sopra. Un processo non elevato puo' creare una voce ARP per utente con %X% nel nome e una
+    # variabile d'ambiente utente X con apici e '&': disinstallarla da qui eseguirebbe il resto
+    # da amministratore. Un Id o un percorso con '%' e' raro: si rifiuta, come fa UniGetUI.
+    # Per !VAR! c'e' /v:off piu' sotto: l'espansione ritardata si accende anche da HKCU.
+    if ($argLine.Contains('%')) {
+        throw "winget arguments contain '%', which cmd would expand, refusing to run: $argLine"
     }
     $outFile = Join-Path ([IO.Path]::GetTempPath()) "wgt_$([Guid]::NewGuid().ToString('N')).out"
     $errFile = [IO.Path]::ChangeExtension($outFile, 'err')
@@ -102,16 +114,18 @@ function Invoke-WinGet([string]$exePath, [string]$argLine, [scriptblock]$Tick, [
         # Il redirect su file lo fa cmd (/s /c + tutta la riga tra apici: cmd toglie solo
         # gli apici esterni e passa il resto verbatim), cosi' non ci sono pipe da svuotare
         # e l'attesa dipende dal solo processo.
+        # /v:off: DelayedExpansion=1 in HKCU\Software\Microsoft\Command Processor lo puo' mettere
+        # un processo non elevato, e allora cmd espanderebbe anche !VAR!. L'opzione vince sul registro.
         $run = "`"$exePath`" $argLine >`"$outFile`" 2>`"$errFile`""
         $sw = [Diagnostics.Stopwatch]::StartNew()
         if ($Unelevated) {
             # L'attivita' apre una finestra console nella sessione: il titolo dice di chi e'.
-            $code = Invoke-UnelevatedTask "/d /s /c `"title WinGet Studio & $run`"" $Tick
+            $code = Invoke-UnelevatedTask "/d /v:off /s /c `"title WinGet Studio & $run`"" $Tick
         }
         else {
             $psi = New-Object Diagnostics.ProcessStartInfo
             $psi.FileName        = 'cmd.exe'
-            $psi.Arguments       = "/d /s /c `"$run`""
+            $psi.Arguments       = "/d /v:off /s /c `"$run`""
             $psi.UseShellExecute = $false
             $psi.CreateNoWindow  = $true
             $p = [Diagnostics.Process]::Start($psi)

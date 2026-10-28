@@ -307,7 +307,9 @@ if ($posDef -lt 0 -or $posCheck -lt 0 -or $posDef -gt $posCheck) {
 # 8) Le righe notificano WPF da sole? Senza INotifyPropertyChanged servirebbe
 # $Grid.Items.Refresh() a ogni cambio di stato: quello rigenera la vista e riporta lo
 # scroll in cima, cioe' il blocco dell'elenco durante l'aggiornamento.
-$cs = [regex]::Match($code, "(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@").Groups[1].Value
+# Per nome: non e' l'unico Add-Type -TypeDefinition dell'app (WgtTrust, App.Update.ps1).
+$cs = @([regex]::Matches($code, "(?s)Add-Type -TypeDefinition @'\r?\n(.*?)\r?\n'@") | ForEach-Object { $_.Groups[1].Value } |
+        Where-Object { $_ -match '\bclass WgtRow\b' })[0]
 if (-not $cs) { throw "definizione C# di WgtRow non trovata nello script" }
 if (-not ('WgtRow' -as [type])) { Add-Type -TypeDefinition $cs }
 $fired = New-Object System.Collections.ArrayList
@@ -1776,8 +1778,10 @@ if ($importFailures.Count) { throw "conteggio dei file di import: $($importFailu
 
 # 19b) Anteprima dell'import (issue #24): i pacchetti del file in una griglia dentro la conferma,
 # si toglie la spunta a cio' che non si vuole, e winget importa un file ridotto. Il file ridotto
-# tiene gli oggetto-pacchetto COSI' COME SONO: winget 1.29 ci salva --custom/--override, e cosi'
-# passano senza che l'app ne conosca i nomi. Una sorgente rimasta senza pacchetti si toglie.
+# tiene per default solo PackageIdentifier, Version, Channel e Scope: winget 1.29 ci salva
+# --custom/--override, il file puo' venire da chiunque e l'installer li riceverebbe da
+# amministratore. Una casella spenta li tiene (-KeepStored). Una sorgente rimasta senza
+# pacchetti si toglie.
 $ipFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-preview-$PID.json"
 [IO.File]::WriteAllText($ipFile, (@'
 {"$schema":"https://aka.ms/winget-packages.schema.2.0.json","CreationDate":"2026-10-14",
@@ -1796,14 +1800,24 @@ try {
     if ($ip.Stored -ne 1) { throw "pacchetti con argomenti salvati: $($ip.Stored), atteso 1" }
     $subFile = Join-Path ([IO.Path]::GetTempPath()) "wgt-preview-sub-$PID.json"
     try {
-        [IO.File]::WriteAllText($subFile, (New-ImportSubset $ip.Json @(1)))
+        [IO.File]::WriteAllText($subFile, (New-ImportSubset $ip.Json @(1) -KeepStored))
         if ((Get-ImportPackageCount $subFile) -ne 1) { throw "il file ridotto non contiene un solo pacchetto" }
         $sub = Get-Content -LiteralPath $subFile -Raw | ConvertFrom-Json
         if (@($sub.Sources).Count -ne 1 -or $sub.Sources[0].SourceDetails.Name -ne 'winget') { throw "la sorgente rimasta vuota (msstore) non e' stata tolta" }
         $kept = @($sub.Sources[0].Packages)[0]
-        if ($kept.PackageIdentifier -ne 'Notepad++.Notepad++' -or $kept.Custom -ne '/NoUpdater' -or $kept.Version -ne '8.9') { throw "il pacchetto tenuto non e' intatto: $($kept | ConvertTo-Json -Compress)" }
+        if ($kept.PackageIdentifier -ne 'Notepad++.Notepad++' -or $kept.Custom -ne '/NoUpdater' -or $kept.Version -ne '8.9') { throw "-KeepStored: il pacchetto tenuto non e' intatto: $($kept | ConvertTo-Json -Compress)" }
         if ($sub.'$schema' -ne 'https://aka.ms/winget-packages.schema.2.0.json') { throw "le proprieta' della radice non sono state tenute" }
         if (@($ip.Json.Sources[0].Packages).Count -ne 2) { throw "New-ImportSubset ha modificato il file letto" }
+        # Per default: solo le quattro proprieta' note, e solo quelle presenti (lo schema di winget
+        # rifiuta un null). 7zip ha il solo Id, Notepad++ anche la versione fissata.
+        [IO.File]::WriteAllText($subFile, (New-ImportSubset $ip.Json @(0, 1)))
+        $sub = Get-Content -LiteralPath $subFile -Raw | ConvertFrom-Json
+        $pk = @($sub.Sources[0].Packages)
+        $pkProps = @($pk | ForEach-Object { ($_.PSObject.Properties.Name) -join '+' }) -join ','
+        if ($pkProps -ne 'PackageIdentifier,PackageIdentifier+Version') { throw "per default il file ridotto tiene altro: $pkProps" }
+        if ($pk[1].Version -ne '8.9') { throw "per default la versione fissata si perde: '$($pk[1].Version)'" }
+        if ((Get-Content -LiteralPath $subFile -Raw) -match 'null|NoUpdater') { throw "per default il file ridotto contiene null o gli argomenti salvati" }
+        if (-not $ip.Json.Sources[0].Packages[1].Custom) { throw "New-ImportSubset ha tolto gli argomenti dal file letto" }
     }
     finally { Remove-Item -LiteralPath $subFile -ErrorAction SilentlyContinue }
 }
@@ -1819,7 +1833,15 @@ if (-not $dlg.FindName('DlgBody').Children.Contains($probe)) { throw "New-AppDia
 if ($dlg.FindName('DlgText').Text -ne 'with content') { throw "con -Content il testo del popup si perde" }
 $ipGrid = New-ImportPreviewGrid (New-Object System.Collections.ObjectModel.ObservableCollection[object])
 if ($ipGrid.Columns.Count -lt 3 -or $ipGrid.Columns[0] -isnot [System.Windows.Controls.DataGridCheckBoxColumn]) { throw "griglia dell'anteprima senza colonna di spunta" }
-"OK preview anteprima con spunte, file ridotto con i pacchetti intatti, sorgenti vuote tolte"
+# La casella per tenere gli argomenti: solo se ce ne sono, SPENTA, col conteggio.
+if ($null -ne (New-ImportArgsBox 0)) { throw "casella degli argomenti senza argomenti salvati" }
+$argsBox = New-ImportArgsBox 2
+if ($argsBox -isnot [System.Windows.Controls.CheckBox] -or $argsBox.IsChecked -ne $false) { throw "la casella degli argomenti non e' una CheckBox spenta" }
+if ($argsBox.Content.Text -notmatch '\b2 packages\b') { throw "la casella non dice quanti pacchetti: '$($argsBox.Content.Text)'" }
+if ($importSrc -notmatch 'New-ImportArgsBox' -or $importSrc -notmatch '-KeepStored:\$keepStored' -or $importSrc -notmatch '\$dropStored\)') {
+    throw "l'import non toglie gli argomenti salvati per default (anche con tutto spuntato)"
+}
+"OK preview anteprima con spunte, file ridotto alle proprieta' note (argomenti solo con la casella), sorgenti vuote tolte"
 
 if (-not $realWinget) {
     "SKIP export  senza -Live o winget non presente"
@@ -1905,12 +1927,101 @@ $updSrc = Get-FunctionSource 'Start-SelfUpdate'
 $refuse = $updSrc.IndexOf('-not $rel.Sha256')
 if ($refuse -lt 0 -or $refuse -gt $updSrc.IndexOf('Show-AppDialog')) { throw "installed: il digest mancante non e' rifiutato prima della conferma" }
 if ($updSrc -notmatch '/SILENT /CLOSEAPPLICATIONS /relaunch=1') { throw "il setup non viene avviato con /SILENT /CLOSEAPPLICATIONS /relaunch=1" }
-if ($updSrc -notmatch '"wgt_') { throw "il setup scaricato non ha il prefisso wgt_: resterebbe in %TEMP%" }
+if ($updSrc -notmatch 'New-UpdateDownloadDir' -or (Get-FunctionSource 'New-UpdateDownloadDir') -notmatch '"wgt_') { throw "il file scaricato non sta in una cartella wgt_: resterebbe dopo l'aggiornamento" }
 if ($updSrc -notmatch '(?s)Start-Process -FilePath \$tmp[^\r\n]*-ErrorAction Stop.*?catch.*?Set-AppBusy \$false.*?return') {
     throw "se il setup non parte, l'app deve restare aperta e dirlo"
 }
 if ((Get-FunctionSource 'Start-UpdateCheck') -notmatch 'Get-InstallChannel') { throw "Start-UpdateCheck non sceglie l'asset per canale" }
 "OK assets  asset per nome e canale; setup verificato, rilancio, uscita pulita se non parte"
+
+# Firma (ADR 0022): il digest arriva da GitHub come il file, quindi si controlla anche che il
+# firmatario abbia la NOSTRA chiave pubblica, in ogni canale. L'esito e' l'HRESULT di WinVerifyTrust:
+# 0 dove il .cer e' fra le radici attendibili, CERT_E_UNTRUSTEDROOT altrove (radice self-signed,
+# ADR 0012); nient'altro, e mai con un'altra chiave.
+$cerObj = New-Object Security.Cryptography.X509Certificates.X509Certificate2 (Join-Path $root 'assets\WinGetStudio-codesign.cer')
+$cerKey = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($cerObj.GetPublicKey())).Replace('-', '')
+if ($UpdateSignerKeySha256 -ne $cerKey) { throw "la chiave fissata ($UpdateSignerKeySha256) non e' quella di assets\WinGetStudio-codesign.cer ($cerKey)" }
+# cmd.exe e' firmato da Microsoft via catalogo: WinVerifyTrust sul file lo dice non firmato
+# (0x800B0100), ma il certificato (da Get-AuthenticodeSignature) serve come "un'altra chiave".
+$cmdTrust = Get-UpdateSignerTrust "$env:SystemRoot\System32\cmd.exe"
+if (-not $cmdTrust.Certificate) { throw "cmd.exe senza certificato del firmatario" }
+$sigCases = @(
+    @(0, $cerObj, $true), @(0x800B0109, $cerObj, $true),
+    @(0x80096004, $cerObj, $false), @(0x80096003, $cerObj, $false), @(0x80096010, $cerObj, $false), @(0x800B0100, $cerObj, $false),
+    @(0, $cmdTrust.Certificate, $false), @(0x800B0109, $null, $false)
+)
+$sigBad = @(foreach ($c in $sigCases) {
+    $t = [PSCustomObject]@{ Result = [int]$c[0]; Certificate = $c[1] }
+    if ((Test-UpdateSignature $t $UpdateSignerKeySha256) -ne $c[2]) { "0x$('{0:X8}' -f $c[0])/$(if ($c[1]) { $c[1].Subject } else { 'nessun firmatario' }) -> atteso $($c[2])" }
+})
+if ($sigBad) { throw "Test-UpdateSignature: $($sigBad -join '; ')" }
+if (Test-UpdateSignature ([PSCustomObject]@{ Result = 0; Certificate = $cerObj }) '') { throw "senza chiave attesa la firma passa" }
+# Firme vere: cmd.exe e' di Microsoft, un file di testo non e' firmato.
+if (Test-UpdateSignature $cmdTrust $UpdateSignerKeySha256) { throw "accettato un file firmato da Microsoft" }
+if (Test-UpdateSignature (Get-UpdateSignerTrust (Join-Path $root 'README.md')) $UpdateSignerKeySha256) { throw "accettato un file non firmato" }
+# L'exe compilato, se c'e' (non in CI), e' nostro; una sua copia con un byte alterato no. E fra le
+# copie con la FIRMA alterata ce n'e' almeno una che PowerShell chiama UnknownError col nostro
+# firmatario, come una buona: e' la ragione per cui si guarda WinVerifyTrust e non Status.
+$distExe = Join-Path $root 'dist\WinGetStudio.exe'
+$distOk = $false
+if ((Test-Path -LiteralPath $distExe) -and (Get-AuthenticodeSignature -LiteralPath $distExe).SignerCertificate) {
+    if (-not (Test-UpdateSignature (Get-UpdateSignerTrust $distExe) $UpdateSignerKeySha256)) { throw "l'exe firmato in dist\ non passa la verifica" }
+    $probeExe = Join-Path ([IO.Path]::GetTempPath()) "wgt-sigprobe-$PID.exe"
+    try {
+        $bytes = [IO.File]::ReadAllBytes($distExe)
+        $b2 = [byte[]]$bytes.Clone(); $b2[0x400] = $b2[0x400] -bxor 0xFF
+        [IO.File]::WriteAllBytes($probeExe, $b2)
+        if (Test-UpdateSignature (Get-UpdateSignerTrust $probeExe) $UpdateSignerKeySha256) { throw "accettata una copia dell'exe con un byte del codice alterato" }
+        $opt  = [BitConverter]::ToInt32($bytes, 0x3C) + 24
+        $dirs = $opt + $(if ([BitConverter]::ToUInt16($bytes, $opt) -eq 0x20b) { 112 } else { 96 })
+        $secOff = [BitConverter]::ToInt32($bytes, $dirs + 32); $secLen = [BitConverter]::ToInt32($bytes, $dirs + 36)
+        $trap = $false
+        for ($i = $secOff + 8; $i -lt $secOff + $secLen -and -not $trap; $i += 37) {
+            $b2 = [byte[]]$bytes.Clone(); $b2[$i] = $b2[$i] -bxor 0x5A
+            [IO.File]::WriteAllBytes($probeExe, $b2)
+            $ps = Get-AuthenticodeSignature -LiteralPath $probeExe
+            $t  = Get-UpdateSignerTrust $probeExe
+            if ("$($ps.Status)" -eq 'UnknownError' -and $ps.SignerCertificate.Thumbprint -eq $cerObj.Thumbprint -and $t.Result -ne [int]0x800B0109) {
+                $trap = $true
+                if (Test-UpdateSignature $t $UpdateSignerKeySha256) { throw "accettata una firma alterata (0x$('{0:X8}' -f $t.Result))" }
+            }
+        }
+        if (-not $trap) { throw "nessuna firma alterata che PowerShell chiami UnknownError: la prova non prova nulla" }
+        $distOk = $true
+    }
+    finally { Remove-Item -LiteralPath $probeExe -Force -ErrorAction SilentlyContinue }
+}
+$updSrc = Get-FunctionSource 'Start-SelfUpdate'
+if ($updSrc -notmatch 'Get-UpdateSignerTrust \$dest' -or $updSrc -notmatch 'Test-UpdateSignature \$sig \$signer' -or $updSrc -notmatch "-Functions 'Get-UpdateSignerTrust', 'Test-UpdateSignature'") {
+    throw "Start-SelfUpdate non verifica la firma del file scaricato"
+}
+if ($updSrc.IndexOf('Get-UpdateSignerTrust $dest') -gt $updSrc.IndexOf('-OnDone')) { throw "la firma si verifica dopo il job, non prima di eseguire" }
+# Firma che non torna: un popup con il link alle release, perche' il log non lo legge nessuno.
+if ($updSrc -notmatch '(?s)HashOk\)\s*\{\s*Show-AppDialog.*?releases/latest.*?-Links') { throw "una firma rifiutata non spiega all'utente come aggiornare a mano" }
+# portable: copia e non spostamento, o il nuovo exe si porterebbe l'ACL della cartella protetta.
+if ($updSrc -notmatch 'Copy-Item -LiteralPath \$tmp -Destination \$exe' -or $updSrc -match 'Move-Item -LiteralPath \$tmp') { throw "portable: il nuovo exe va copiato al suo posto, non spostato" }
+"OK sign    chiave del .cer fissata, WinVerifyTrust 0 o radice non attendibile, altri e non firmati rifiutati$(if ($distOk) { '; exe di dist\ accettato, copie alterate rifiutate' } else { '; SKIP exe firmato in dist\' })"
+
+# Cartella del download (ADR 0022): in %SystemRoot%\Temp, dove un utente non puo' rinominarla, con
+# un'ACL propria (non ereditata) solo per Administrators e SYSTEM, e OWNER RIGHTS senza permessi
+# di cambiarla. Qui in %TEMP%: il test non e' elevato, e da Windows\Temp non potrebbe ripulire.
+if ((Get-FunctionSource 'New-UpdateDownloadDir') -notmatch "Join-Path \`$env:SystemRoot 'Temp'") { throw "la cartella del download non sta in %SystemRoot%\Temp" }
+$dlDir = New-UpdateDownloadDir ([IO.Path]::GetTempPath())
+try {
+    if ((Split-Path $dlDir -Leaf) -notmatch '^wgt_update_[0-9a-f]{32}$') { throw "nome della cartella del download: $dlDir" }
+    $dlAcl = Get-Acl -LiteralPath $dlDir
+    if (-not $dlAcl.AreAccessRulesProtected) { throw "la cartella del download eredita l'ACL della cartella padre" }
+    $dlRules = @($dlAcl.Access)
+    $dlSids = @($dlRules | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } | Sort-Object -Unique) -join ','
+    if ($dlSids -ne 'S-1-3-4,S-1-5-18,S-1-5-32-544') { throw "ACL della cartella del download: $dlSids" }
+    $owner = @($dlRules | Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-3-4' })
+    if (@($owner | Where-Object { $_.FileSystemRights -band ([Security.AccessControl.FileSystemRights]::ChangePermissions -bor [Security.AccessControl.FileSystemRights]::TakeOwnership -bor [Security.AccessControl.FileSystemRights]::Write) }).Count) {
+        throw "OWNER RIGHTS puo' scrivere o cambiare l'ACL della cartella del download"
+    }
+    if (@($dlRules | Where-Object { $_.IsInherited }).Count) { throw "regole ereditate nella cartella del download" }
+}
+finally { [IO.Directory]::Delete($dlDir) }   # vuota: senza elevazione la cancella il diritto sul padre
+"OK dldir   cartella del download con ACL protetta: Administrators, SYSTEM, OWNER RIGHTS in sola lettura"
 
 # Il download e' l'unico punto in cui il programma ESEGUE codice preso da internet:
 # la conferma deve precederlo e il checksum deve essere confrontato.
