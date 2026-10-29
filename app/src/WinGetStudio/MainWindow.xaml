@@ -83,6 +83,51 @@
                        ToolTip="Pinned: winget will not upgrade it until the pin is removed"/>
         </DataTemplate>
 
+        <!-- Linguette: glifo (Tag) e nome, mostrati secondo Settings > Tab strip. Solo il contenuto
+             dell'intestazione, il template della linguetta resta quello Fluent (ADR 0027). -->
+        <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+            <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource Self}}"/>
+            <Setter Property="HeaderTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center"
+                                       Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabItem}}" ToolTip="{Binding}"
+                                       Visibility="{Binding DataContext.Settings.TabIconVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Margin" Value="0,0,8,0"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DataContext.Settings.TabTextVisible, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                <Setter Property="Margin" Value="0"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center"
+                                       Visibility="{Binding DataContext.Settings.TabTextVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Settings e About: titoli di sezione, etichette, descrizioni. -->
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
+        </Style>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,16,10"/>
+        </Style>
+        <Style x:Key="Subtle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
         <Style x:Key="Hint" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
@@ -151,7 +196,7 @@
         </Grid.RowDefinitions>
 
         <TabControl x:Name="TabMain" SelectedIndex="{Binding SelectedTab}">
-            <TabItem Header="Install" DataContext="{Binding Install}"
+            <TabItem Header="Install" Tag="&#xE896;" DataContext="{Binding Install}"
                      AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
@@ -212,7 +257,7 @@
                 </Grid>
             </TabItem>
 
-            <TabItem Header="Installed" DataContext="{Binding Installed}"
+            <TabItem Header="Installed" Tag="&#xE71D;" DataContext="{Binding Installed}"
                      AutomationProperties.HelpText="Everything installed on this machine: filter it, pin it, uninstall it">
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
@@ -258,7 +303,7 @@
                 </Grid>
             </TabItem>
 
-            <TabItem Header="Updates" DataContext="{Binding Updates}"
+            <TabItem Header="Updates" Tag="&#xE777;" DataContext="{Binding Updates}"
                      AutomationProperties.HelpText="Packages with a newer version available, and the queue that updates them">
                 <Grid Margin="0,8,0,0">
                     <Grid.RowDefinitions>
@@ -296,6 +341,125 @@
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding SelectedText}"/>
                     </DockPanel>
                 </Grid>
+            </TabItem>
+
+            <TabItem Header="Settings" Tag="&#xE713;" DataContext="{Binding Settings}"
+                     AutomationProperties.HelpText="Theme, tab strip, version and updates">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <!-- Etichette a larghezza automatica, controlli elastici: una etichetta piu' lunga
+                         non rompe l'allineamento. -->
+                    <Grid Margin="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="110"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.ColumnSpan="2" Text="Appearance" Style="{StaticResource SectionHeader}"/>
+                        <TextBlock Grid.Row="1" Text="Theme" Style="{StaticResource Label}"/>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                            <ComboBox Width="150" ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}"
+                                      AutomationProperties.Name="Theme"/>
+                            <TextBlock Style="{StaticResource Hint}" Text="{Binding ThemeHint}"/>
+                        </StackPanel>
+                        <TextBlock Grid.Row="2" Text="Tab strip" Style="{StaticResource Label}" Margin="0,0,16,24"/>
+                        <ComboBox Grid.Row="2" Grid.Column="1" Width="150" HorizontalAlignment="Left" Margin="0,0,0,24"
+                                  ItemsSource="{Binding TabStyles}" SelectedItem="{Binding SelectedTabStyle}"
+                                  AutomationProperties.Name="Tab strip" ToolTip="What the tabs show: the icon, the name, or both"/>
+
+                        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="Updates" Style="{StaticResource SectionHeader}"/>
+                        <!-- Valgono per tutte e due le voci sotto: una riga loro. -->
+                        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,16">
+                            <Button Content="Check for updates" MinWidth="140" Command="{Binding CheckForUpdatesCommand}"/>
+                            <CheckBox Content="Check at startup" Margin="16,0,0,0" VerticalAlignment="Center"
+                                      IsChecked="{Binding CheckAtStartup}"
+                                      ToolTip="Anonymous calls to the GitHub API when the app starts: one for WinGet Studio, and one for winget where the Microsoft Store does not update it. Turn it off to go online only when you press Check for updates"/>
+                            <ProgressBar Style="{StaticResource Busy}" Visibility="{Binding Checking, Converter={StaticResource Visible}}"/>
+                        </StackPanel>
+                        <!-- Una voce per riga: versione, pulsante (solo con una versione piu' recente), esito. -->
+                        <TextBlock Grid.Row="5" Text="WinGet Studio" Style="{StaticResource Label}" Margin="0,0,16,14"/>
+                        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,14">
+                            <TextBlock Text="{Binding VersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,18,0"/>
+                            <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateAppText}" ToolTip="{Binding UpdateAppToolTip}"
+                                    Command="{Binding UpdateAppCommand}" Visibility="{Binding UpdateAppVisible, Converter={StaticResource Visible}}"/>
+                            <TextBlock Style="{StaticResource Hint}" Text="{Binding UpdateStatus}" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                        <!-- winget stesso (ADR 0019): chi lo aggiorna, o il pulsante. -->
+                        <TextBlock Grid.Row="6" Text="winget" Style="{StaticResource Label}"/>
+                        <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
+                            <TextBlock Text="{Binding WinGetVersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,18,0"/>
+                            <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateWinGetText}" ToolTip="{Binding UpdateWinGetToolTip}"
+                                    Command="{Binding UpdateWinGetCommand}" Visibility="{Binding UpdateWinGetVisible, Converter={StaticResource Visible}}"/>
+                            <TextBlock Style="{StaticResource Subtle}" VerticalAlignment="Center"
+                                       Visibility="{Binding WinGetStore, Converter={StaticResource Visible}}">Updated by the <Hyperlink
+                                       NavigateUri="ms-windows-store://downloadsandupdates">Microsoft Store</Hyperlink></TextBlock>
+                            <TextBlock Style="{StaticResource Hint}" Text="{Binding WinGetStatus}" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Grid>
+                </ScrollViewer>
+            </TabItem>
+
+            <TabItem Header="About" Tag="&#xE946;"
+                     AutomationProperties.HelpText="What this app does, where to report a bug, and the licence">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <!-- Le funzioni in una tabella senza bordi: nome a sinistra, descrizione a destra,
+                         cosi' l'occhio trova dove comincia ognuna. -->
+                    <StackPanel Margin="12">
+                        <TextBlock Style="{StaticResource Subtle}" Text="WinGet Studio is a desktop front end for winget, the Windows package manager."/>
+                        <Grid Margin="0,14,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="Updates" FontWeight="SemiBold" Margin="0,0,14,8"/>
+                            <TextBlock Grid.Column="1" Style="{StaticResource Subtle}" Margin="0,0,0,8">
+                                List what has a newer version and upgrade the packages you tick, one at a time.<LineBreak/>
+                                A running queue can be stopped: the package in progress finishes, the rest are left alone.
+                            </TextBlock>
+                            <TextBlock Grid.Row="1" Text="Install" FontWeight="SemiBold" Margin="0,0,14,8"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource Subtle}" Margin="0,0,0,8"
+                                       Text="Search the winget catalogue as you type, optionally the Microsoft Store, and pick the install scope."/>
+                            <TextBlock Grid.Row="2" Text="Installed" FontWeight="SemiBold" Margin="0,0,14,8"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource Subtle}" Margin="0,0,0,8"
+                                       Text="The inventory of the machine, with a local filter and an uninstall behind a confirmation."/>
+                            <TextBlock Grid.Row="3" Text="Pin" FontWeight="SemiBold" Margin="0,0,14,8"/>
+                            <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource Subtle}" Margin="0,0,0,8"
+                                       Text="Block a package from being upgraded, from either list, until you remove the pin."/>
+                            <TextBlock Grid.Row="4" Text="Export / Import" FontWeight="SemiBold" Margin="0,0,14,0"/>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource Subtle}"
+                                       Text="Save the package list to a .json file and rebuild a machine from it."/>
+                        </Grid>
+                        <!-- 2.0 non e' elevata (ADR 0024): l'UAC lo chiede l'installer che ne ha bisogno. -->
+                        <TextBlock Style="{StaticResource Subtle}" Margin="0,18,0,0">
+                            It runs without administrator rights: an installer that needs them asks for them.<LineBreak/>
+                            No telemetry.<LineBreak/>
+                            <LineBreak/>
+                            Found a bug, or have an idea?
+                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues">Open an issue on GitHub</Hyperlink>.<LineBreak/>
+                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio">Source code</Hyperlink> &#183;
+                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases">Release notes</Hyperlink> &#183;
+                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE">MIT licence</Hyperlink><LineBreak/>
+                            <LineBreak/>
+                            Made by <Hyperlink NavigateUri="https://github.com/FedeB2160">FedeB2160</Hyperlink>,
+                            with the help of <Italic>Claude Code</Italic> (Anthropic).
+                        </TextBlock>
+                    </StackPanel>
+                </ScrollViewer>
             </TabItem>
         </TabControl>
 

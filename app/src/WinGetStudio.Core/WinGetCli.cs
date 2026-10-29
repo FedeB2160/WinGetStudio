@@ -11,6 +11,9 @@ public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null) 
     private readonly IProcessRunner _runner = runner ?? new ProcessRunner();
     private bool? _noProgress;
 
+    // Si aggiorna dopo che l'app ha installato winget (ADR 0019).
+    public string WinGetPath { get; set; } = wingetPath;
+
     // Percorso completo di winget, o null. Sempre completo: CreateProcess con un nome nudo
     // cercherebbe prima nella cartella corrente.
     public static string? FindWinGet()
@@ -133,15 +136,30 @@ public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null) 
             // --no-progress dalla 1.29 (accettato anche se --help non lo elenca); prima restano i
             // frame \r, che il parser riduce all'ultimo segmento.
             _noProgress ??= await SupportsNoProgressAsync();
-            return await _runner.RunAsync(wingetPath, _noProgress.Value ? [.. arguments, "--no-progress"] : arguments, tick);
+            return await _runner.RunAsync(WinGetPath, _noProgress.Value ? [.. arguments, "--no-progress"] : arguments, tick);
         }
         finally { Gate.Release(); }
     }
 
     // "v1.29.380". Una versione illeggibile vale come vecchia: senza l'opzione si legge lo stesso.
-    private async Task<bool> SupportsNoProgressAsync()
+    private async Task<bool> SupportsNoProgressAsync() =>
+        Version.TryParse(await ReadVersionAsync() ?? "", out var v) && v >= new Version(1, 29);
+
+    // Versione di winget ("1.29.380"), o null. Sotto il lock: e' un processo winget (ADR 0003).
+    // Da winget e non dal pacchetto App Installer: niente proiezione WinRT, e il numero e' quello
+    // dei tag di winget-cli, con cui si confronta.
+    public async Task<string?> GetVersionAsync()
     {
-        var r = await _runner.RunAsync(wingetPath, ["--version"]);
-        return r.ExitCode == 0 && Version.TryParse(r.Output.Trim().TrimStart('v'), out var v) && v >= new Version(1, 29);
+        await Gate.WaitAsync();
+        try { return await ReadVersionAsync(); }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException or UnauthorizedAccessException) { return null; }
+        finally { Gate.Release(); }
+    }
+
+    private async Task<string?> ReadVersionAsync()
+    {
+        var r = await _runner.RunAsync(WinGetPath, ["--version"]);
+        var v = r.Output.Trim().TrimStart('v');
+        return r.ExitCode == 0 && v.Length > 0 ? v : null;
     }
 }

@@ -78,6 +78,52 @@ internal sealed class FakeDialogs : IDialogService
     public string? PickOpenFile(string title, string filter) => OpenFile;
 }
 
+// GitHub, l'exe e winget finti. Releases per repo (null: nessuna release); Requests registra
+// ogni chiamata a GitHub come "repo asset". Before gira prima della risposta di GitHub.
+internal sealed class FakeUpdateHost : IUpdateHost
+{
+    public InstallChannel Channel { get; set; } = InstallChannel.Portable;
+    public string AppVersion { get; set; } = "2.0.0";
+    public readonly Dictionary<string, Release?> Releases = [];
+    public readonly List<string> Requests = [];
+    public Func<Task>? Before;
+    public string? WinGetVersion = "1.29.380";
+    public bool Store;
+    public DownloadResult Download = new(null, "no network");
+    public readonly List<bool> Applied = [];
+    public string? WinGetFoundAfterInstall = @"C:\WindowsApps\winget.exe";
+    public string? InstallError;
+    public readonly List<bool> Installs = [];
+
+    public async Task<Release?> GetLatestReleaseAsync(string repo, string assetName)
+    {
+        lock (Requests) Requests.Add($"{repo} {assetName}");
+        if (Before is not null) await Before();
+        return Releases.GetValueOrDefault(repo);
+    }
+
+    public Task<DownloadResult> DownloadAsync(Release release) => Task.FromResult(Download);
+
+    public string? Apply(VerifiedFile file, bool installed)
+    {
+        Applied.Add(installed);
+        return null;
+    }
+
+    public Task<string?> GetWinGetVersionAsync() => Task.FromResult(WinGetVersion);
+    public bool StoreUpdatesWinGet() => Store;
+    public string? FindWinGet() => Installs.Count > 0 ? WinGetFoundAfterInstall : null;
+
+    public Task<string?> InstallWinGetAsync(bool register, Action<string> log)
+    {
+        Installs.Add(register);
+        return Task.FromResult(InstallError);
+    }
+
+    public static Release Release(string tag, string? sha256 = "AB", string name = "WinGetStudio.exe") =>
+        new(tag, tag.TrimStart('v'), name, $"https://example.invalid/{name}", 2048, sha256);
+}
+
 // La finestra senza finestra: MainViewModel su winget e dialoghi finti, preferenze in una
 // chiave di registro propria del test, cancellata alla fine.
 internal sealed class Harness : IDisposable
@@ -85,14 +131,16 @@ internal sealed class Harness : IDisposable
     private readonly string _key = $@"Software\WinGetStudio.Tests\{Guid.NewGuid():N}";
     public readonly FakeWinGet WinGet = new();
     public readonly FakeDialogs Dialogs = new();
+    public readonly FakeUpdateHost Host = new();
     public readonly Preferences Prefs;
     public readonly MainViewModel Vm;
+    public bool WinGetFound = true;
 
     public Harness(Action<Harness>? setup = null)
     {
         Prefs = new Preferences(_key);
         setup?.Invoke(this);
-        Vm = new MainViewModel(new WinGetCli("winget.exe", WinGet), Prefs, Dialogs);
+        Vm = new MainViewModel(new WinGetCli("winget.exe", WinGet), Prefs, Dialogs, Host, WinGetFound);
     }
 
     public AppState State => Vm.State;

@@ -35,13 +35,19 @@ public class WindowSmokeTests
         Pump(() => !h.State.IsBusy && h.Vm.Updates.Items.Count == 1);
 
         var tabs = (TabControl)w.FindName("TabMain");
-        Assert.Equal(["Install", "Installed", "Updates"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
+        Assert.Equal(["Install", "Installed", "Updates", "Settings", "About"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
         Assert.Equal(MainViewModel.UpdatesTab, tabs.SelectedIndex);
+        // Settings e About si disegnano; Settings cambia il tema a caldo.
+        h.Vm.SelectedTab = MainViewModel.AboutTab;
+        Pump(() => true);
+        h.Vm.SelectedTab = MainViewModel.SettingsTab;
+        Pump(() => true);
+        h.Vm.Settings.ApplyTheme = name => app.ThemeMode = App.Theme(name);
         Assert.Contains("Found 1 updates.", ((TextBox)w.FindName("TxtLog")).Text);
         foreach (var key in FluentKeys) Assert.True(w.TryFindResource(key) is not null, key);
 
         var light = ((SolidColorBrush)w.FindResource("TextFillColorPrimaryBrush")).Color;
-        app.ThemeMode = ThemeMode.Dark;
+        h.Vm.Settings.SelectedTheme = "Dark";
         Pump(() => true);
         Assert.NotEqual(light, ((SolidColorBrush)w.FindResource("TextFillColorPrimaryBrush")).Color);
 
