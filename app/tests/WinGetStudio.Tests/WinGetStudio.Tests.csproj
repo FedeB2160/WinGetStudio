@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ViewModel senza finestra, piu' uno smoke test STA della finestra (ADR 0023, ADR 0027). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <UseWPF>true</UseWPF>
+    <!-- WPF0001: ThemeMode, sperimentale in .NET 10. xUnit1051: come in Core.Tests, winget e'
+         finto e i test non hanno nulla da annullare. -->
+    <NoWarn>$(NoWarn);WPF0001;xUnit1051</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\WinGetStudio\WinGetStudio.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" Version="4.0.2" />
+  </ItemGroup>
+
+</Project>

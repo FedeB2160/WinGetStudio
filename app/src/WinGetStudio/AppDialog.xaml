@@ -1,0 +1,60 @@
+<Window x:Class="WinGetStudio.AppDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:WinGetStudio.ViewModels"
+        ShowInTaskbar="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
+        MinWidth="360" MaxWidth="560">
+    <!-- Dialogo dell'app (ADR 0020): finestra modale col tema Fluent di ThemeMode (ADR 0027). -->
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="Visible"/>
+        <!-- Anteprima dell'import: spunta, Id, sorgente, versione. Larghezze FISSE: il dialogo
+             prende la misura del contenuto, e una colonna a '*' non avrebbe spazio da dividere. -->
+        <DataTemplate DataType="{x:Type vm:ImportPreviewViewModel}">
+            <StackPanel Margin="0,12,0,0">
+                <DataGrid ItemsSource="{Binding Rows}" MaxHeight="260" AutoGenerateColumns="False" CanUserAddRows="False"
+                          IsReadOnly="True" HeadersVisibility="Column">
+                    <DataGrid.Columns>
+                        <DataGridTemplateColumn Width="44">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" MinWidth="0"
+                                              HorizontalAlignment="Center" AutomationProperties.Name="Import"/>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Id" Width="200" Binding="{Binding Id}"/>
+                        <DataGridTextColumn Header="Source" Width="90" Binding="{Binding Source}"/>
+                        <DataGridTextColumn Header="Version" Width="80" Binding="{Binding Version}"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <!-- Spenta: si sceglie di riapplicare gli argomenti salvati, non di toglierli. -->
+                <CheckBox Margin="0,10,0,0" IsChecked="{Binding KeepStoredArguments}"
+                          Visibility="{Binding HasStoredArguments, Converter={StaticResource Visible}}">
+                    <TextBlock Text="{Binding KeepStoredText}" TextWrapping="Wrap" MaxWidth="380"/>
+                </CheckBox>
+            </StackPanel>
+        </DataTemplate>
+    </Window.Resources>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid Margin="20,20,24,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="DlgIcon" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="28"
+                       Margin="0,0,16,0" VerticalAlignment="Top" Visibility="Collapsed"/>
+            <!-- Il testo si seleziona e si copia: un TextBox in sola lettura (o un RichTextBox
+                 coi link, aggiunto dal codice). -->
+            <StackPanel x:Name="DlgBody" Grid.Column="1" VerticalAlignment="Center">
+                <TextBox x:Name="DlgText" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="480"
+                         VerticalScrollBarVisibility="Auto" BorderThickness="0" Background="Transparent" Padding="0"/>
+                <ContentControl x:Name="DlgContent" Focusable="False"/>
+            </StackPanel>
+        </Grid>
+        <StackPanel x:Name="DlgButtons" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="16,0,16,16"/>
+    </Grid>
+</Window>
