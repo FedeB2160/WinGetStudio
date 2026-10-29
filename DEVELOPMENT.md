@@ -230,7 +230,8 @@ The 2.0 rewrite in C# on .NET 10 WPF (→ [ADR 0023](docs/adr/0023-version-2-in-
 ```
 global.json                         pins the .NET 10 SDK (10.0.100 or a later 10.0 feature band, no previews)
 app\WinGetStudio.sln
-    src\WinGetStudio.Core\          engine, no WPF: winget CLI reads, process runner without cmd, table parser, exit codes
+    src\WinGetStudio.Core\          engine, no WPF: winget CLI, process runner without cmd, table parser, exit codes,
+                                    queue, pins, HKCU preferences, export/import files
     src\WinGetStudio\               WPF app: Fluent theme through ThemeMode, asInvoker (an empty window for now)
     tests\WinGetStudio.Core.Tests\  xUnit v3 on Microsoft.Testing.Platform
 ```

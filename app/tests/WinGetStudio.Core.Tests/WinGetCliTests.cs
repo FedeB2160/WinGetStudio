@@ -8,29 +8,7 @@ public class WinGetCliTests
 {
     private const int NoApplicationsFound = unchecked((int)0x8A150014);
 
-    private sealed class FakeRunner : IProcessRunner
-    {
-        public readonly List<string[]> Calls = [];
-        public string Version = "v1.29.380";
-        public Func<IReadOnlyList<string>, ProcessResult> Respond = _ => Result(0, "");
-        public Func<Task> Delay = () => Task.CompletedTask;
-        public int Running, MaxRunning;
-
-        public async Task<ProcessResult> RunAsync(string exePath, IReadOnlyList<string> arguments, Action<TimeSpan>? tick = null)
-        {
-            MaxRunning = Math.Max(MaxRunning, Interlocked.Increment(ref Running));
-            try
-            {
-                await Delay();
-                if (arguments is ["--version"]) return Result(0, Version);
-                lock (Calls) Calls.Add([.. arguments]);
-                return Respond(arguments);
-            }
-            finally { Interlocked.Decrement(ref Running); }
-        }
-    }
-
-    private static ProcessResult Result(int exit, string output) => new(exit, output, TimeSpan.Zero);
+    private static ProcessResult Result(int exit, string output) => FakeRunner.Result(exit, output);
 
     private static (WinGetCli Cli, FakeRunner Runner) Create(string output = "", int exit = 0)
     {

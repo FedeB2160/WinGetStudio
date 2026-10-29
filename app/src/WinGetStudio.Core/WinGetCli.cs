@@ -123,7 +123,9 @@ public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null) 
         return new(r.ExitCode == 0, r.ExitCode == 0 ? WinGetTable.Parse(r.Output, maxColumns) : [], r.ExitCode, r.Output);
     }
 
-    private async Task<ProcessResult> RunAsync(IReadOnlyList<string> arguments, Action<TimeSpan>? tick = null)
+    // Un comando qualunque (scritture comprese), sotto il lock. Le eccezioni del runner passano:
+    // le gestisce il chiamante (la coda le scrive sulla riga).
+    public async Task<ProcessResult> RunAsync(IReadOnlyList<string> arguments, Action<TimeSpan>? tick = null)
     {
         await Gate.WaitAsync();
         try
