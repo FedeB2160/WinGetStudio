@@ -9,7 +9,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="WinGetStudio.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\WinGetStudio.Core\WinGetStudio.Core.csproj" />
+  </ItemGroup>
+
+  <!-- MVVM della finestra (ADR 0023). -->
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
   </ItemGroup>
 
 </Project>

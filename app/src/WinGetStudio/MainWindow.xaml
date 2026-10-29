@@ -1,8 +1,325 @@
 <Window x:Class="WinGetStudio.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:WinGetStudio.ViewModels"
         Title="WinGet Studio"
         Width="900" Height="620" MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterScreen">
-    <!-- Scheletro: i tab arrivano con la finestra vera (fase 1, PR 3). -->
+    <!-- Solo il tema Fluent (ADR 0027): nessun template ne' colore proprio. Le risorse qui sotto
+         danno significato (esito, pin) con chiavi Fluent, mai un colore. -->
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="Visible"/>
+
+        <!-- Spunta di riga: un clic la cambia (niente transazione di edit del DataGrid), spenta
+             mentre winget lavora. La griglia resta scorrevole: si spegne la spunta, non la griglia. -->
+        <Style x:Key="RowCheck" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+            <!-- Le misure minime Fluent della CheckBox (32 px) allungavano ogni riga. -->
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="AutomationProperties.Name" Value="Select"/>
+            <Setter Property="IsEnabled" Value="{Binding DataContext.State.IsIdle, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+        </Style>
+        <DataTemplate x:Key="SelectCell" DataType="{x:Type vm:PackageItem}">
+            <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RowCheck}"/>
+        </DataTemplate>
+        <!-- In Updates una riga con un pin non si spunta: non e' aggiornabile. -->
+        <DataTemplate x:Key="SelectUnpinnedCell" DataType="{x:Type vm:PackageItem}">
+            <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}">
+                <CheckBox.Style>
+                    <Style TargetType="CheckBox" BasedOn="{StaticResource RowCheck}">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Pinned}" Value="True">
+                                <Setter Property="IsEnabled" Value="False"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </CheckBox.Style>
+            </CheckBox>
+        </DataTemplate>
+
+        <!-- Result: avanzamento mentre gira, poi un glifo pieno e distinto, leggibile anche
+             senza distinguere i colori. Il ToolTip sta sul glifo: c'e' solo con un esito. -->
+        <DataTemplate x:Key="ResultCell" DataType="{x:Type vm:PackageItem}">
+            <Grid HorizontalAlignment="Center">
+                <ProgressBar x:Name="running" IsIndeterminate="True" Width="36" VerticalAlignment="Center" Visibility="Collapsed"
+                             AutomationProperties.Name="In progress"/>
+                <TextBlock x:Name="icon" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
+                           VerticalAlignment="Center" Visibility="Collapsed" ToolTip="{Binding StatusDetail}"
+                           AutomationProperties.Name="No result yet"/>
+            </Grid>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding Status}" Value="Running">
+                    <Setter TargetName="running" Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Ok">
+                    <Setter TargetName="icon" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="icon" Property="Text" Value="&#xEC61;"/>
+                    <Setter TargetName="icon" Property="AutomationProperties.Name" Value="Succeeded"/>
+                    <Setter TargetName="icon" Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Warning">
+                    <Setter TargetName="icon" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="icon" Property="Text" Value="&#xE814;"/>
+                    <Setter TargetName="icon" Property="AutomationProperties.Name" Value="Finished with a warning"/>
+                    <Setter TargetName="icon" Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Error">
+                    <Setter TargetName="icon" Property="Visibility" Value="Visible"/>
+                    <Setter TargetName="icon" Property="Text" Value="&#xEB90;"/>
+                    <Setter TargetName="icon" Property="AutomationProperties.Name" Value="Failed"/>
+                    <Setter TargetName="icon" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}"/>
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PinCell" DataType="{x:Type vm:PackageItem}">
+            <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Text="&#xE718;"
+                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Visibility="{Binding Pinned, Converter={StaticResource Visible}}"
+                       AutomationProperties.Name="Pinned"
+                       ToolTip="Pinned: winget will not upgrade it until the pin is removed"/>
+        </DataTemplate>
+
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+        </Style>
+        <!-- Messaggio al posto della griglia vuota: guida, "nessun risultato", errore di winget. -->
+        <Style x:Key="EmptyMessage" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Visibility" Value="{Binding IsEmpty, Converter={StaticResource Visible}}"/>
+        </Style>
+        <Style x:Key="Grid" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+            <Setter Property="AutoGenerateColumns" Value="False"/>
+            <Setter Property="CanUserAddRows" Value="False"/>
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="HeadersVisibility" Value="Column"/>
+            <Setter Property="SelectionMode" Value="Extended"/>
+            <!-- Righe piu' basse di quelle Fluent (32 px): a finestra di default si vedono quasi
+                 tante righe quante nella 1.x (ADR 0027, punto 5). Testo centrato come la spunta. -->
+            <Setter Property="RowHeight" Value="28"/>
+            <Setter Property="CellStyle">
+                <Setter.Value>
+                    <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                        <Setter Property="VerticalContentAlignment" Value="Center"/>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemsSource" Value="{Binding Items}"/>
+            <Setter Property="Visibility" Value="{Binding HasItems, Converter={StaticResource Visible}}"/>
+        </Style>
+        <Style x:Key="Busy" TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+            <Setter Property="IsIndeterminate" Value="True"/>
+            <Setter Property="Width" Value="60"/>
+            <Setter Property="Margin" Value="12,0,0,0"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="Retry" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Content" Value="{Binding RetryText}"/>
+            <Setter Property="Command" Value="{Binding RetryCommand}"/>
+            <Setter Property="Visibility" Value="{Binding RetryVisible, Converter={StaticResource Visible}}"/>
+            <Setter Property="ToolTip" Value="Run the last operation again on the packages in this list where it failed"/>
+        </Style>
+        <!-- Pin e Unpin sulle righe EVIDENZIATE, non sulle spuntate: la spunta di una riga con
+             un pin e' spenta, e con le spunte il pin non si toglierebbe piu'. -->
+        <ContextMenu x:Key="PinMenu" x:Shared="False">
+            <MenuItem Header="Details of highlighted package" Command="{Binding DetailsCommand}"
+                      CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+            <MenuItem Header="Pin highlighted (block upgrades)" Command="{Binding PinCommand}"
+                      CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+            <MenuItem Header="Remove pin from highlighted" Command="{Binding UnpinCommand}"
+                      CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+        </ContextMenu>
+    </Window.Resources>
+
+    <!-- Schede nello spazio elastico; avanzamento e log fuori, condivisi da tutte. -->
+    <Grid Margin="10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="140"/>
+        </Grid.RowDefinitions>
+
+        <TabControl x:Name="TabMain" SelectedIndex="{Binding SelectedTab}">
+            <TabItem Header="Install" DataContext="{Binding Install}"
+                     AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <!-- Invio: ricerca subito, con lo Store se spuntato. -->
+                            <TextBox x:Name="TxtSearch" Width="380" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                     IsEnabled="{Binding State.IsIdle}"
+                                     AutomationProperties.Name="Package name or ID, at least 3 characters">
+                                <TextBox.InputBindings>
+                                    <KeyBinding Key="Return" Command="{Binding SearchNowCommand}"/>
+                                </TextBox.InputBindings>
+                            </TextBox>
+                            <Button Content="Search" MinWidth="96" Margin="8,0,0,0" Command="{Binding SearchNowCommand}"/>
+                            <CheckBox Content="MS Store" Margin="12,0,0,0" VerticalAlignment="Center"
+                                      IsChecked="{Binding IncludeStore}" IsEnabled="{Binding State.IsIdle}"
+                                      ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"/>
+                            <ProgressBar Style="{StaticResource Busy}" Visibility="{Binding Searching, Converter={StaticResource Visible}}"/>
+                        </StackPanel>
+                        <Button Style="{StaticResource Retry}" HorizontalAlignment="Right"/>
+                    </Grid>
+
+                    <DataGrid x:Name="GridSearch" Grid.Row="1" Style="{StaticResource Grid}">
+                        <!-- Doppio clic: installa quel pacchetto, senza passare dalle spunte. -->
+                        <DataGrid.InputBindings>
+                            <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding InstallOneCommand}"
+                                          CommandParameter="{Binding SelectedItem, ElementName=GridSearch}"/>
+                        </DataGrid.InputBindings>
+                        <DataGrid.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Details of highlighted package" Command="{Binding DetailsCommand}"
+                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                            </ContextMenu>
+                        </DataGrid.ContextMenu>
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Width="44" CellTemplate="{StaticResource SelectCell}"/>
+                            <DataGridTextColumn Header="Name" Width="2*" Binding="{Binding Name}"/>
+                            <DataGridTextColumn Header="Version" Width="1.2*" Binding="{Binding Version}"/>
+                            <DataGridTextColumn Header="Id" Width="2.4*" Binding="{Binding Id}"/>
+                            <!-- Con MS Store i risultati vengono da due sorgenti: l'installazione usa quella della riga. -->
+                            <DataGridTextColumn Header="Source" Width="90" Binding="{Binding Source}"/>
+                            <DataGridTemplateColumn Header="Result" Width="80" CellTemplate="{StaticResource ResultCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding Message}"/>
+
+                    <DockPanel Grid.Row="2" Margin="0,8,0,0">
+                        <Button DockPanel.Dock="Left" MinWidth="124" Content="{Binding ScopeText}" ToolTip="{Binding ScopeToolTip}"
+                                Command="{Binding CycleScopeCommand}"/>
+                        <Button DockPanel.Dock="Left" MinWidth="96" Margin="8,0,0,0" Content="Install"
+                                Style="{StaticResource AccentButtonStyle}" Command="{Binding InstallCommand}"/>
+                        <TextBlock Style="{StaticResource Hint}" Text="{Binding InfoText}"/>
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Installed" DataContext="{Binding Installed}"
+                     AutomationProperties.HelpText="Everything installed on this machine: filter it, pin it, uninstall it">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal">
+                            <Button Content="Refresh" MinWidth="96" Command="{Binding ReloadCommand}"/>
+                            <!-- Filtro locale sull'elenco gia' caricato: non richiama winget. -->
+                            <TextBox Width="300" Margin="8,0,0,0" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                                     IsEnabled="{Binding State.IsIdle}" AutomationProperties.Name="Filter by name or ID"/>
+                            <ProgressBar Style="{StaticResource Busy}" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
+                            <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding CountText}"/>
+                        </StackPanel>
+                        <Button Style="{StaticResource Retry}" HorizontalAlignment="Right"/>
+                    </Grid>
+
+                    <DataGrid x:Name="GridInstalled" Grid.Row="1" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
+                        <DataGrid.Columns>
+                            <!-- Qui la spunta resta attiva sui pinnati: il pin blocca gli
+                                 aggiornamenti, non la disinstallazione. -->
+                            <DataGridTemplateColumn Width="44" CellTemplate="{StaticResource SelectCell}"/>
+                            <DataGridTemplateColumn Header="Pin" Width="48" CellTemplate="{StaticResource PinCell}"/>
+                            <DataGridTextColumn Header="Name" Width="2*" Binding="{Binding Name}"/>
+                            <DataGridTextColumn Header="Version" Width="1.2*" Binding="{Binding Version}"/>
+                            <DataGridTextColumn Header="Id" Width="2.4*" Binding="{Binding Id}"/>
+                            <DataGridTemplateColumn Header="Result" Width="80" CellTemplate="{StaticResource ResultCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding EmptyText}"/>
+
+                    <DockPanel Grid.Row="2" Margin="0,8,0,0">
+                        <Button DockPanel.Dock="Left" MinWidth="96" Content="Uninstall" Command="{Binding UninstallCommand}"/>
+                        <!-- Export e Import a destra: agiscono sulla macchina, non sulle righe. -->
+                        <Button DockPanel.Dock="Right" MinWidth="96" Margin="8,0,0,0" Content="Import..." Command="{Binding ImportCommand}"
+                                ToolTip="Install the packages listed in a .json file exported from winget"/>
+                        <Button DockPanel.Dock="Right" MinWidth="96" Content="Export..." Command="{Binding ExportCommand}"
+                                ToolTip="Save the list of installed packages to a .json file"/>
+                        <TextBlock Style="{StaticResource Hint}" Text="{Binding InfoText}"/>
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="Updates" DataContext="{Binding Updates}"
+                     AutomationProperties.HelpText="Packages with a newer version available, and the queue that updates them">
+                <Grid Margin="0,8,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <DockPanel Margin="0,0,0,8">
+                        <Button DockPanel.Dock="Left" MinWidth="96" Content="Check" Command="{Binding CheckCommand}"/>
+                        <CheckBox DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" Content="Unknown"
+                                  IsChecked="{Binding IncludeUnknown}" IsEnabled="{Binding State.IsIdle}"
+                                  ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"/>
+                        <ProgressBar DockPanel.Dock="Left" Style="{StaticResource Busy}" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource Retry}"/>
+                        <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding AvailableText}"/>
+                    </DockPanel>
+
+                    <DataGrid x:Name="GridUpdates" Grid.Row="1" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
+                        <DataGrid.Columns>
+                            <DataGridTemplateColumn Width="44" CellTemplate="{StaticResource SelectUnpinnedCell}"/>
+                            <DataGridTemplateColumn Header="Pin" Width="48" CellTemplate="{StaticResource PinCell}"/>
+                            <DataGridTextColumn Header="Name" Width="2*" Binding="{Binding Name}"/>
+                            <DataGridTextColumn Header="Installed version" Width="1.2*" Binding="{Binding Version}"/>
+                            <DataGridTextColumn Header="Available version" Width="1.2*" Binding="{Binding Available}"/>
+                            <DataGridTextColumn Header="Id" Width="2*" Binding="{Binding Id}"/>
+                            <DataGridTemplateColumn Header="Result" Width="80" CellTemplate="{StaticResource ResultCell}"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding EmptyText}"/>
+
+                    <DockPanel Grid.Row="2" Margin="0,8,0,0">
+                        <Button DockPanel.Dock="Left" MinWidth="96" Content="{Binding ToggleAllText}" Command="{Binding ToggleAllCommand}"/>
+                        <Button DockPanel.Dock="Left" MinWidth="96" Margin="8,0,0,0" Style="{StaticResource AccentButtonStyle}"
+                                Content="{Binding UpdateButtonText}" ToolTip="{Binding UpdateButtonToolTip}" Command="{Binding UpdateCommand}"/>
+                        <TextBlock Style="{StaticResource Hint}" Text="{Binding SelectedText}"/>
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+        </TabControl>
+
+        <!-- Avanzamento della coda in corso, condiviso da tutte le schede. -->
+        <ProgressBar Grid.Row="1" Margin="0,8,0,4" Value="{Binding State.ProgressValue, Mode=OneWay}"
+                     Maximum="{Binding State.ProgressMaximum}" IsIndeterminate="{Binding State.ProgressIndeterminate}"/>
+
+        <TextBlock Grid.Row="2" Text="Log" Margin="0,4,0,4" FontWeight="SemiBold"/>
+        <!-- Il menu proprio sostituisce quello del TextBox: Copy e Select all vanno rimessi. -->
+        <TextBox x:Name="TxtLog" Grid.Row="3" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
+                 TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                 VerticalContentAlignment="Top" AutomationProperties.Name="Log">
+            <TextBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Copy" Command="ApplicationCommands.Copy"/>
+                    <MenuItem Header="Select all" Command="ApplicationCommands.SelectAll"/>
+                    <MenuItem Header="Save log..." Command="{Binding SaveLogCommand}"/>
+                    <MenuItem Header="Clear log" Command="{Binding ClearLogCommand}"/>
+                </ContextMenu>
+            </TextBox.ContextMenu>
+        </TextBox>
+
+        <!-- Velo sotto un dialogo (ADR 0020): copre tutta la finestra, margine compreso. -->
+        <Border x:Name="DialogDim" Grid.RowSpan="4" Margin="-10" Panel.ZIndex="100" Visibility="Collapsed"
+                Background="{DynamicResource SmokeFillColorDefaultBrush}"/>
+    </Grid>
 </Window>

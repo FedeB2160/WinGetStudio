@@ -1,7 +1,7 @@
 <Application x:Class="WinGetStudio.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             ThemeMode="System"
-             StartupUri="MainWindow.xaml">
-    <!-- Solo il tema Fluent: nessun template ne' colore proprio (ADR 0027). -->
+             ThemeMode="System">
+    <!-- Solo il tema Fluent: nessun template ne' colore proprio (ADR 0027). La finestra la
+         crea OnStartup, sopra i servizi di Core. -->
 </Application>
