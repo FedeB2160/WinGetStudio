@@ -286,4 +286,12 @@ Each decision that shapes the architecture has an Architecture Decision Record i
 - [ADR 0021](docs/adr/0021-package-details-as-winget-text.md) — Package details are winget's own text (`show`, `list --details`), never parsed: its labels are translated. Every row carries its source; install passes it.
 - [ADR 0022](docs/adr/0022-self-update-checks-the-signer.md) — The self-update accepts only files signed with the published key (public key pinned, checked through `WinVerifyTrust` because PowerShell's `UnknownError` hides altered signatures), downloaded to a folder in `%SystemRoot%\Temp` that only Administrators and SYSTEM can write.
 
+Version 2.0, being written in `app/` (the decisions below apply to 2.0; the ADRs they supersede still describe 1.x until it ships):
+
+- [ADR 0023](docs/adr/0023-version-2-in-csharp-on-dotnet-10.md) — 2.0 is a rewrite in C# on .NET 10 WPF, in `app/` on `main`; 1.x gets fixes only until 2.0 reaches parity.
+- [ADR 0024](docs/adr/0024-runs-unelevated-elevates-on-demand.md) — 2.0 runs unelevated: installers raise their own UAC, failed per-machine uninstalls get "Retry as administrator" in one `runas`, and "Restart as administrator" keeps today's mode.
+- [ADR 0025](docs/adr/0025-winget-backends-cli-then-com.md) — winget through its CLI first (started without `cmd`), then its COM API, unelevated only, for structured reads and per-row progress.
+- [ADR 0026](docs/adr/0026-distribution-runtime-dependent-and-self-contained.md) — Same assets and signing key, so 1.x updates itself to 2.0; runtime-dependent installer, self-contained portable.
+- [ADR 0027](docs/adr/0027-fluent-theme-with-thememode.md) — WPF's Fluent theme through `ThemeMode`, no templates or colours of its own; Mica, accent and high contrast from the theme.
+
 The rule: **a decision that shapes the architecture gets a new numbered ADR**, written from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md); a superseded or withdrawn ADR is kept and its number never reused. **A spec in `docs\superpowers\specs\` is deleted once it is implemented**, after its decisions have been moved into an ADR.
