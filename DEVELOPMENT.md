@@ -223,6 +223,26 @@ Two standalone scripts of sequential assertions, no framework and no single-test
 
 The Windows CI (`.github/workflows/ci.yml`, GitHub-hosted `windows-2022`) runs both suites offline on every pull request and push to `main`, then installs Inno Setup 6.7.1, builds the exe and the setup, fails if either is missing, and uploads both as unsigned test artifacts for seven days. What each check guards against, and why CI never sees a signing key: → [ADR 0016](docs/adr/0016-tests.md).
 
+## Version 2 (`app\`)
+
+The 2.0 rewrite in C# on .NET 10 WPF (→ [ADR 0023](docs/adr/0023-version-2-in-csharp-on-dotnet-10.md)) grows in `app\`, next to the 1.x, which keeps shipping from `src\` with fixes only until 2.0 reaches parity with the README.
+
+```
+global.json                         pins the .NET 10 SDK (10.0.100 or a later 10.0 feature band, no previews)
+app\WinGetStudio.sln
+    src\WinGetStudio.Core\          engine, no WPF: winget CLI reads, process runner without cmd, table parser, exit codes
+    src\WinGetStudio\               WPF app: Fluent theme through ThemeMode, asInvoker (an empty window for now)
+    tests\WinGetStudio.Core.Tests\  xUnit v3 on Microsoft.Testing.Platform
+```
+
+```powershell
+dotnet build app\WinGetStudio.sln
+dotnet test --solution app\WinGetStudio.sln
+dotnet run --project app\src\WinGetStudio
+```
+
+The Core tests are the 1.x fixtures of `Test-InvokeWinGet.ps1`, rewritten: no test runs winget (the readers get a fake runner), while the process runner tests start real `cmd.exe` and `ping`. CI runs them in their own `dotnet` job, alongside the PowerShell suites.
+
 ## Knowledge graph
 
 `graphify-out\` holds a knowledge graph of this repository: 361 nodes and 590 edges over the code (extracted from the AST) plus the concepts and rationale from the documentation, grouped into 42 communities. `.graphifyignore` keeps the generated icon PNGs out of it.

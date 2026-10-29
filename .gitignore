@@ -25,3 +25,7 @@ graphify-out/*
 !graphify-out/graph.json
 !graphify-out/graph.html
 !graphify-out/manifest.json
+
+# Output di build della 2.0 (app\)
+bin/
+obj/

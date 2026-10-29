@@ -32,6 +32,24 @@ jobs:
       - name: Hidden WPF integration (offline)
         run: powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1
 
+  # La 2.0 in app\ (ADR 0023): build della soluzione e test xUnit di Core, offline.
+  dotnet:
+    name: .NET 10 build and tests (app)
+    runs-on: windows-2022
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # 10.0.x e non global-json-file: l'ultima patch dello SDK 10, che global.json accetta.
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build
+        run: dotnet build app\WinGetStudio.sln -c Release
+      - name: Core tests
+        run: dotnet test --solution app\WinGetStudio.sln -c Release --no-build
+
   build:
     name: Build and verify executable
     needs: tests
