@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Motore della 2.0: esecuzione di winget, parser, codici d'uscita. Niente WPF (ADR 0023). -->
+  <PropertyGroup>
+    <!-- LibraryImport di ProcessRunner. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="WinGetStudio.Core.Tests" />
+  </ItemGroup>
+
+</Project>

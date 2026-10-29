@@ -19,6 +19,9 @@ powershell -ExecutionPolicy Bypass -File .\tests\Test-InvokeWinGet.ps1
 # Real winget reads/export, the GitHub API, one unelevated scheduled task and one pin cycle on 7zip.7zip
 powershell -NoProfile -STA -ExecutionPolicy Bypass -File .\tests\Test-Ui.ps1 -Live
 
+# 2.0 rewrite in app\ (ADR 0023): build and xUnit tests of Core, offline; the SDK is pinned in global.json
+dotnet test --solution app\WinGetStudio.sln
+
 # winget manifests
 winget validate --manifest .\winget\1.11.0
 ```
