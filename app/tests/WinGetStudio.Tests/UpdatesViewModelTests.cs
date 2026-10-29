@@ -85,13 +85,18 @@ public class UpdatesViewModelTests
         var vm = h.Vm.Updates;
         await vm.LoadAsync();
 
-        vm.ToggleAllCommand.Execute(null);
+        // La spunta nell'intestazione: spenta, tutte, alcune (indeterminata).
+        Assert.Equal((false, true), (vm.AllChecked, vm.CanCheckAll));
+        vm.AllChecked = true;
         Assert.Equal([true, false, true], vm.Items.Select(i => i.Selected));
-        Assert.Equal("Deselect all", vm.ToggleAllText);
+        Assert.True(vm.AllChecked);
         Assert.Equal("2 selected", vm.SelectedText);
 
-        vm.ToggleAllCommand.Execute(null);
+        vm.Items[0].Selected = false;
+        Assert.Null(vm.AllChecked);
+        vm.AllChecked = false;
         Assert.All(vm.Items, i => Assert.False(i.Selected));
+        Assert.False(vm.AllChecked);
     }
 
     [Fact]

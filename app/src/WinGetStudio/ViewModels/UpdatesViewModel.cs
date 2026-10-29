@@ -14,7 +14,6 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     {
         _includeUnknown = state.Prefs.GetBool(Preferences.IncludeUnknown, false);
         EmptyText = AvailableText = SelectedText = "";
-        ToggleAllText = "Select all";
         UpdateButtonText = "Update";
         state.UpdatesStale += () => { Stale = true; Refresh(); };
         UpdateCommand = new AsyncRelayCommand(UpdateAsync, () => UpdateEnabled, AsyncRelayCommandOptions.AllowConcurrentExecutions);
@@ -45,7 +44,6 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     [ObservableProperty] public partial string EmptyText { get; private set; }
     [ObservableProperty] public partial string AvailableText { get; private set; }
     [ObservableProperty] public partial string SelectedText { get; private set; }
-    [ObservableProperty] public partial string ToggleAllText { get; private set; }
     [ObservableProperty] public partial string UpdateButtonText { get; private set; }
     [ObservableProperty] public partial string? UpdateButtonToolTip { get; private set; }
 
@@ -60,15 +58,20 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private Task Check() => LoadAsync();
 
-    // I pinnati restano fuori: spuntarli sarebbe una promessa che la coda non puo' mantenere.
-    [RelayCommand(CanExecute = nameof(CanToggleAll))]
-    private void ToggleAll()
+    // La spunta nell'intestazione della griglia: true tutte, false nessuna, null alcune. Un clic
+    // su "alcune" le spunta tutte. I pinnati restano fuori: spuntarli sarebbe una promessa che la
+    // coda non puo' mantenere.
+    public bool? AllChecked
     {
-        var value = !AllSelected;
-        foreach (var i in Selectable) i.Selected = value;
+        get => AllSelected ? true : Selectable.Any(i => i.Selected) ? null : false;
+        set
+        {
+            var on = value == true;
+            foreach (var i in Selectable) i.Selected = on;
+        }
     }
 
-    private bool CanToggleAll() => State.IsIdle && Items.Count > 0;
+    public bool CanCheckAll => State.IsIdle && Items.Count > 0;
 
     public async Task LoadAsync(bool keepOutcome = false)
     {
@@ -155,11 +158,11 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         AvailableText = total switch { 0 => "", 1 => "1 update available", _ => $"{total} updates available" };
         // A lista vecchia il contatore cede il posto al motivo per cui Update e' spento.
         SelectedText = Stale ? "list out of date - press Check" : selected > 0 ? $"{selected} selected" : "";
-        ToggleAllText = AllSelected ? "Deselect all" : "Select all";
+        OnPropertyChanged(nameof(AllChecked));
+        OnPropertyChanged(nameof(CanCheckAll));
         UpdateButtonText = OurQueue ? State.Cancelling ? "Cancelling..." : "Cancel" : "Update";
         UpdateButtonToolTip = OurQueue ? "Finish the package in progress, then stop without starting the others" : null;
         UpdateCommand?.NotifyCanExecuteChanged();
         CheckCommand.NotifyCanExecuteChanged();
-        ToggleAllCommand.NotifyCanExecuteChanged();
     }
 }

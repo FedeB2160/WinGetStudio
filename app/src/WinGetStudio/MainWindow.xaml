@@ -139,13 +139,32 @@
                     <Setter.Value>
                         <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
                             <Setter Property="VerticalContentAlignment" Value="Center"/>
+                            <!-- Si seleziona la riga, non la cella: niente cornice di fuoco sulla
+                                 cella cliccata (il trigger Fluent la colora). -->
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                </Trigger>
+                                <!-- Dopo il fuoco: la cella cliccata resta del colore della riga. -->
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                </Trigger>
+                            </Style.Triggers>
                         </Style>
                     </Setter.Value>
                 </Setter>
+                <Setter Property="SelectionUnit" Value="FullRow"/>
                 <!-- Solo i bordi sopra e sotto: ai lati la griglia resta aperta (ADR 0028). Senza
-                     sfondo: quello Fluent, arrotondato, disegnava i lati anche senza bordo. -->
+                     sfondo: quello Fluent, arrotondato, disegnava i lati anche senza bordo. Solo
+                     le righe orizzontali fra le righe. -->
                 <Setter Property="BorderThickness" Value="0,1"/>
                 <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+                <!-- Ancorata ai due lati: allargare una colonna stringe le altre a '*', non spinge
+                     la griglia oltre il bordo con una barra orizzontale. -->
+                <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
                 <Setter Property="ItemsSource" Value="{Binding Items}"/>
                 <Setter Property="Visibility" Value="{Binding HasItems, Converter={StaticResource Visible}}"/>
             </Style>
@@ -190,10 +209,13 @@
             <Button Style="{StaticResource IconButton}" Content="&#xE946;" ToolTip="About" Command="{Binding OpenAboutCommand}" Margin="6,0,0,0"/>
         </StackPanel>
 
-        <TabControl x:Name="TabMain" SelectedIndex="{Binding SelectedTab}">
+        <!-- Il riquadro delle schede: bordo e sfondo delle card, che il template Fluent usa gia'
+             (ADR 0028). -->
+        <TabControl x:Name="TabMain" SelectedIndex="{Binding SelectedTab}" BorderThickness="1"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
             <TabItem Header="Install" Tag="&#xE896;" DataContext="{Binding Install}"
                      AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
-                <Grid Margin="0,8,0,0">
+                <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -254,7 +276,7 @@
 
             <TabItem Header="Installed" Tag="&#xE71D;" DataContext="{Binding Installed}"
                      AutomationProperties.HelpText="Everything installed on this machine: filter it, pin it, uninstall it">
-                <Grid Margin="0,8,0,0">
+                <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -300,7 +322,7 @@
 
             <TabItem Header="Updates" Tag="&#xE777;" DataContext="{Binding Updates}"
                      AutomationProperties.HelpText="Packages with a newer version available, and the queue that updates them">
-                <Grid Margin="0,8,0,0">
+                <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -318,7 +340,19 @@
 
                     <DataGrid x:Name="GridUpdates" Grid.Row="1" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="44" CellTemplate="{StaticResource SelectUnpinnedCell}"/>
+                            <DataGridTemplateColumn Width="44" CanUserResize="False" CellTemplate="{StaticResource SelectUnpinnedCell}">
+                                <!-- Seleziona tutto: spenta, tutte, alcune (indeterminata). In un
+                                     template e non come Header diretto: un controllo messo li' viene
+                                     legato prima di entrare nell'albero e non trova la griglia. -->
+                                <DataGridTemplateColumn.HeaderTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Style="{StaticResource RowCheck}" AutomationProperties.Name="Select all"
+                                                  ToolTip="Select or clear every package that is not pinned"
+                                                  IsChecked="{Binding DataContext.AllChecked, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                  IsEnabled="{Binding DataContext.CanCheckAll, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.HeaderTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTemplateColumn Header="Pin" Width="48" CellTemplate="{StaticResource PinCell}"/>
                             <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Name" Width="2*" Binding="{Binding Name}"/>
                             <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Installed version" Width="1.2*" Binding="{Binding Version}"/>
@@ -330,8 +364,7 @@
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding EmptyText}"/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">
-                        <Button DockPanel.Dock="Left" MinWidth="96" Content="{Binding ToggleAllText}" Command="{Binding ToggleAllCommand}"/>
-                        <Button DockPanel.Dock="Left" MinWidth="96" Margin="8,0,0,0" Style="{StaticResource AccentButtonStyle}"
+                        <Button DockPanel.Dock="Left" MinWidth="96" Style="{StaticResource AccentButtonStyle}"
                                 Content="{Binding UpdateButtonText}" ToolTip="{Binding UpdateButtonToolTip}" Command="{Binding UpdateCommand}"/>
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding SelectedText}"/>
                     </DockPanel>
@@ -340,7 +373,8 @@
         </TabControl>
 
         <!-- Avanzamento della coda in corso, condiviso da tutte le schede. -->
-        <ProgressBar Grid.Row="1" Margin="0,8,0,4" Value="{Binding State.ProgressValue, Mode=OneWay}"
+        <!-- 8 px e non i 4 Fluent: e' l'unico segno, da ogni scheda, che una coda sta lavorando. -->
+        <ProgressBar Grid.Row="1" Height="8" Margin="0,10,0,6" Value="{Binding State.ProgressValue, Mode=OneWay}"
                      Maximum="{Binding State.ProgressMaximum}" IsIndeterminate="{Binding State.ProgressIndeterminate}"/>
 
         <TextBlock Grid.Row="2" Text="Log" Margin="0,4,0,4" FontWeight="SemiBold"/>

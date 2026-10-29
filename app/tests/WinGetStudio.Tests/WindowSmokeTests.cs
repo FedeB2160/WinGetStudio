@@ -1,6 +1,7 @@
 using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using WinGetStudio.Core;
@@ -38,6 +39,13 @@ public class WindowSmokeTests
         var tabs = (TabControl)w.FindName("TabMain");
         Assert.Equal(["Install", "Installed", "Updates"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
         Assert.Equal(MainViewModel.UpdatesTab, tabs.SelectedIndex);
+        // Seleziona tutto e' la spunta nell'intestazione della griglia (ADR 0028).
+        var all = FindChild<DataGridColumnHeadersPresenter>((DataGrid)w.FindName("GridUpdates")) is { } headers ? FindChild<CheckBox>(headers) : null;
+        Assert.NotNull(all);
+        Assert.True(all.IsEnabled);
+        all.IsChecked = true;
+        Assert.True(h.Vm.Updates.Items[0].Selected);
+        all.IsChecked = false;
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
         var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };
         about.Show();

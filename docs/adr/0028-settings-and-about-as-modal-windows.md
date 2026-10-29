@@ -36,9 +36,23 @@ list on all four sides.
    version, a longer list of what the app does, and a "Good to know" card. The exe gets
    `assets\icon.ico` as its icon, which WPF also uses for every window.
 5. **Grids are open at the sides**: `BorderThickness="0,1"` and a transparent background (the Fluent
-   background is rounded and drew the sides on its own). Text columns get an element style that
-   centres the `TextBlock` vertically: the cell's `VerticalContentAlignment` does not reach it.
-6. Shared styles live in `Styles.xaml`, merged into each window's resources rather than into
+   background is rounded and drew the sides on its own), horizontal lines only. Text columns get an
+   element style that centres the `TextBlock` vertically: the cell's `VerticalContentAlignment` does
+   not reach it. **A click selects the whole row**: the clicked cell keeps the row's selection colour
+   and loses its focus frame. **Grids stay anchored to both sides**: no horizontal scroll bar, so
+   widening a column narrows the `*` columns instead of pushing the grid past the edge.
+   **Select all is a check box in the header** of the Updates grid: on, off, or indeterminate when
+   only some rows are ticked. It sits in a `HeaderTemplate`: a control set straight as the column
+   `Header` is bound before it enters the visual tree and never finds the grid.
+6. **The tab area is a card**: the Fluent `TabControl` template already draws a border and background
+   from `BorderThickness`, `BorderBrush` and `Background`, so the tabs get the card keys and their
+   content a 12 px margin. **The shared progress bar is 8 px** instead of the Fluent 4: it is the only
+   sign, from every tab, that a queue is working.
+7. **A solid window background instead of Mica** (amends ADR 0027, point 6): Mica tints the window
+   with the colour of the desktop wallpaper, which read as blue in the dark theme. The runtime
+   switch `Switch.System.Windows.Appearance.DisableFluentThemeWindowBackdrop` (in the project file)
+   makes the Fluent theme use its `WindowBackground`, the plain Windows dark or light grey.
+8. Shared styles live in `Styles.xaml`, merged into each window's resources rather than into
    `App.xaml`, because the window smoke test runs under an `Application` of its own.
 
 ## Consequences
