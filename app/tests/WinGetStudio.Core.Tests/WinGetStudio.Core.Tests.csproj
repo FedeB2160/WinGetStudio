@@ -5,6 +5,9 @@
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- xUnit1051: i test della coda girano in millisecondi su un winget finto; il token del
+         test servirebbe solo ad annullare prima, e il test dell'annullamento usa il suo. -->
+    <NoWarn>$(NoWarn);xUnit1051</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
