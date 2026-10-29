@@ -74,6 +74,11 @@ internal sealed class FakeDialogs : IDialogService
         return Answer(call);
     }
 
+    // Le pagine aperte, in ordine: "Settings" o "About <versione>".
+    public readonly List<string> Pages = [];
+    public void ShowSettings(SettingsViewModel settings) => Pages.Add("Settings");
+    public void ShowAbout(string version) => Pages.Add($"About {version}");
+
     public string? PickSaveFile(string title, string filter, string fileName) => SaveFile;
     public string? PickOpenFile(string title, string filter) => OpenFile;
 }

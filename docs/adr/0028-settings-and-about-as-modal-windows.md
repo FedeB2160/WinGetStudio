@@ -1,0 +1,64 @@
+# ADR 0028 — Version 2 opens Settings and About as modal windows, and gives areas room of their own
+
+- **Status:** Accepted (for 2.0; amends ADR 0011 and ADR 0027 there)
+- **Date:** 2026-10-29
+- **Depends on:** ADR 0011, ADR 0020, ADR 0027
+
+## Context
+
+1.x puts Settings and About at the right end of the tab strip (ADR 0011). That needs a `TabControl`
+re-templated with a `DockPanel` as items host, because `TabPanel` cannot right-align one item. ADR 0011
+also turned down a second window, because the 1.x theme brushes lived in the main window's merged
+dictionaries and a separate window would have had to be wired to them.
+
+In 2.0 the Fluent theme comes from `Application.ThemeMode` (ADR 0027): every window is themed by
+itself, as the themed dialogs already show (ADR 0020). ADR 0027 forbids templates of our own, so the
+1.x tab strip cannot be ported. The first 2.0 Settings and About tabs (phase 1, PR 4) sat at the
+left, after Updates, with nothing to set them apart from the three tabs that work on packages.
+
+The same review of the PR 4 screenshots found two smaller faults: the grid text sat a few pixels
+above the middle of its row, and the Fluent grid frame, drawn by its rounded background, closed the
+list on all four sides.
+
+## Decision
+
+1. **Settings and About are modal windows** owned by the main window, opened by two icon buttons at
+   the top right of the window, over the empty right end of the tab strip. They go through
+   `IDialogService` like the dialogs: the main window is dimmed and blocked, the work going on in it
+   continues, and the log keeps writing under the veil. **Close** is the cancel button, so Esc closes.
+   A dialog opened from a page (an update confirmation from Settings) is owned by the page, not by
+   the main window, or it would open behind it.
+2. **Settings keeps its view model.** `SettingsViewModel` does not change; only where it is shown.
+3. **Areas get cards**: a section header and a `Border` with the Fluent card keys
+   (`CardBackgroundFillColorDefaultBrush`, `CardStrokeColorDefaultBrush`, `OverlayCornerRadius`),
+   as in the Windows 11 Settings app. Still no colour and no template of our own.
+4. **About carries the logo** (`assets\icon\icon-128.png`, the same file as the README) and the
+   version, a longer list of what the app does, and a "Good to know" card. The exe gets
+   `assets\icon.ico` as its icon, which WPF also uses for every window.
+5. **Grids are open at the sides**: `BorderThickness="0,1"` and a transparent background (the Fluent
+   background is rounded and drew the sides on its own). Text columns get an element style that
+   centres the `TextBlock` vertically: the cell's `VerticalContentAlignment` does not reach it.
+6. Shared styles live in `Styles.xaml`, merged into each window's resources rather than into
+   `App.xaml`, because the window smoke test runs under an `Application` of its own.
+
+## Consequences
+
+**Positive**
+- The three tabs are only about packages; Settings and About are one click away from any of them.
+- No template of our own, and the pages follow the theme with no wiring.
+
+**To watch**
+- A page is modal: while Settings is open the lists cannot be used. Fine for a page that is opened,
+  changed and closed; a setting that needs to be watched while working would need another place.
+- "Restart as administrator" (ADR 0024, phase 1 PR 5) lands in the Settings window.
+- Closing the app from a page (an update that restarts it, No to installing winget) closes the page
+  first.
+
+## Alternatives considered
+
+1. **Re-template the `TabControl`** as in 1.x — keeps the tabs at the right, but is the template
+   ADR 0027 rules out, to be re-checked at every .NET update.
+2. **Tabs at the left, after Updates** — the PR 4 layout: nothing tells the settings apart from the
+   lists.
+3. **A navigation pane (NavigationView style)** — more room, but more chrome than three tabs and two
+   pages need, and no standard WPF control.

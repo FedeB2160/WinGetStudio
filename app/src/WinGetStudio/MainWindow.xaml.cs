@@ -2,9 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Navigation;
 using System.Windows.Threading;
 using WinGetStudio.ViewModels;
 
@@ -27,15 +25,6 @@ public partial class MainWindow : Window
         var installed = CollectionViewSource.GetDefaultView(vm.Installed.Items);
         installed.Filter = o => vm.Installed.Matches((PackageItem)o);
         vm.Installed.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(InstalledViewModel.FilterText)) installed.Refresh(); };
-
-        // I link di Settings e About: WPF non apre il browser da solo. Un handler per tutta la
-        // finestra, cosi' un link nuovo non chiede codice nuovo.
-        AddHandler(Hyperlink.RequestNavigateEvent, new RequestNavigateEventHandler((_, e) =>
-        {
-            try { Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true })?.Dispose(); }
-            catch (System.ComponentModel.Win32Exception ex) { vm.Log.Write($"Could not open {e.Uri}: {ex.Message}"); }
-            e.Handled = true;
-        }));
 
         ContentRendered += async (_, _) =>
         {

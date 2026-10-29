@@ -1,0 +1,84 @@
+<Window x:Class="WinGetStudio.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Width="600" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        AutomationProperties.HelpText="Theme, tab strip, version and updates">
+    <!-- Settings come finestra modale sopra la principale (ADR 0028): una card per area. -->
+    <Window.Resources>
+        <ResourceDictionary Source="Styles.xaml"/>
+    </Window.Resources>
+    <StackPanel Margin="20">
+        <TextBlock Text="Appearance" Style="{StaticResource SectionHeader}"/>
+        <Border Style="{StaticResource Card}">
+            <!-- Etichette a larghezza automatica: una piu' lunga non rompe l'allineamento. -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" MinWidth="110"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <TextBlock Text="Theme" Style="{StaticResource Label}"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <ComboBox Width="150" ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}"
+                              AutomationProperties.Name="Theme"/>
+                    <TextBlock Style="{StaticResource Hint}" Text="{Binding ThemeHint}"/>
+                </StackPanel>
+                <TextBlock Grid.Row="2" Text="Tab strip" Style="{StaticResource Label}"/>
+                <ComboBox Grid.Row="2" Grid.Column="1" Width="150" HorizontalAlignment="Left"
+                          ItemsSource="{Binding TabStyles}" SelectedItem="{Binding SelectedTabStyle}"
+                          AutomationProperties.Name="Tab strip" ToolTip="What the tabs show: the icon, the name, or both"/>
+            </Grid>
+        </Border>
+
+        <TextBlock Text="Updates" Style="{StaticResource SectionHeader}" Margin="2,20,0,8"/>
+        <Border Style="{StaticResource Card}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" MinWidth="110"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="12"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="16"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <!-- Una voce per riga: versione, pulsante (solo con una versione piu' recente), esito. -->
+                <TextBlock Text="WinGet Studio" Style="{StaticResource Label}"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" MinHeight="32">
+                    <TextBlock Text="{Binding VersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,18,0"/>
+                    <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateAppText}" ToolTip="{Binding UpdateAppToolTip}"
+                            Command="{Binding UpdateAppCommand}" Visibility="{Binding UpdateAppVisible, Converter={StaticResource Visible}}"/>
+                    <TextBlock Style="{StaticResource Hint}" Text="{Binding UpdateStatus}" TextTrimming="CharacterEllipsis" MaxWidth="320"/>
+                </StackPanel>
+                <!-- winget stesso (ADR 0019): chi lo aggiorna, o il pulsante. -->
+                <TextBlock Grid.Row="2" Text="winget" Style="{StaticResource Label}"/>
+                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" MinHeight="32">
+                    <TextBlock Text="{Binding WinGetVersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,18,0"/>
+                    <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateWinGetText}" ToolTip="{Binding UpdateWinGetToolTip}"
+                            Command="{Binding UpdateWinGetCommand}" Visibility="{Binding UpdateWinGetVisible, Converter={StaticResource Visible}}"/>
+                    <TextBlock Style="{StaticResource Subtle}" VerticalAlignment="Center"
+                               Visibility="{Binding WinGetStore, Converter={StaticResource Visible}}">Updated by the <Hyperlink
+                               NavigateUri="ms-windows-store://downloadsandupdates">Microsoft Store</Hyperlink></TextBlock>
+                    <TextBlock Style="{StaticResource Hint}" Text="{Binding WinGetStatus}" TextTrimming="CharacterEllipsis" MaxWidth="320"/>
+                </StackPanel>
+                <!-- Valgono per tutte e due le voci sopra. -->
+                <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal">
+                    <Button Content="Check for updates" MinWidth="140" Command="{Binding CheckForUpdatesCommand}"/>
+                    <CheckBox Content="Check at startup" Margin="16,0,0,0" VerticalAlignment="Center"
+                              IsChecked="{Binding CheckAtStartup}"
+                              ToolTip="Anonymous calls to the GitHub API when the app starts: one for WinGet Studio, and one for winget where the Microsoft Store does not update it. Turn it off to go online only when you press Check for updates"/>
+                    <ProgressBar Style="{StaticResource Busy}" Visibility="{Binding Checking, Converter={StaticResource Visible}}"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Esc chiude: e' il pulsante di annullamento. -->
+        <Button Content="Close" IsCancel="True" MinWidth="96" HorizontalAlignment="Right" Margin="0,20,0,0"/>
+    </StackPanel>
+</Window>

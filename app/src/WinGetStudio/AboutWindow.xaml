@@ -1,0 +1,100 @@
+<Window x:Class="WinGetStudio.AboutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="About WinGet Studio" Width="660" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False"
+        AutomationProperties.HelpText="What this app does, where to report a bug, and the licence">
+    <!-- About come finestra modale (ADR 0028): logo e versione, le funzioni in una tabella senza
+         bordi (nome a sinistra, descrizione a destra), poi note, link e crediti. -->
+    <Window.Resources>
+        <ResourceDictionary Source="Styles.xaml"/>
+    </Window.Resources>
+    <StackPanel Margin="20">
+        <Grid Margin="0,0,0,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <!-- Il nome dell'assembly nel pack URI: senza, nello smoke test punterebbe al test. -->
+            <Image Source="pack://application:,,,/WinGetStudio;component/Assets/icon-128.png" Width="64" Height="64"
+                   Margin="0,0,16,0" VerticalAlignment="Center" AutomationProperties.Name="WinGet Studio logo"/>
+            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                <TextBlock Text="WinGet Studio" FontSize="24" FontWeight="SemiBold"/>
+                <TextBlock x:Name="TxtVersion" Style="{StaticResource Subtle}"/>
+                <TextBlock Style="{StaticResource Subtle}" Margin="0,4,0,0"
+                           Text="A desktop front end for winget, the Windows package manager: one table with checkboxes to update, install, uninstall, pin, export and import."/>
+            </StackPanel>
+        </Grid>
+
+        <TextBlock Text="What it does" Style="{StaticResource SectionHeader}"/>
+        <Border Style="{StaticResource Card}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+                <Grid.Resources>
+                    <Style x:Key="Name" TargetType="TextBlock">
+                        <Setter Property="FontWeight" Value="SemiBold"/>
+                        <Setter Property="Margin" Value="0,0,16,10"/>
+                    </Style>
+                    <Style x:Key="Text" TargetType="TextBlock" BasedOn="{StaticResource Subtle}">
+                        <Setter Property="Margin" Value="0,0,0,10"/>
+                    </Style>
+                </Grid.Resources>
+                <TextBlock Text="Updates" Style="{StaticResource Name}"/>
+                <TextBlock Grid.Column="1" Style="{StaticResource Text}"
+                           Text="List what has a newer version and update the packages you tick, one at a time, each with its own outcome. A running queue can be stopped: the package in progress finishes, the rest are left alone."/>
+                <TextBlock Grid.Row="1" Text="Install" Style="{StaticResource Name}"/>
+                <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource Text}"
+                           Text="Search the winget catalogue as you type, optionally the Microsoft Store, and pick who the package is installed for."/>
+                <TextBlock Grid.Row="2" Text="Installed" Style="{StaticResource Name}"/>
+                <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource Text}"
+                           Text="Everything on the machine, programs installed without winget included, with a filter and an uninstall behind a confirmation."/>
+                <TextBlock Grid.Row="3" Text="Details" Style="{StaticResource Name}"/>
+                <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource Text}"
+                           Text="What a package is, who publishes it, and where and how it is installed, in winget's own words."/>
+                <TextBlock Grid.Row="4" Text="Pin" Style="{StaticResource Name}"/>
+                <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource Text}"
+                           Text="Keep a package from being upgraded, from either list, until you remove the pin."/>
+                <TextBlock Grid.Row="5" Text="Export / Import" Style="{StaticResource Name}"/>
+                <TextBlock Grid.Row="5" Grid.Column="1" Style="{StaticResource Text}"
+                           Text="Save the package list to a .json file and rebuild a machine from it."/>
+                <TextBlock Grid.Row="6" Text="winget" Style="{StaticResource Name}" Margin="0,0,16,0"/>
+                <TextBlock Grid.Row="6" Grid.Column="1" Style="{StaticResource Subtle}"
+                           Text="Installed for you if it is missing, and updated where the Microsoft Store does not do it."/>
+            </Grid>
+        </Border>
+
+        <TextBlock Text="Good to know" Style="{StaticResource SectionHeader}" Margin="2,20,0,8"/>
+        <Border Style="{StaticResource Card}">
+            <TextBlock Style="{StaticResource Subtle}">
+                It runs without administrator rights: an installer that needs them asks for them.<LineBreak/>
+                Lists refresh themselves after every operation, and Retry failed repeats just what failed.<LineBreak/>
+                Its own updates come from GitHub, checked against their checksum and the author's signature.<LineBreak/>
+                No telemetry: your preferences stay in your user registry, and nothing is sent anywhere.
+            </TextBlock>
+        </Border>
+
+        <Grid Margin="2,20,0,0">
+            <TextBlock Style="{StaticResource Subtle}" VerticalAlignment="Center">
+                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues">Report a bug or an idea</Hyperlink> &#183;
+                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio">Source code</Hyperlink> &#183;
+                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases">Release notes</Hyperlink> &#183;
+                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE">MIT licence</Hyperlink><LineBreak/>
+                Made by <Hyperlink NavigateUri="https://github.com/FedeB2160">FedeB2160</Hyperlink>,
+                with the help of <Italic>Claude Code</Italic> (Anthropic).
+            </TextBlock>
+            <!-- Esc chiude: e' il pulsante di annullamento. -->
+            <Button Content="Close" IsCancel="True" IsDefault="True" MinWidth="96" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+        </Grid>
+    </StackPanel>
+</Window>

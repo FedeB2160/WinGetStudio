@@ -19,6 +19,7 @@ public class WindowSmokeTests
     [
         "AccentButtonStyle", "SystemFillColorSuccessBrush", "SystemFillColorCautionBrush", "SystemFillColorCriticalBrush",
         "TextFillColorSecondaryBrush", "AccentTextFillColorPrimaryBrush", "SmokeFillColorDefaultBrush",
+        "CardBackgroundFillColorDefaultBrush", "CardStrokeColorDefaultBrush", "OverlayCornerRadius",
     ];
 
     [Fact]
@@ -35,13 +36,19 @@ public class WindowSmokeTests
         Pump(() => !h.State.IsBusy && h.Vm.Updates.Items.Count == 1);
 
         var tabs = (TabControl)w.FindName("TabMain");
-        Assert.Equal(["Install", "Installed", "Updates", "Settings", "About"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
+        Assert.Equal(["Install", "Installed", "Updates"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
         Assert.Equal(MainViewModel.UpdatesTab, tabs.SelectedIndex);
-        // Settings e About si disegnano; Settings cambia il tema a caldo.
-        h.Vm.SelectedTab = MainViewModel.AboutTab;
+        // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
+        var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };
+        about.Show();
         Pump(() => true);
-        h.Vm.SelectedTab = MainViewModel.SettingsTab;
+        Assert.True(about.FindName("TxtVersion") is TextBlock { Text: "Version 2.0.0" });
+        Assert.NotNull(FindChild<Image>(about)?.Source);
+        about.Close();
+        var settings = new SettingsWindow { DataContext = h.Vm.Settings, Owner = w, ShowActivated = false };
+        settings.Show();
         Pump(() => true);
+        Assert.Equal(h.Vm.Settings.Themes.Count, FindChild<ComboBox>(settings)!.Items.Count);
         h.Vm.Settings.ApplyTheme = name => app.ThemeMode = App.Theme(name);
         Assert.Contains("Found 1 updates.", ((TextBox)w.FindName("TxtLog")).Text);
         foreach (var key in FluentKeys) Assert.True(w.TryFindResource(key) is not null, key);
@@ -59,9 +66,20 @@ public class WindowSmokeTests
         Assert.Same(w.FindResource("AccentButtonStyle"), buttons[1].Style);
         dialog.Close();
 
+        settings.Close();
         w.Close();
         app.Shutdown();
     });
+
+    private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var c = VisualTreeHelper.GetChild(parent, i);
+            if ((c as T ?? FindChild<T>(c)) is { } found) return found;
+        }
+        return null;
+    }
 
     // Elabora la coda del dispatcher finche' la condizione vale (o 10 s).
     private static void Pump(Func<bool> until)

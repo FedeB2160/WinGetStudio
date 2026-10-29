@@ -22,6 +22,16 @@ public class SettingsViewModelTests
         Assert.Equal(("Dark", "Dark", ""), (applied, h.Prefs.GetString(Preferences.Theme, ""), s.ThemeHint));
     }
 
+    // Settings e About sono finestre a parte, aperte dai pulsanti in alto a destra (ADR 0028).
+    [Fact]
+    public void SettingsAndAboutOpenAsPages()
+    {
+        using var h = new Harness();
+        h.Vm.OpenSettingsCommand.Execute(null);
+        h.Vm.OpenAboutCommand.Execute(null);
+        Assert.Equal(["Settings", "About 2.0.0"], h.Dialogs.Pages);
+    }
+
     [Fact]
     public void TabStripShowsIconTextOrBoth()
     {
