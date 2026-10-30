@@ -105,6 +105,17 @@ public class WindowSmokeTests
         app.Shutdown();
     });
 
+    // Menu dei pin: ogni voce solo se ha qualcosa da fare sulle righe evidenziate.
+    [Fact]
+    public void PinMenuOffersOnlyWhatChangesSomething()
+    {
+        PackageItem Row(bool pinned) => new(new PackageRow("App", "A.A", "1.0")) { Pinned = pinned };
+        Assert.Equal((true, false), MainWindow.PinChoices([Row(false)]));
+        Assert.Equal((false, true), MainWindow.PinChoices([Row(true), Row(true)]));
+        Assert.Equal((true, true), MainWindow.PinChoices([Row(true), Row(false)]));
+        Assert.Equal((false, false), MainWindow.PinChoices([]));
+    }
+
     private static IEnumerable<T> FindAll<T>(DependencyObject parent) where T : DependencyObject
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)

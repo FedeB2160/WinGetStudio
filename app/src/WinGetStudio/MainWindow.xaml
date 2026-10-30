@@ -283,13 +283,14 @@
                 <Setter Property="ToolTip" Value="Run the last operation again on the packages in this list where it failed"/>
             </Style>
             <!-- Pin e Unpin sulle righe EVIDENZIATE, non sulle spuntate: la spunta di una riga con
-                 un pin e' spenta, e con le spunte il pin non si toglierebbe piu'. -->
-            <ContextMenu x:Key="PinMenu" x:Shared="False">
+                 un pin e' spenta, e con le spunte il pin non si toglierebbe piu'. Ognuna compare
+                 solo se ha qualcosa da fare (PinMenu_Opened). -->
+            <ContextMenu x:Key="PinMenu" x:Shared="False" Opened="PinMenu_Opened">
                 <MenuItem Header="Details of highlighted package" Command="{Binding DetailsCommand}"
                           CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                <MenuItem Header="Pin highlighted (block upgrades)" Command="{Binding PinCommand}"
+                <MenuItem Header="Pin highlighted (block upgrades)" Command="{Binding PinCommand}" Tag="pin"
                           CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                <MenuItem Header="Remove pin from highlighted" Command="{Binding UnpinCommand}"
+                <MenuItem Header="Remove pin from highlighted" Command="{Binding UnpinCommand}" Tag="unpin"
                           CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
             </ContextMenu>
         </ResourceDictionary>
@@ -432,7 +433,8 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <DockPanel Margin="0,0,0,8">
+                    <!-- LastChildFill spento: Retry e' l'ultimo e senza riempirebbe lo spazio da sinistra. -->
+                    <DockPanel Margin="0,0,0,8" LastChildFill="False">
                         <Button DockPanel.Dock="Left" MinWidth="96" Content="Check" Command="{Binding CheckCommand}"/>
                         <CheckBox DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" Content="Unknown"
                                   IsChecked="{Binding IncludeUnknown}" IsEnabled="{Binding State.IsIdle}"

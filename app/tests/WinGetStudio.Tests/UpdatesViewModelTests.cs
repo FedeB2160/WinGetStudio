@@ -113,12 +113,18 @@ public class UpdatesViewModelTests
         await vm.UpdateAsync();
 
         Assert.Equal(["A.A", "B.B", "C.C"], h.WinGet.Calls.Where(c => c[1] == "--id").Select(c => c[2]));
-        // Le riuscite spariscono con la ricarica, la fallita resta con il suo esito.
-        var c = Assert.Single(vm.Items);
-        Assert.Equal(("C.C", RowStatus.Error, "exit 1"), (c.Id, c.Status, c.StatusDetail));
+        // Con un fallimento non si riscansiona: la lista resta coi suoi esiti, vecchia, e la
+        // nuova ricerca la decide l'utente (Check). Retry failed resta disponibile.
+        Assert.Equal(1, h.WinGet.Count("upgrade", "--accept-source-agreements"));
+        Assert.Equal([RowStatus.Ok, RowStatus.Ok, RowStatus.Error], vm.Items.Select(i => i.Status));
+        Assert.Equal("exit 1", vm.Items[2].StatusDetail);
         Assert.Contains("Update complete: 2 ok, 1 failed.", h.Log);
+        Assert.True(vm.Stale);
+        Assert.Equal("list out of date - press Check", vm.SelectedText);
+        Assert.False(vm.UpdateCommand.CanExecute(null));
         Assert.Equal(1, vm.RetryCount);
         Assert.Equal("Retry failed (1)", vm.RetryText);
+        Assert.True(vm.RetryCommand.CanExecute(null));
         Assert.False(h.State.IsBusy);
     }
 

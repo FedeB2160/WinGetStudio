@@ -88,7 +88,10 @@ list on all four sides.
     wrapped line. The count of updates is a badge overlaid on the top-right corner of the Updates tab (drawn
     shifted, so the tab keeps its width), in the accent colour, seen
     from every tab (grey, as if disabled, when another tab is active), instead of a
-    "N updates available" line inside it. Check for updates is never
+    "N updates available" line inside it. An update queue with failures no longer reloads the list
+    (issue #24 reloaded after every queue): the rows keep their outcomes, the list is marked out of
+    date (Update off, Retry failed on) and the next check is the user's. The pin menu shows Pin
+    and Remove pin only when they would change one of the highlighted rows. Check for updates is never
     disabled by a queue (it talks to GitHub and asks `winget --version` under the lock); installing
     the update still waits. Settings gains **Start with Windows**: a `Run` entry for the user, which
     is itself the state, off in a development build.

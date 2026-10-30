@@ -129,11 +129,18 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
             State.Dialogs.Show("No items selected.", image: MessageBoxImage.Information);
             return;
         }
-        // Le versioni a schermo sono vecchie: la lista si rilegge subito, con l'esito per Id. Le
-        // riuscite spariscono, le fallite restano e si possono ripetere.
+        // Le versioni a schermo sono vecchie. Tutto riuscito: la lista si rilegge subito, con
+        // l'esito per Id. Con un fallimento no: la lista resta coi suoi esiti da guardare, segnata
+        // come vecchia (Update spento), e la nuova ricerca la decide l'utente; Retry failed resta.
         await State.RunQueueAsync(new QueueRequest(Core.QueueVerb.Update, rows, WinGetCommands.Upgrade), Items, () =>
         {
             State.MarkInstalledStale();
+            if (State.Last?.Result.FailedIds.Count > 0)
+            {
+                Stale = true;
+                Refresh();
+                return Task.CompletedTask;
+            }
             return LoadCoreAsync(keepOutcome: true);
         });
     }

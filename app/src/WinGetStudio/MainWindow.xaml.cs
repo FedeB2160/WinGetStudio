@@ -50,6 +50,25 @@ public partial class MainWindow : Window
 
     public MainViewModel ViewModel { get; }
 
+    // Pin solo se fra le righe evidenziate ce n'e' una senza pin, Remove pin solo se ce n'e' una
+    // con: una voce che non farebbe nulla non si mostra.
+    private void PinMenu_Opened(object sender, RoutedEventArgs e)
+    {
+        var menu = (ContextMenu)sender;
+        var (pin, unpin) = PinChoices((menu.PlacementTarget as DataGrid)?.SelectedItems.OfType<PackageItem>() ?? []);
+        foreach (var m in menu.Items.OfType<MenuItem>())
+        {
+            if (m.Tag is "pin") m.Visibility = pin ? Visibility.Visible : Visibility.Collapsed;
+            else if (m.Tag is "unpin") m.Visibility = unpin ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    internal static (bool Pin, bool Unpin) PinChoices(IEnumerable<PackageItem> highlighted)
+    {
+        var rows = highlighted.ToList();
+        return (rows.Any(r => !r.Pinned), rows.Any(r => r.Pinned));
+    }
+
     // Solo se l'evento viene da un'intestazione di colonna; dopo il layout, quando le larghezze
     // nuove sono quelle vere.
     private void RefitColumns(object source)
