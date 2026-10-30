@@ -12,6 +12,14 @@ public sealed class UpdateHost(WinGetCli cli) : IUpdateHost
     public static string? ExePath => string.IsNullOrEmpty(typeof(App).Assembly.Location) ? Environment.ProcessPath : null;
 
     public InstallChannel Channel { get; } = SelfUpdate.Channel(ExePath, SelfUpdate.InstalledLocation());
+
+    string? IUpdateHost.ExePath => ExePath;
+
+    public bool StartsWithWindows
+    {
+        get => ExePath is { } exe && Autostart.IsOn(exe);
+        set { if (ExePath is { } exe) Autostart.Set(value, exe); }
+    }
     public string AppVersion { get; } = typeof(App).Assembly.GetName().Version?.ToString(3) ?? "0.0.0";
 
     public Task<Release?> GetLatestReleaseAsync(string repo, string assetName) => GitHubReleases.GetLatestAsync(repo, assetName);

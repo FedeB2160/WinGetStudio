@@ -22,6 +22,48 @@ public class SettingsViewModelTests
         Assert.Equal(("Dark", "Dark", ""), (applied, h.Prefs.GetString(Preferences.Theme, ""), s.ThemeHint));
     }
 
+    // Settings e About sono finestre a parte, aperte dai pulsanti in alto a destra (ADR 0028).
+    [Fact]
+    public void SettingsAndAboutOpenAsPages()
+    {
+        using var h = new Harness();
+        h.Vm.OpenSettingsCommand.Execute(null);
+        h.Vm.OpenAboutCommand.Execute(null);
+        Assert.Equal(["Settings", "About 2.0.0"], h.Dialogs.Pages);
+    }
+
+    // Il controllo parla solo con GitHub e con winget --version (sotto il lock): non va in conflitto
+    // con una coda, quindi resta sempre premibile. L'installazione invece aspetta.
+    [Fact]
+    public async Task CheckForUpdatesStaysAvailableWhileBusy()
+    {
+        using var h = new Harness();
+        h.Host.Releases[SelfUpdate.Repo] = FakeUpdateHost.Release("v9.0.0");
+        Assert.True(h.State.TryBegin());
+        Assert.True(h.Vm.Settings.CheckForUpdatesCommand.CanExecute(null));
+        await h.Vm.Settings.CheckForUpdatesCommand.ExecuteAsync(null);
+        Assert.True(h.Vm.Settings.UpdateAppVisible);
+        Assert.False(h.Vm.Settings.UpdateAppCommand.CanExecute(null));
+        h.State.End();
+        Assert.True(h.Vm.Settings.UpdateAppCommand.CanExecute(null));
+    }
+
+    // Avvio con Windows: legge e scrive la voce vera; una build di sviluppo non ha un exe da avviare.
+    [Fact]
+    public void StartWithWindowsFollowsTheRunEntry()
+    {
+        using var h = new Harness(h => h.Host.StartsWithWindows = true);
+        var s = h.Vm.Settings;
+        Assert.Equal((true, true), (s.CanStartWithWindows, s.StartWithWindows));
+        s.StartWithWindows = false;
+        Assert.False(h.Host.StartsWithWindows);
+
+        using var dev = new Harness(h => h.Host.ExePath = null);
+        Assert.False(dev.Vm.Settings.CanStartWithWindows);
+        dev.Vm.Settings.StartWithWindows = true;
+        Assert.False(dev.Host.StartsWithWindows);
+    }
+
     [Fact]
     public void TabStripShowsIconTextOrBoth()
     {

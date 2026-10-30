@@ -2,192 +2,302 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:WinGetStudio.ViewModels"
+        xmlns:local="clr-namespace:WinGetStudio"
         Title="WinGet Studio"
         Width="900" Height="620" MinWidth="760" MinHeight="520"
         WindowStartupLocation="CenterScreen">
     <!-- Solo il tema Fluent (ADR 0027): nessun template ne' colore proprio. Le risorse qui sotto
          danno significato (esito, pin) con chiavi Fluent, mai un colore. -->
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="Visible"/>
-
-        <!-- Spunta di riga: un clic la cambia (niente transazione di edit del DataGrid), spenta
-             mentre winget lavora. La griglia resta scorrevole: si spegne la spunta, non la griglia. -->
-        <Style x:Key="RowCheck" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
-            <!-- Le misure minime Fluent della CheckBox (32 px) allungavano ogni riga. -->
-            <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Padding" Value="0"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="AutomationProperties.Name" Value="Select"/>
-            <Setter Property="IsEnabled" Value="{Binding DataContext.State.IsIdle, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
-        </Style>
-        <DataTemplate x:Key="SelectCell" DataType="{x:Type vm:PackageItem}">
-            <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RowCheck}"/>
-        </DataTemplate>
-        <!-- In Updates una riga con un pin non si spunta: non e' aggiornabile. -->
-        <DataTemplate x:Key="SelectUnpinnedCell" DataType="{x:Type vm:PackageItem}">
-            <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}">
-                <CheckBox.Style>
-                    <Style TargetType="CheckBox" BasedOn="{StaticResource RowCheck}">
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding Pinned}" Value="True">
-                                <Setter Property="IsEnabled" Value="False"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </CheckBox.Style>
-            </CheckBox>
-        </DataTemplate>
-
-        <!-- Result: avanzamento mentre gira, poi un glifo pieno e distinto, leggibile anche
-             senza distinguere i colori. Il ToolTip sta sul glifo: c'e' solo con un esito. -->
-        <DataTemplate x:Key="ResultCell" DataType="{x:Type vm:PackageItem}">
-            <Grid HorizontalAlignment="Center">
-                <ProgressBar x:Name="running" IsIndeterminate="True" Width="36" VerticalAlignment="Center" Visibility="Collapsed"
-                             AutomationProperties.Name="In progress"/>
-                <TextBlock x:Name="icon" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
-                           VerticalAlignment="Center" Visibility="Collapsed" ToolTip="{Binding StatusDetail}"
-                           AutomationProperties.Name="No result yet"/>
-            </Grid>
-            <DataTemplate.Triggers>
-                <DataTrigger Binding="{Binding Status}" Value="Running">
-                    <Setter TargetName="running" Property="Visibility" Value="Visible"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Status}" Value="Ok">
-                    <Setter TargetName="icon" Property="Visibility" Value="Visible"/>
-                    <Setter TargetName="icon" Property="Text" Value="&#xEC61;"/>
-                    <Setter TargetName="icon" Property="AutomationProperties.Name" Value="Succeeded"/>
-                    <Setter TargetName="icon" Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Status}" Value="Warning">
-                    <Setter TargetName="icon" Property="Visibility" Value="Visible"/>
-                    <Setter TargetName="icon" Property="Text" Value="&#xE814;"/>
-                    <Setter TargetName="icon" Property="AutomationProperties.Name" Value="Finished with a warning"/>
-                    <Setter TargetName="icon" Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}"/>
-                </DataTrigger>
-                <DataTrigger Binding="{Binding Status}" Value="Error">
-                    <Setter TargetName="icon" Property="Visibility" Value="Visible"/>
-                    <Setter TargetName="icon" Property="Text" Value="&#xEB90;"/>
-                    <Setter TargetName="icon" Property="AutomationProperties.Name" Value="Failed"/>
-                    <Setter TargetName="icon" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}"/>
-                </DataTrigger>
-            </DataTemplate.Triggers>
-        </DataTemplate>
-
-        <DataTemplate x:Key="PinCell" DataType="{x:Type vm:PackageItem}">
-            <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Text="&#xE718;"
-                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Visibility="{Binding Pinned, Converter={StaticResource Visible}}"
-                       AutomationProperties.Name="Pinned"
-                       ToolTip="Pinned: winget will not upgrade it until the pin is removed"/>
-        </DataTemplate>
-
-        <!-- Linguette: glifo (Tag) e nome, mostrati secondo Settings > Tab strip. Solo il contenuto
-             dell'intestazione, il template della linguetta resta quello Fluent (ADR 0027). -->
-        <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
-            <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource Self}}"/>
-            <Setter Property="HeaderTemplate">
-                <Setter.Value>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center"
-                                       Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabItem}}" ToolTip="{Binding}"
-                                       Visibility="{Binding DataContext.Settings.TabIconVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Margin" Value="0,0,8,0"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Styles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+    
+            <!-- Spunta di riga: un clic la cambia (niente transazione di edit del DataGrid), spenta
+                 mentre winget lavora. La griglia resta scorrevole: si spegne la spunta, non la griglia. -->
+            <Style x:Key="RowCheck" TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+                <!-- Le misure minime Fluent della CheckBox (32 px) allungavano ogni riga. -->
+                <Setter Property="MinWidth" Value="0"/>
+                <Setter Property="MinHeight" Value="0"/>
+                <Setter Property="Padding" Value="0"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+                <Setter Property="AutomationProperties.Name" Value="Select"/>
+                <Setter Property="IsEnabled" Value="{Binding DataContext.State.IsIdle, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
+            </Style>
+            <DataTemplate x:Key="SelectCell" DataType="{x:Type vm:PackageItem}">
+                <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RowCheck}"/>
+            </DataTemplate>
+            <!-- Seleziona tutto, nell'intestazione della colonna delle spunte di ogni griglia: spenta,
+                 tutte, alcune (indeterminata); quali righe tocca lo decide la scheda (Selectable).
+                 In un template e non come Header diretto: un controllo messo li' viene legato
+                 prima di entrare nell'albero e non trova la griglia. -->
+            <DataTemplate x:Key="SelectAllHeader">
+                <!-- 6 px a destra: l'intestazione Fluent tiene a destra lo spazio della freccia di
+                     ordinamento anche nascosta, e la spunta finiva a sinistra di quelle sotto. Un
+                     margine non ci sta nella colonna stretta: si sposta solo il disegno. -->
+                <CheckBox Style="{StaticResource RowCheck}" AutomationProperties.Name="Select all"
+                          ToolTip="Select or clear every package in the list"
+                          IsChecked="{Binding DataContext.AllChecked, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                          IsEnabled="{Binding DataContext.CanCheckAll, RelativeSource={RelativeSource AncestorType=DataGrid}}">
+                    <CheckBox.RenderTransform>
+                        <TranslateTransform X="6"/>
+                    </CheckBox.RenderTransform>
+                </CheckBox>
+            </DataTemplate>
+            <!-- In Updates una riga con un pin non si spunta: non e' aggiornabile. -->
+            <DataTemplate x:Key="SelectUnpinnedCell" DataType="{x:Type vm:PackageItem}">
+                <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}">
+                    <CheckBox.Style>
+                        <Style TargetType="CheckBox" BasedOn="{StaticResource RowCheck}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Pinned}" Value="True">
+                                    <Setter Property="IsEnabled" Value="False"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </CheckBox.Style>
+                </CheckBox>
+            </DataTemplate>
+    
+            <!-- Result: avanzamento mentre gira, poi un glifo pieno e distinto, leggibile anche
+                 senza distinguere i colori. Il ToolTip sta sul glifo: c'e' solo con un esito. -->
+            <DataTemplate x:Key="ResultCell" DataType="{x:Type vm:PackageItem}">
+                <Grid HorizontalAlignment="Center">
+                    <local:Spinner x:Name="running" Width="16" Height="16" Visibility="Collapsed" AutomationProperties.Name="In progress"/>
+                    <TextBlock x:Name="icon" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
+                               VerticalAlignment="Center" Visibility="Collapsed" ToolTip="{Binding StatusDetail}"
+                               AutomationProperties.Name="No result yet"/>
+                </Grid>
+                <DataTemplate.Triggers>
+                    <DataTrigger Binding="{Binding Status}" Value="Running">
+                        <Setter TargetName="running" Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Status}" Value="Ok">
+                        <Setter TargetName="icon" Property="Visibility" Value="Visible"/>
+                        <Setter TargetName="icon" Property="Text" Value="&#xEC61;"/>
+                        <Setter TargetName="icon" Property="AutomationProperties.Name" Value="Succeeded"/>
+                        <Setter TargetName="icon" Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Status}" Value="Warning">
+                        <Setter TargetName="icon" Property="Visibility" Value="Visible"/>
+                        <Setter TargetName="icon" Property="Text" Value="&#xE814;"/>
+                        <Setter TargetName="icon" Property="AutomationProperties.Name" Value="Finished with a warning"/>
+                        <Setter TargetName="icon" Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}"/>
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding Status}" Value="Error">
+                        <Setter TargetName="icon" Property="Visibility" Value="Visible"/>
+                        <Setter TargetName="icon" Property="Text" Value="&#xEB90;"/>
+                        <Setter TargetName="icon" Property="AutomationProperties.Name" Value="Failed"/>
+                        <Setter TargetName="icon" Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}"/>
+                    </DataTrigger>
+                </DataTemplate.Triggers>
+            </DataTemplate>
+    
+            <DataTemplate x:Key="PinCell" DataType="{x:Type vm:PackageItem}">
+                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" Text="&#xE718;"
+                           Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding Pinned, Converter={StaticResource Visible}}"
+                           AutomationProperties.Name="Pinned"
+                           ToolTip="Pinned: winget will not upgrade it until the pin is removed"/>
+            </DataTemplate>
+    
+            <!-- Linguette: glifo (Tag) e nome, mostrati secondo Settings > Tab strip. Solo il contenuto
+                 dell'intestazione, il template della linguetta resta quello Fluent (ADR 0027). -->
+            <!-- La linguetta selezionata: bordo come il riquadro, sfondo come il riquadro (chiave
+                 Fluent TabViewItemHeaderBackgroundSelected, SolidBackgroundFillColorTertiary), cosi'
+                 si unisce a lui. Il bordo Fluent era nero al 10%, invisibile sul tema scuro. -->
+            <SolidColorBrush x:Key="TabViewSelectedItemBorderBrush" Color="{DynamicResource ControlStrongStrokeColorDefault}" Opacity="0.55"/>
+            <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+                <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource Self}}"/>
+                <!-- Ogni linguetta col suo bordo; -1 in basso: copre la riga del riquadro sotto la
+                     selezionata, che ha lo stesso sfondo. Nessun margine orizzontale: TabPanel
+                     dispone le linguette senza contarlo e taglierebbe il bordo destro. -->
+                <Setter Property="BorderBrush" Value="{DynamicResource AreaStrokeBrush}"/>
+                <Setter Property="Margin" Value="0,0,0,-1"/>
+                <Setter Property="FontSize" Value="{StaticResource ListFontSize}"/>
+                <Setter Property="HeaderTemplate">
+                    <Setter.Value>
+                        <DataTemplate>
+                            <!-- Il padding Fluent della linguetta e' fisso a 6 px nel template: il
+                                 resto dello spazio attorno al nome sta qui. Non attive in grigio,
+                                 l'attiva in grassetto pieno (piu' grande scendeva sotto l'icona): qui e non sulla TabItem,
+                                 da cui passerebbero al contenuto della scheda. -->
+                            <Grid>
+                            <StackPanel Orientation="Horizontal" Margin="6,0">
+                                <StackPanel.Style>
+                                    <Style TargetType="StackPanel">
+                                        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding DataContext.Settings.TabTextVisible, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
-                                                <Setter Property="Margin" Value="0"/>
+                                            <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
+                                                <Setter Property="TextElement.FontWeight" Value="Bold"/>
+                                                <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                            <TextBlock Text="{Binding}" VerticalAlignment="Center"
-                                       Visibility="{Binding DataContext.Settings.TabTextVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}"/>
-                        </StackPanel>
-                    </DataTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Settings e About: titoli di sezione, etichette, descrizioni. -->
-        <Style x:Key="SectionHeader" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="SemiBold"/>
-            <Setter Property="Margin" Value="0,0,0,10"/>
-        </Style>
-        <Style x:Key="Label" TargetType="TextBlock">
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="0,0,16,10"/>
-        </Style>
-        <Style x:Key="Subtle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-        </Style>
-
-        <Style x:Key="Hint" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="12,0,0,0"/>
-        </Style>
-        <!-- Messaggio al posto della griglia vuota: guida, "nessun risultato", errore di winget. -->
-        <Style x:Key="EmptyMessage" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
-            <Setter Property="HorizontalAlignment" Value="Center"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="TextAlignment" Value="Center"/>
-            <Setter Property="Visibility" Value="{Binding IsEmpty, Converter={StaticResource Visible}}"/>
-        </Style>
-        <Style x:Key="Grid" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
-            <Setter Property="AutoGenerateColumns" Value="False"/>
-            <Setter Property="CanUserAddRows" Value="False"/>
-            <Setter Property="IsReadOnly" Value="True"/>
-            <Setter Property="HeadersVisibility" Value="Column"/>
-            <Setter Property="SelectionMode" Value="Extended"/>
-            <!-- Righe piu' basse di quelle Fluent (32 px): a finestra di default si vedono quasi
-                 tante righe quante nella 1.x (ADR 0027, punto 5). Testo centrato come la spunta. -->
-            <Setter Property="RowHeight" Value="28"/>
-            <Setter Property="CellStyle">
-                <Setter.Value>
-                    <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
-                        <Setter Property="VerticalContentAlignment" Value="Center"/>
-                    </Style>
-                </Setter.Value>
-            </Setter>
-            <Setter Property="ItemsSource" Value="{Binding Items}"/>
-            <Setter Property="Visibility" Value="{Binding HasItems, Converter={StaticResource Visible}}"/>
-        </Style>
-        <Style x:Key="Busy" TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
-            <Setter Property="IsIndeterminate" Value="True"/>
-            <Setter Property="Width" Value="60"/>
-            <Setter Property="Margin" Value="12,0,0,0"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-        <Style x:Key="Retry" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-            <Setter Property="Content" Value="{Binding RetryText}"/>
-            <Setter Property="Command" Value="{Binding RetryCommand}"/>
-            <Setter Property="Visibility" Value="{Binding RetryVisible, Converter={StaticResource Visible}}"/>
-            <Setter Property="ToolTip" Value="Run the last operation again on the packages in this list where it failed"/>
-        </Style>
-        <!-- Pin e Unpin sulle righe EVIDENZIATE, non sulle spuntate: la spunta di una riga con
-             un pin e' spenta, e con le spunte il pin non si toglierebbe piu'. -->
-        <ContextMenu x:Key="PinMenu" x:Shared="False">
-            <MenuItem Header="Details of highlighted package" Command="{Binding DetailsCommand}"
-                      CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-            <MenuItem Header="Pin highlighted (block upgrades)" Command="{Binding PinCommand}"
-                      CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-            <MenuItem Header="Remove pin from highlighted" Command="{Binding UnpinCommand}"
-                      CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-        </ContextMenu>
+                                </StackPanel.Style>
+                                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center"
+                                           Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabItem}}" ToolTip="{Binding}"
+                                           Visibility="{Binding DataContext.Settings.TabIconVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Margin" Value="0,0,8,0"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding DataContext.Settings.TabTextVisible, RelativeSource={RelativeSource AncestorType=Window}}" Value="False">
+                                                    <Setter Property="Margin" Value="0"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{Binding}" VerticalAlignment="Center"
+                                           Visibility="{Binding DataContext.Settings.TabTextVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}"/>
+                            </StackPanel>
+                                <!-- Badge col numero (Updates: quanti aggiornamenti), visibile da ogni
+                                     scheda; nascosto quando la scheda non ne ha. In sovraimpressione
+                                     sull'angolo in alto a destra: spostato solo nel disegno, la
+                                     linguetta resta larga quanto il nome. Sulla scheda attiva in
+                                     accento; sulle altre grigio, come disattivato, ma sempre presente. -->
+                                <Border CornerRadius="8" MinWidth="16" Height="16" Padding="4,0"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                        AutomationProperties.Name="{Binding DataContext.Badge, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                        AutomationProperties.HelpText="updates available">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                            <Setter Property="TextElement.Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="False">
+                                                    <Setter Property="Background" Value="{DynamicResource ControlStrongStrokeColorDisabledBrush}"/>
+                                                    <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding DataContext.Badge, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <!-- -1 px in alto: le cifre non hanno discendenti e senza
+                                         sembravano basse nel cerchio. -->
+                                    <Border.RenderTransform>
+                                        <TranslateTransform X="12" Y="-12"/>
+                                    </Border.RenderTransform>
+                                    <TextBlock Text="{Binding DataContext.Badge, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                               FontSize="10" FontWeight="SemiBold" TextAlignment="Center" Margin="0,-1,0,0"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <MultiTrigger>
+                        <MultiTrigger.Conditions>
+                            <Condition Property="IsMouseOver" Value="True"/>
+                            <Condition Property="IsSelected" Value="False"/>
+                        </MultiTrigger.Conditions>
+                        <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPointerOver}"/>
+                    </MultiTrigger>
+                </Style.Triggers>
+            </Style>
+    
+            <!-- Messaggio al posto della griglia vuota: guida, "nessun risultato", errore di winget. -->
+            <Style x:Key="EmptyMessage" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="16"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+                <Setter Property="HorizontalAlignment" Value="Center"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+                <Setter Property="TextAlignment" Value="Center"/>
+                <Setter Property="Visibility" Value="{Binding IsEmpty, Converter={StaticResource Visible}}"/>
+            </Style>
+            <Style x:Key="Grid" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
+                <Setter Property="AutoGenerateColumns" Value="False"/>
+                <Setter Property="CanUserAddRows" Value="False"/>
+                <!-- Le colonne non si spostano: spunta, Pin e Result restano dove sono. -->
+                <Setter Property="CanUserReorderColumns" Value="False"/>
+                <Setter Property="IsReadOnly" Value="True"/>
+                <Setter Property="HeadersVisibility" Value="Column"/>
+                <Setter Property="SelectionMode" Value="Extended"/>
+                <!-- Righe piu' basse di quelle Fluent (32 px): a finestra di default si vedono quasi
+                     tante righe quante nella 1.x (ADR 0027, punto 5). Testo centrato come la spunta. -->
+                <Setter Property="RowHeight" Value="28"/>
+                <Setter Property="CellStyle">
+                    <Setter.Value>
+                        <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                            <Setter Property="VerticalContentAlignment" Value="Center"/>
+                            <!-- Si seleziona la riga, non la cella: niente cornice di fuoco sulla
+                                 cella cliccata (il trigger Fluent la colora). -->
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                                    <Setter Property="BorderBrush" Value="Transparent"/>
+                                </Trigger>
+                                <!-- Dopo il fuoco: la cella cliccata resta del colore della riga. -->
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Setter.Value>
+                </Setter>
+                <Setter Property="SelectionUnit" Value="FullRow"/>
+                <Setter Property="FontSize" Value="{StaticResource ListFontSize}"/>
+                <!-- Chiusa sui quattro lati col bordo arrotondato del template Fluent: aperta ai lati,
+                     l'intestazione finiva nel nulla (ADR 0028). Sfondo trasparente e solo le righe
+                     orizzontali: il contenuto resta libero. -->
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AreaStrokeBrush}"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+                <!-- Ancorata ai due lati: allargare una colonna stringe le altre a '*', non spinge
+                     la griglia oltre il bordo con una barra orizzontale. -->
+                <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+                <Setter Property="ItemsSource" Value="{Binding Items}"/>
+                <Setter Property="Visibility" Value="{Binding HasItems, Converter={StaticResource Visible}}"/>
+            </Style>
+            <!-- Titoli delle colonne al centro. Stile implicito e non ColumnHeaderStyle della griglia:
+                 col tema Fluent le intestazioni prendono lo stile per tipo e ignorano quello. -->
+            <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <!-- Niente separatori verticali: come le righe, solo linee orizzontali. -->
+                <Setter Property="SeparatorVisibility" Value="Collapsed"/>
+                <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
+                     rispetto a quelle delle righe. Centrati, i titoli non ne hanno bisogno. -->
+                <Setter Property="Padding" Value="0"/>
+            </Style>
+            <!-- Testo delle colonne: VerticalContentAlignment della cella non arriva al TextBlock,
+                 che si stende e lascia il testo in alto. Lo si centra qui. Testo lungo: i puntini. -->
+            <Style x:Key="CellText" TargetType="TextBlock" BasedOn="{x:Static DataGridTextColumn.DefaultElementStyle}">
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                <!-- Il testo tagliato coi puntini si legge intero passandoci sopra (Id lunghi). -->
+                <Setter Property="ToolTip" Value="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+            </Style>
+            <Style x:Key="Retry" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+                <Setter Property="Content" Value="{Binding RetryText}"/>
+                <Setter Property="Command" Value="{Binding RetryCommand}"/>
+                <Setter Property="Visibility" Value="{Binding RetryVisible, Converter={StaticResource Visible}}"/>
+                <Setter Property="ToolTip" Value="Run the last operation again on the packages in this list where it failed"/>
+            </Style>
+            <!-- Pin e Unpin sulle righe EVIDENZIATE, non sulle spuntate: la spunta di una riga con
+                 un pin e' spenta, e con le spunte il pin non si toglierebbe piu'. Ognuna compare
+                 solo se ha qualcosa da fare (PinMenu_Opened). -->
+            <ContextMenu x:Key="PinMenu" x:Shared="False" Opened="PinMenu_Opened">
+                <MenuItem Header="Details of highlighted package" Command="{Binding DetailsCommand}"
+                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                <MenuItem Header="Pin highlighted (block upgrades)" Command="{Binding PinCommand}" Tag="pin"
+                          CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                <MenuItem Header="Remove pin from highlighted" Command="{Binding UnpinCommand}" Tag="unpin"
+                          CommandParameter="{Binding PlacementTarget.SelectedItems, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+            </ContextMenu>
+        </ResourceDictionary>
     </Window.Resources>
 
     <!-- Schede nello spazio elastico; avanzamento e log fuori, condivisi da tutte. -->
-    <Grid Margin="10">
+    <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -195,10 +305,22 @@
             <RowDefinition Height="140"/>
         </Grid.RowDefinitions>
 
-        <TabControl x:Name="TabMain" SelectedIndex="{Binding SelectedTab}">
+        <!-- Settings e About: finestre modali, aperte da qui, a destra della striscia (ADR 0028).
+             ZIndex: sopra la striscia delle schede, che a destra e' vuota. -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="1">
+            <Button Style="{StaticResource PageButton}" Tag="&#xE713;" Content="Settings" Command="{Binding OpenSettingsCommand}"
+                    ToolTip="Theme, tab strip, version and updates"/>
+            <Button Style="{StaticResource PageButton}" Tag="&#xE946;" Content="About" Command="{Binding OpenAboutCommand}" Margin="6,0,0,0"
+                    ToolTip="What this app does, where to report a bug, and the licence"/>
+        </StackPanel>
+
+        <!-- Il riquadro delle schede: bordo e sfondo delle card, che il template Fluent usa gia'
+             (ADR 0028). -->
+        <TabControl x:Name="TabMain" SelectedIndex="{Binding SelectedTab}" BorderThickness="1"
+                    BorderBrush="{DynamicResource AreaStrokeBrush}" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}">
             <TabItem Header="Install" Tag="&#xE896;" DataContext="{Binding Install}"
                      AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
-                <Grid Margin="0,8,0,0">
+                <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -218,7 +340,7 @@
                             <CheckBox Content="MS Store" Margin="12,0,0,0" VerticalAlignment="Center"
                                       IsChecked="{Binding IncludeStore}" IsEnabled="{Binding State.IsIdle}"
                                       ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"/>
-                            <ProgressBar Style="{StaticResource Busy}" Visibility="{Binding Searching, Converter={StaticResource Visible}}"/>
+                            <local:Spinner Margin="12,0,0,0" Visibility="{Binding Searching, Converter={StaticResource Visible}}"/>
                         </StackPanel>
                         <Button Style="{StaticResource Retry}" HorizontalAlignment="Right"/>
                     </Grid>
@@ -236,13 +358,13 @@
                             </ContextMenu>
                         </DataGrid.ContextMenu>
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="44" CellTemplate="{StaticResource SelectCell}"/>
-                            <DataGridTextColumn Header="Name" Width="2*" Binding="{Binding Name}"/>
-                            <DataGridTextColumn Header="Version" Width="1.2*" Binding="{Binding Version}"/>
-                            <DataGridTextColumn Header="Id" Width="2.4*" Binding="{Binding Id}"/>
+                            <DataGridTemplateColumn Width="44" CanUserResize="False" HeaderTemplate="{StaticResource SelectAllHeader}" CellTemplate="{StaticResource SelectCell}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Name" Width="2*" Binding="{Binding Name}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Version" Width="1.2*" Binding="{Binding Version}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Id" Width="2.4*" Binding="{Binding Id}"/>
                             <!-- Con MS Store i risultati vengono da due sorgenti: l'installazione usa quella della riga. -->
-                            <DataGridTextColumn Header="Source" Width="90" Binding="{Binding Source}"/>
-                            <DataGridTemplateColumn Header="Result" Width="80" CellTemplate="{StaticResource ResultCell}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Source" Width="90" Binding="{Binding Source}"/>
+                            <DataGridTemplateColumn Header="Result" Width="80" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding Message}"/>
@@ -259,7 +381,7 @@
 
             <TabItem Header="Installed" Tag="&#xE71D;" DataContext="{Binding Installed}"
                      AutomationProperties.HelpText="Everything installed on this machine: filter it, pin it, uninstall it">
-                <Grid Margin="0,8,0,0">
+                <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
@@ -271,7 +393,7 @@
                             <!-- Filtro locale sull'elenco gia' caricato: non richiama winget. -->
                             <TextBox Width="300" Margin="8,0,0,0" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
                                      IsEnabled="{Binding State.IsIdle}" AutomationProperties.Name="Filter by name or ID"/>
-                            <ProgressBar Style="{StaticResource Busy}" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
+                            <local:Spinner Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
                             <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding CountText}"/>
                         </StackPanel>
                         <Button Style="{StaticResource Retry}" HorizontalAlignment="Right"/>
@@ -281,12 +403,12 @@
                         <DataGrid.Columns>
                             <!-- Qui la spunta resta attiva sui pinnati: il pin blocca gli
                                  aggiornamenti, non la disinstallazione. -->
-                            <DataGridTemplateColumn Width="44" CellTemplate="{StaticResource SelectCell}"/>
-                            <DataGridTemplateColumn Header="Pin" Width="48" CellTemplate="{StaticResource PinCell}"/>
-                            <DataGridTextColumn Header="Name" Width="2*" Binding="{Binding Name}"/>
-                            <DataGridTextColumn Header="Version" Width="1.2*" Binding="{Binding Version}"/>
-                            <DataGridTextColumn Header="Id" Width="2.4*" Binding="{Binding Id}"/>
-                            <DataGridTemplateColumn Header="Result" Width="80" CellTemplate="{StaticResource ResultCell}"/>
+                            <DataGridTemplateColumn Width="44" CanUserResize="False" HeaderTemplate="{StaticResource SelectAllHeader}" CellTemplate="{StaticResource SelectCell}"/>
+                            <DataGridTemplateColumn Header="Pin" Width="48" CanUserResize="False" CellTemplate="{StaticResource PinCell}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Name" Width="2*" Binding="{Binding Name}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Version" Width="1.2*" Binding="{Binding Version}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Id" Width="2.4*" Binding="{Binding Id}"/>
+                            <DataGridTemplateColumn Header="Result" Width="80" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding EmptyText}"/>
@@ -305,167 +427,68 @@
 
             <TabItem Header="Updates" Tag="&#xE777;" DataContext="{Binding Updates}"
                      AutomationProperties.HelpText="Packages with a newer version available, and the queue that updates them">
-                <Grid Margin="0,8,0,0">
+                <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <DockPanel Margin="0,0,0,8">
+                    <!-- LastChildFill spento: Retry e' l'ultimo e senza riempirebbe lo spazio da sinistra. -->
+                    <DockPanel Margin="0,0,0,8" LastChildFill="False">
                         <Button DockPanel.Dock="Left" MinWidth="96" Content="Check" Command="{Binding CheckCommand}"/>
                         <CheckBox DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" Content="Unknown"
                                   IsChecked="{Binding IncludeUnknown}" IsEnabled="{Binding State.IsIdle}"
                                   ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"/>
-                        <ProgressBar DockPanel.Dock="Left" Style="{StaticResource Busy}" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
+                        <local:Spinner DockPanel.Dock="Left" Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
                         <Button DockPanel.Dock="Right" Style="{StaticResource Retry}"/>
-                        <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding AvailableText}"/>
                     </DockPanel>
 
                     <DataGrid x:Name="GridUpdates" Grid.Row="1" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
                         <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="44" CellTemplate="{StaticResource SelectUnpinnedCell}"/>
-                            <DataGridTemplateColumn Header="Pin" Width="48" CellTemplate="{StaticResource PinCell}"/>
-                            <DataGridTextColumn Header="Name" Width="2*" Binding="{Binding Name}"/>
-                            <DataGridTextColumn Header="Installed version" Width="1.2*" Binding="{Binding Version}"/>
-                            <DataGridTextColumn Header="Available version" Width="1.2*" Binding="{Binding Available}"/>
-                            <DataGridTextColumn Header="Id" Width="2*" Binding="{Binding Id}"/>
-                            <DataGridTemplateColumn Header="Result" Width="80" CellTemplate="{StaticResource ResultCell}"/>
+                            <DataGridTemplateColumn Width="44" CanUserResize="False" HeaderTemplate="{StaticResource SelectAllHeader}" CellTemplate="{StaticResource SelectUnpinnedCell}"/>
+                            <DataGridTemplateColumn Header="Pin" Width="48" CanUserResize="False" CellTemplate="{StaticResource PinCell}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Name" Width="2*" Binding="{Binding Name}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Installed version" Width="1.2*" Binding="{Binding Version}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Available version" Width="1.2*" Binding="{Binding Available}"/>
+                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Id" Width="2*" Binding="{Binding Id}"/>
+                            <DataGridTemplateColumn Header="Result" Width="80" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding EmptyText}"/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">
-                        <Button DockPanel.Dock="Left" MinWidth="96" Content="{Binding ToggleAllText}" Command="{Binding ToggleAllCommand}"/>
-                        <Button DockPanel.Dock="Left" MinWidth="96" Margin="8,0,0,0" Style="{StaticResource AccentButtonStyle}"
+                        <Button DockPanel.Dock="Left" MinWidth="96" Style="{StaticResource AccentButtonStyle}"
                                 Content="{Binding UpdateButtonText}" ToolTip="{Binding UpdateButtonToolTip}" Command="{Binding UpdateCommand}"/>
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding SelectedText}"/>
                     </DockPanel>
                 </Grid>
             </TabItem>
-
-            <TabItem Header="Settings" Tag="&#xE713;" DataContext="{Binding Settings}"
-                     AutomationProperties.HelpText="Theme, tab strip, version and updates">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <!-- Etichette a larghezza automatica, controlli elastici: una etichetta piu' lunga
-                         non rompe l'allineamento. -->
-                    <Grid Margin="12">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" MinWidth="110"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Grid.ColumnSpan="2" Text="Appearance" Style="{StaticResource SectionHeader}"/>
-                        <TextBlock Grid.Row="1" Text="Theme" Style="{StaticResource Label}"/>
-                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
-                            <ComboBox Width="150" ItemsSource="{Binding Themes}" SelectedItem="{Binding SelectedTheme}"
-                                      AutomationProperties.Name="Theme"/>
-                            <TextBlock Style="{StaticResource Hint}" Text="{Binding ThemeHint}"/>
-                        </StackPanel>
-                        <TextBlock Grid.Row="2" Text="Tab strip" Style="{StaticResource Label}" Margin="0,0,16,24"/>
-                        <ComboBox Grid.Row="2" Grid.Column="1" Width="150" HorizontalAlignment="Left" Margin="0,0,0,24"
-                                  ItemsSource="{Binding TabStyles}" SelectedItem="{Binding SelectedTabStyle}"
-                                  AutomationProperties.Name="Tab strip" ToolTip="What the tabs show: the icon, the name, or both"/>
-
-                        <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Text="Updates" Style="{StaticResource SectionHeader}"/>
-                        <!-- Valgono per tutte e due le voci sotto: una riga loro. -->
-                        <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="0,0,0,16">
-                            <Button Content="Check for updates" MinWidth="140" Command="{Binding CheckForUpdatesCommand}"/>
-                            <CheckBox Content="Check at startup" Margin="16,0,0,0" VerticalAlignment="Center"
-                                      IsChecked="{Binding CheckAtStartup}"
-                                      ToolTip="Anonymous calls to the GitHub API when the app starts: one for WinGet Studio, and one for winget where the Microsoft Store does not update it. Turn it off to go online only when you press Check for updates"/>
-                            <ProgressBar Style="{StaticResource Busy}" Visibility="{Binding Checking, Converter={StaticResource Visible}}"/>
-                        </StackPanel>
-                        <!-- Una voce per riga: versione, pulsante (solo con una versione piu' recente), esito. -->
-                        <TextBlock Grid.Row="5" Text="WinGet Studio" Style="{StaticResource Label}" Margin="0,0,16,14"/>
-                        <StackPanel Grid.Row="5" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,14">
-                            <TextBlock Text="{Binding VersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,18,0"/>
-                            <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateAppText}" ToolTip="{Binding UpdateAppToolTip}"
-                                    Command="{Binding UpdateAppCommand}" Visibility="{Binding UpdateAppVisible, Converter={StaticResource Visible}}"/>
-                            <TextBlock Style="{StaticResource Hint}" Text="{Binding UpdateStatus}" TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
-                        <!-- winget stesso (ADR 0019): chi lo aggiorna, o il pulsante. -->
-                        <TextBlock Grid.Row="6" Text="winget" Style="{StaticResource Label}"/>
-                        <StackPanel Grid.Row="6" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,10">
-                            <TextBlock Text="{Binding WinGetVersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,18,0"/>
-                            <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateWinGetText}" ToolTip="{Binding UpdateWinGetToolTip}"
-                                    Command="{Binding UpdateWinGetCommand}" Visibility="{Binding UpdateWinGetVisible, Converter={StaticResource Visible}}"/>
-                            <TextBlock Style="{StaticResource Subtle}" VerticalAlignment="Center"
-                                       Visibility="{Binding WinGetStore, Converter={StaticResource Visible}}">Updated by the <Hyperlink
-                                       NavigateUri="ms-windows-store://downloadsandupdates">Microsoft Store</Hyperlink></TextBlock>
-                            <TextBlock Style="{StaticResource Hint}" Text="{Binding WinGetStatus}" TextTrimming="CharacterEllipsis"/>
-                        </StackPanel>
-                    </Grid>
-                </ScrollViewer>
-            </TabItem>
-
-            <TabItem Header="About" Tag="&#xE946;"
-                     AutomationProperties.HelpText="What this app does, where to report a bug, and the licence">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <!-- Le funzioni in una tabella senza bordi: nome a sinistra, descrizione a destra,
-                         cosi' l'occhio trova dove comincia ognuna. -->
-                    <StackPanel Margin="12">
-                        <TextBlock Style="{StaticResource Subtle}" Text="WinGet Studio is a desktop front end for winget, the Windows package manager."/>
-                        <Grid Margin="0,14,0,0">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-                            <TextBlock Text="Updates" FontWeight="SemiBold" Margin="0,0,14,8"/>
-                            <TextBlock Grid.Column="1" Style="{StaticResource Subtle}" Margin="0,0,0,8">
-                                List what has a newer version and upgrade the packages you tick, one at a time.<LineBreak/>
-                                A running queue can be stopped: the package in progress finishes, the rest are left alone.
-                            </TextBlock>
-                            <TextBlock Grid.Row="1" Text="Install" FontWeight="SemiBold" Margin="0,0,14,8"/>
-                            <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource Subtle}" Margin="0,0,0,8"
-                                       Text="Search the winget catalogue as you type, optionally the Microsoft Store, and pick the install scope."/>
-                            <TextBlock Grid.Row="2" Text="Installed" FontWeight="SemiBold" Margin="0,0,14,8"/>
-                            <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource Subtle}" Margin="0,0,0,8"
-                                       Text="The inventory of the machine, with a local filter and an uninstall behind a confirmation."/>
-                            <TextBlock Grid.Row="3" Text="Pin" FontWeight="SemiBold" Margin="0,0,14,8"/>
-                            <TextBlock Grid.Row="3" Grid.Column="1" Style="{StaticResource Subtle}" Margin="0,0,0,8"
-                                       Text="Block a package from being upgraded, from either list, until you remove the pin."/>
-                            <TextBlock Grid.Row="4" Text="Export / Import" FontWeight="SemiBold" Margin="0,0,14,0"/>
-                            <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource Subtle}"
-                                       Text="Save the package list to a .json file and rebuild a machine from it."/>
-                        </Grid>
-                        <!-- 2.0 non e' elevata (ADR 0024): l'UAC lo chiede l'installer che ne ha bisogno. -->
-                        <TextBlock Style="{StaticResource Subtle}" Margin="0,18,0,0">
-                            It runs without administrator rights: an installer that needs them asks for them.<LineBreak/>
-                            No telemetry.<LineBreak/>
-                            <LineBreak/>
-                            Found a bug, or have an idea?
-                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues">Open an issue on GitHub</Hyperlink>.<LineBreak/>
-                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio">Source code</Hyperlink> &#183;
-                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases">Release notes</Hyperlink> &#183;
-                            <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE">MIT licence</Hyperlink><LineBreak/>
-                            <LineBreak/>
-                            Made by <Hyperlink NavigateUri="https://github.com/FedeB2160">FedeB2160</Hyperlink>,
-                            with the help of <Italic>Claude Code</Italic> (Anthropic).
-                        </TextBlock>
-                    </StackPanel>
-                </ScrollViewer>
-            </TabItem>
         </TabControl>
 
         <!-- Avanzamento della coda in corso, condiviso da tutte le schede. -->
-        <ProgressBar Grid.Row="1" Margin="0,8,0,4" Value="{Binding State.ProgressValue, Mode=OneWay}"
-                     Maximum="{Binding State.ProgressMaximum}" IsIndeterminate="{Binding State.ProgressIndeterminate}"/>
+        <!-- 8 px e non i 4 Fluent: e' l'unico segno, da ogni scheda, che una coda sta lavorando. -->
+        <!-- Riga di stato: cosa sta facendo la coda e a che punto ("Updating 2 of 3: LibreOffice"),
+             con una barra sottile, da qualunque scheda. Solo durante una coda o un'operazione lunga
+             senza spinner suo (AppState.ShowProgress). Hidden e non Collapsed: il log non salta. -->
+        <DockPanel Grid.Row="1" Margin="2,10,0,6" MinHeight="20">
+            <DockPanel.Style>
+                <Style TargetType="DockPanel">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding State.ShowProgress}" Value="False">
+                            <Setter Property="Visibility" Value="Hidden"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DockPanel.Style>
+            <TextBlock DockPanel.Dock="Left" Text="{Binding State.ProgressText}" Margin="0,0,12,0" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" MaxWidth="480"/>
+            <!-- 10 px, angoli arrotondati (Clip nel codice), accento del tema sul binario del tratto
+                 forte: si nota in tutti e due i temi. -->
+            <ProgressBar x:Name="Progress" Height="10" VerticalAlignment="Center" Value="{Binding State.ProgressValue, Mode=OneWay}"
+                         Maximum="{Binding State.ProgressMaximum}" IsIndeterminate="{Binding State.ProgressIndeterminate}"
+                         Background="{DynamicResource ControlStrongStrokeColorDisabledBrush}"
+                         AutomationProperties.Name="{Binding State.ProgressText}"/>
+        </DockPanel>
 
         <TextBlock Grid.Row="2" Text="Log" Margin="0,4,0,4" FontWeight="SemiBold"/>
         <!-- Il menu proprio sostituisce quello del TextBox: Copy e Select all vanno rimessi. -->

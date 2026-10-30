@@ -71,9 +71,32 @@ public abstract partial class PackageListViewModel : ObservableObject
         }
     }
 
+    // Le righe che "seleziona tutto" tocca: tutte, salvo dove la scheda dice altrimenti.
+    protected virtual IEnumerable<PackageItem> Selectable => Items;
+
+    // La spunta nell'intestazione della griglia: true tutte, false nessuna, null alcune. Un clic
+    // su "alcune" le spunta tutte.
+    public bool? AllChecked
+    {
+        get => Selectable.Any() && Selectable.All(i => i.Selected) ? true : Selectable.Any(i => i.Selected) ? null : false;
+        set
+        {
+            var on = value == true;
+            foreach (var i in Selectable.ToList()) i.Selected = on;
+        }
+    }
+
+    public bool CanCheckAll => State.IsIdle && Selectable.Any();
+
+    // Il numero nel badge della linguetta, o "" (nessun badge).
+    public virtual string Badge => "";
+
     // Contatori, etichette e comandi dipendono da righe, spunte e stato occupato.
     protected virtual void Refresh()
     {
+        OnPropertyChanged(nameof(Badge));
+        OnPropertyChanged(nameof(AllChecked));
+        OnPropertyChanged(nameof(CanCheckAll));
         RetryCount = State.RetryItems(Items).Count;
         OnPropertyChanged(nameof(HasItems));
         OnPropertyChanged(nameof(IsEmpty));

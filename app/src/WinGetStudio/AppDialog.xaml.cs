@@ -69,10 +69,11 @@ public partial class AppDialog : Window
     public MessageBoxResult Answer => _answer ?? (_button == MessageBoxButton.YesNo ? MessageBoxResult.No : MessageBoxResult.OK);
 
     // Testo coi link cliccabili (ADR 0021), in sola lettura ma selezionabile. Larghezza fissa:
-    // in un dialogo che prende la misura del contenuto un RichTextBox non ne ha una sua.
-    private static RichTextBox LinkedText(string text)
+    // in un dialogo che prende la misura del contenuto un RichTextBox non ne ha una sua. E' il
+    // testo lungo dei dettagli: piu' largo e piu' piccolo del resto, allineato a sinistra.
+    private RichTextBox LinkedText(string text)
     {
-        var p = new Paragraph { Margin = new Thickness(0) };
+        var p = new Paragraph { Margin = new Thickness(0), TextAlignment = TextAlignment.Left };
         var lines = text.Replace("\r\n", "\n").Split('\n');
         for (var i = 0; i < lines.Length; i++)
         {
@@ -80,14 +81,18 @@ public partial class AppDialog : Window
                 p.Inlines.Add(part.IsLink ? new Hyperlink(new Run(part.Text)) { NavigateUri = new Uri(part.Text) } : new Run(part.Text));
             if (i < lines.Length - 1) p.Inlines.Add(new LineBreak());
         }
-        return new RichTextBox(new FlowDocument(p) { PagePadding = new Thickness(0) })
+        // Il FlowDocument ha un font serif suo: prende quello della finestra, cioe' dell'app.
+        var doc = new FlowDocument(p) { PagePadding = new Thickness(0), FontSize = 12 };
+        doc.SetBinding(FlowDocument.FontFamilyProperty, new System.Windows.Data.Binding(nameof(FontFamily)) { Source = this });
+        MaxWidth = 760;
+        return new RichTextBox(doc)
         {
             IsReadOnly = true,
             IsDocumentEnabled = true,
             BorderThickness = new Thickness(0),
             Background = Brushes.Transparent,
-            Width = 460,
-            MaxHeight = 480,
+            Width = 680,
+            MaxHeight = 520,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
         };
     }

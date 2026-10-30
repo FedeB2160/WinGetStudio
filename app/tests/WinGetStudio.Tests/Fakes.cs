@@ -74,6 +74,11 @@ internal sealed class FakeDialogs : IDialogService
         return Answer(call);
     }
 
+    // Le pagine aperte, in ordine: "Settings" o "About <versione>".
+    public readonly List<string> Pages = [];
+    public void ShowSettings(SettingsViewModel settings) => Pages.Add("Settings");
+    public void ShowAbout(string version) => Pages.Add($"About {version}");
+
     public string? PickSaveFile(string title, string filter, string fileName) => SaveFile;
     public string? PickOpenFile(string title, string filter) => OpenFile;
 }
@@ -83,6 +88,8 @@ internal sealed class FakeDialogs : IDialogService
 internal sealed class FakeUpdateHost : IUpdateHost
 {
     public InstallChannel Channel { get; set; } = InstallChannel.Portable;
+    public string? ExePath { get; set; } = @"C:\Tools\WinGetStudio.exe";
+    public bool StartsWithWindows { get; set; }
     public string AppVersion { get; set; } = "2.0.0";
     public readonly Dictionary<string, Release?> Releases = [];
     public readonly List<string> Requests = [];

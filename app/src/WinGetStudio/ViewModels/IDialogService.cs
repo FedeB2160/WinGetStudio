@@ -12,6 +12,10 @@ public interface IDialogService
         MessageBoxImage image = MessageBoxImage.None, MessageBoxResult defaultResult = MessageBoxResult.None,
         object? content = null, bool links = false);
 
+    // Settings e About: finestre modali sopra la principale, col velo (ADR 0028).
+    void ShowSettings(SettingsViewModel settings);
+    void ShowAbout(string version);
+
     // null se l'utente annulla.
     string? PickSaveFile(string title, string filter, string fileName);
     string? PickOpenFile(string title, string filter);

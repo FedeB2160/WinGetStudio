@@ -34,13 +34,13 @@ public sealed partial class AppState : ObservableObject
 
     // winget non regge due processi insieme (ADR 0003): un'operazione in corso spegne i comandi
     // di TUTTE le schede.
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsIdle), nameof(IsWinGetBusy))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsIdle), nameof(IsWinGetBusy), nameof(ShowProgress))]
     public partial bool IsBusy { get; private set; }
 
     public bool IsIdle => !IsBusy;
 
     // Quale coda gira, o null: solo chi l'ha avviata offre Cancel.
-    [ObservableProperty] public partial QueueVerb? QueueVerb { get; private set; }
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowProgress))] public partial QueueVerb? QueueVerb { get; private set; }
     [ObservableProperty] public partial bool Cancelling { get; private set; }
 
     // Le ricerche NON alzano lo stato occupato (la digitazione resta fluida), ma sono un winget:
@@ -52,7 +52,14 @@ public sealed partial class AppState : ObservableObject
 
     [ObservableProperty] public partial double ProgressValue { get; set; }
     [ObservableProperty] public partial double ProgressMaximum { get; set; }
-    [ObservableProperty] public partial bool ProgressIndeterminate { get; set; }
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowProgress))] public partial bool ProgressIndeterminate { get; set; }
+
+    // La barra condivisa: solo per una coda (quanti pacchetti mancano, da ogni scheda) o per
+    // un'operazione lunga senza un indicatore suo. Le scansioni hanno lo spinner della scheda.
+    public bool ShowProgress => IsBusy && (QueueVerb is not null || ProgressIndeterminate);
+
+    // Accanto alla barra durante una coda: "Updating 2 of 3: LibreOffice".
+    [ObservableProperty] public partial string ProgressText { get; private set; } = "";
 
     // Le liste sono una fotografia della macchina: un'azione da un'altra scheda le rende vecchie.
     public event Action? PinsChanged, UpdatesStale, InstalledStale;
@@ -81,6 +88,7 @@ public sealed partial class AppState : ObservableObject
     // Il verbo si azzera PRIMA dello stato occupato: chi reagisce vede lo stato finale.
     public void End()
     {
+        ProgressText = "";
         QueueVerb = null;
         Cancelling = false;
         ProgressIndeterminate = false;
@@ -126,10 +134,16 @@ public sealed partial class AppState : ObservableObject
         ProgressMaximum = request.Rows.Count;
         try
         {
+            var verbing = request.Verb switch
+            {
+                Core.QueueVerb.Install => "Installing", Core.QueueVerb.Uninstall => "Uninstalling",
+                Core.QueueVerb.Pin => "Pinning", Core.QueueVerb.Unpin => "Unpinning", _ => "Updating",
+            };
             var result = await Queue.RunAsync(request, Log.Write, (row, outcome) =>
             {
                 if (rows.TryGetValue(row, out var item)) item.SetOutcome(outcome);
                 if (outcome is not null) ProgressValue++;
+                else ProgressText = $"{verbing} {ProgressValue + 1} of {ProgressMaximum}: {row.Name}";
             }, _cancel.Token);
             Last = new LastQueue(result, then);
             QueueVerb = null;
@@ -200,13 +214,20 @@ public sealed partial class AppState : ObservableObject
     // come gli altri.
     public async Task ShowDetailsAsync(PackageItem? item, bool installed)
     {
+        // Senza la barra condivisa: lo spinner nella colonna Result della riga, poi torna l'esito
+        // che c'era (un errore di prima non si perde aprendo i dettagli).
         if (item is null || !TryBegin()) return;
-        ProgressIndeterminate = true;
         Log.Write($"Reading the details of {item.Name} [{item.Id}]...");
+        var (status, detail) = (item.Status, item.StatusDetail);
+        item.Status = RowStatus.Running;
         string text;
         try { text = await Backend.GetDetailsAsync(item.Id, item.Source, installed); }
         catch (ArgumentException e) { text = e.Message; }
-        finally { End(); }
+        finally
+        {
+            (item.Status, item.StatusDetail) = (status, detail);
+            End();
+        }
         Dialogs.Show(text.Length > 0 ? text : "winget returned no details for this package.", $"{item.Name} - details", links: true);
     }
 }

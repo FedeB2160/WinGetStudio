@@ -14,7 +14,6 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     {
         _includeUnknown = state.Prefs.GetBool(Preferences.IncludeUnknown, false);
         EmptyText = AvailableText = SelectedText = "";
-        ToggleAllText = "Select all";
         UpdateButtonText = "Update";
         state.UpdatesStale += () => { Stale = true; Refresh(); };
         UpdateCommand = new AsyncRelayCommand(UpdateAsync, () => UpdateEnabled, AsyncRelayCommandOptions.AllowConcurrentExecutions);
@@ -22,6 +21,9 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     }
 
     protected override bool DetailsInstalled => true;
+
+    // Quanti aggiornamenti, sulla linguetta: si vede da ogni scheda.
+    public override string Badge => Items.Count > 0 ? Items.Count.ToString() : "";
 
     // L'elenco e' una fotografia della macchina: dopo un'azione da un'altra scheda le versioni a
     // schermo non valgono piu', e ripremere Update rilancerebbe winget su pacchetti gia'
@@ -45,7 +47,6 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     [ObservableProperty] public partial string EmptyText { get; private set; }
     [ObservableProperty] public partial string AvailableText { get; private set; }
     [ObservableProperty] public partial string SelectedText { get; private set; }
-    [ObservableProperty] public partial string ToggleAllText { get; private set; }
     [ObservableProperty] public partial string UpdateButtonText { get; private set; }
     [ObservableProperty] public partial string? UpdateButtonToolTip { get; private set; }
 
@@ -53,22 +54,14 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     public IAsyncRelayCommand UpdateCommand { get; }
 
     private bool OurQueue => State.IsBusy && State.QueueVerb == Core.QueueVerb.Update;
-    private IEnumerable<PackageItem> Selectable => Items.Where(i => !i.Pinned);
-    private bool AllSelected => Selectable.Any() && Selectable.All(i => i.Selected);
+    // I pinnati restano fuori da "seleziona tutto": spuntarli sarebbe una promessa che la coda non
+    // puo' mantenere.
+    protected override IEnumerable<PackageItem> Selectable => Items.Where(i => !i.Pinned);
     private bool UpdateEnabled => OurQueue ? !State.Cancelling : State.IsIdle && !Stale && Items.Any(i => i.Selected);
 
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private Task Check() => LoadAsync();
 
-    // I pinnati restano fuori: spuntarli sarebbe una promessa che la coda non puo' mantenere.
-    [RelayCommand(CanExecute = nameof(CanToggleAll))]
-    private void ToggleAll()
-    {
-        var value = !AllSelected;
-        foreach (var i in Selectable) i.Selected = value;
-    }
-
-    private bool CanToggleAll() => State.IsIdle && Items.Count > 0;
 
     public async Task LoadAsync(bool keepOutcome = false)
     {
@@ -89,12 +82,10 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         Items.Clear();
         EmptyText = "";
         Loading = true;
-        State.ProgressIndeterminate = true;
         // I pin nella stessa operazione, dopo: due winget insieme fanno fallire uno dei due.
         var read = await State.Backend.GetUpgradesAsync(IncludeUnknown);
         var pins = await State.Backend.GetPinsAsync();
         Loading = false;
-        State.ProgressIndeterminate = false;
         // WinGet Studio resta fuori: winget non sovrascrive un exe in esecuzione, quindi spuntarlo
         // fallirebbe sempre. Ci si aggiorna da Settings (ADR 0013).
         if (read.Success) Fill(read.Rows.Where(r => !SelfUpdate.IsSelfPackage(r.Id)), outcomes);
@@ -138,11 +129,18 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
             State.Dialogs.Show("No items selected.", image: MessageBoxImage.Information);
             return;
         }
-        // Le versioni a schermo sono vecchie: la lista si rilegge subito, con l'esito per Id. Le
-        // riuscite spariscono, le fallite restano e si possono ripetere.
+        // Le versioni a schermo sono vecchie. Tutto riuscito: la lista si rilegge subito, con
+        // l'esito per Id. Con un fallimento no: la lista resta coi suoi esiti da guardare, segnata
+        // come vecchia (Update spento), e la nuova ricerca la decide l'utente; Retry failed resta.
         await State.RunQueueAsync(new QueueRequest(Core.QueueVerb.Update, rows, WinGetCommands.Upgrade), Items, () =>
         {
             State.MarkInstalledStale();
+            if (State.Last?.Result.FailedIds.Count > 0)
+            {
+                Stale = true;
+                Refresh();
+                return Task.CompletedTask;
+            }
             return LoadCoreAsync(keepOutcome: true);
         });
     }
@@ -155,11 +153,9 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         AvailableText = total switch { 0 => "", 1 => "1 update available", _ => $"{total} updates available" };
         // A lista vecchia il contatore cede il posto al motivo per cui Update e' spento.
         SelectedText = Stale ? "list out of date - press Check" : selected > 0 ? $"{selected} selected" : "";
-        ToggleAllText = AllSelected ? "Deselect all" : "Select all";
         UpdateButtonText = OurQueue ? State.Cancelling ? "Cancelling..." : "Cancel" : "Update";
         UpdateButtonToolTip = OurQueue ? "Finish the package in progress, then stop without starting the others" : null;
         UpdateCommand?.NotifyCanExecuteChanged();
         CheckCommand.NotifyCanExecuteChanged();
-        ToggleAllCommand.NotifyCanExecuteChanged();
     }
 }
