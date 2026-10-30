@@ -152,6 +152,34 @@
                                 </TextBlock>
                                 <TextBlock Text="{Binding}" VerticalAlignment="Center"
                                            Visibility="{Binding DataContext.Settings.TabTextVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}"/>
+                                <!-- Badge col numero (Updates: quanti aggiornamenti), visibile da ogni
+                                     scheda; nascosto quando la scheda non ne ha. -->
+                                <!-- Sulla scheda attiva in accento; sulle altre grigio, come disattivato,
+                                     ma sempre presente. -->
+                                <Border CornerRadius="9" MinWidth="18" Height="18" Padding="4,0" Margin="6,0,0,0" VerticalAlignment="Center"
+                                        AutomationProperties.Name="{Binding DataContext.Badge, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                        AutomationProperties.HelpText="updates available">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
+                                            <Setter Property="TextElement.Foreground" Value="{DynamicResource TextOnAccentFillColorPrimaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="False">
+                                                    <Setter Property="Background" Value="{DynamicResource ControlStrongStrokeColorDisabledBrush}"/>
+                                                    <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding DataContext.Badge, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                    <!-- -1 px in alto: le cifre non hanno discendenti e senza
+                                         sembravano basse nel cerchio. -->
+                                    <TextBlock Text="{Binding DataContext.Badge, RelativeSource={RelativeSource AncestorType=TabItem}}"
+                                               FontSize="11" FontWeight="SemiBold" TextAlignment="Center" Margin="0,-1,0,0"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
                             </StackPanel>
                         </DataTemplate>
                     </Setter.Value>
@@ -404,7 +432,6 @@
                                   ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"/>
                         <local:Spinner DockPanel.Dock="Left" Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
                         <Button DockPanel.Dock="Right" Style="{StaticResource Retry}"/>
-                        <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding AvailableText}"/>
                     </DockPanel>
 
                     <DataGrid x:Name="GridUpdates" Grid.Row="1" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">

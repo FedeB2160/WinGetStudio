@@ -88,9 +88,13 @@ public abstract partial class PackageListViewModel : ObservableObject
 
     public bool CanCheckAll => State.IsIdle && Selectable.Any();
 
+    // Il numero nel badge della linguetta, o "" (nessun badge).
+    public virtual string Badge => "";
+
     // Contatori, etichette e comandi dipendono da righe, spunte e stato occupato.
     protected virtual void Refresh()
     {
+        OnPropertyChanged(nameof(Badge));
         OnPropertyChanged(nameof(AllChecked));
         OnPropertyChanged(nameof(CanCheckAll));
         RetryCount = State.RetryItems(Items).Count;

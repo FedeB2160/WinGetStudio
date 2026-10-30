@@ -47,6 +47,9 @@ public class UpdatesViewModelTests
         Assert.Equal(["A.A", "B.B", "C.C"], vm.Items.Select(i => i.Id));
         Assert.Equal([false, true, false], vm.Items.Select(i => i.Pinned));
         Assert.Equal("3 updates available", vm.AvailableText);
+        // Il numero va nel badge della linguetta; le altre schede non ne hanno.
+        Assert.Equal("3", vm.Badge);
+        Assert.Equal("", h.Vm.Installed.Badge);
         Assert.Contains("Searching for updates...", h.Log);
         Assert.Contains("Found 3 updates.", h.Log);
         Assert.False(h.State.IsBusy);

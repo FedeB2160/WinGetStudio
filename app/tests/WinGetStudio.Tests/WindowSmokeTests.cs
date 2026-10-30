@@ -22,6 +22,7 @@ public class WindowSmokeTests
         "TextFillColorSecondaryBrush", "AccentTextFillColorPrimaryBrush", "SmokeFillColorDefaultBrush",
         "CardBackgroundFillColorDefaultBrush", "CardStrokeColorDefaultBrush", "OverlayCornerRadius",
         "ControlStrongStrokeColorDefault", "TextFillColorPrimaryBrush", "SolidBackgroundFillColorTertiaryBrush",
+        "AccentFillColorDefaultBrush", "TextOnAccentFillColorPrimaryBrush", "ControlStrongStrokeColorDisabledBrush",
     ];
 
     [Fact]

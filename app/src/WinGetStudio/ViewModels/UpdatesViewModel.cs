@@ -22,6 +22,9 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
 
     protected override bool DetailsInstalled => true;
 
+    // Quanti aggiornamenti, sulla linguetta: si vede da ogni scheda.
+    public override string Badge => Items.Count > 0 ? Items.Count.ToString() : "";
+
     // L'elenco e' una fotografia della macchina: dopo un'azione da un'altra scheda le versioni a
     // schermo non valgono piu', e ripremere Update rilancerebbe winget su pacchetti gia'
     // aggiornati. Update si spegne finche' non si rilegge; riaprire la scheda rilegge.

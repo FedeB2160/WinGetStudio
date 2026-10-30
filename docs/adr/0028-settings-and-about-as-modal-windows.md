@@ -83,7 +83,11 @@ list on all four sides.
     stroke as track, and the Result column shows the spinner while a row runs. Columns cannot be
     moved, and after any manual resize (drag or double click on the header edge) the resizable
     columns go back to `*` widths in the proportions chosen: a column widened to pixels used to push
-    Result out of the grid. Settings is compact, with outcomes and notes on their own wrapped line. Check for updates is never
+    Result out of the grid. Settings is compact, in two columns (Appearance and Startup, Updates) so
+    that new settings widen it instead of making it taller, with outcomes and notes on their own
+    wrapped line. The count of updates is a badge on the Updates tab, in the accent colour, seen
+    from every tab (grey, as if disabled, when another tab is active), instead of a
+    "N updates available" line inside it. Check for updates is never
     disabled by a queue (it talks to GitHub and asks `winget --version` under the lock); installing
     the update still waits. Settings gains **Start with Windows**: a `Run` entry for the user, which
     is itself the state, off in a development build.
