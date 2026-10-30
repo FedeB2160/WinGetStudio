@@ -77,9 +77,13 @@ list on all four sides.
     stroke (`ControlStrongStrokeColorDefault`, white on dark and black on light) at 55%: the Fluent
     grey, the same in both themes, made the window read as one block. Grids are closed on all four
     sides by the rounded Fluent border again (open sides left the header ending in nothing),
-    with horizontal lines only inside. Inactive tabs are grey; the active one is bold and 2 px
-    larger. The shared progress bar becomes a status line, "Updating 2 of 3: LibreOffice" with a
-    thin bar, and the Result column shows the spinner while a row runs. Check for updates is never
+    with horizontal lines only inside. Inactive tabs are grey; the active one is bold at the same
+    size (a larger title sat below its icon). The shared progress bar becomes a status line,
+    "Updating 2 of 3: LibreOffice", with a 10 px bar clipped to rounded corners on the strong
+    stroke as track, and the Result column shows the spinner while a row runs. Columns cannot be
+    moved, and after any manual resize (drag or double click on the header edge) the resizable
+    columns go back to `*` widths in the proportions chosen: a column widened to pixels used to push
+    Result out of the grid. Settings is compact, with outcomes and notes on their own wrapped line. Check for updates is never
     disabled by a queue (it talks to GitHub and asks `winget --version` under the lock); installing
     the update still waits. Settings gains **Start with Windows**: a `Run` entry for the user, which
     is itself the state, off in a development build.

@@ -51,6 +51,16 @@ public class WindowSmokeTests
         // Titoli delle colonne al centro (ADR 0028).
         var name = FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Name");
         Assert.Equal(HorizontalAlignment.Center, name.HorizontalContentAlignment);
+        // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
+        // colonne, Result compresa, stanno dentro e le fisse non cambiano larghezza.
+        var grid = (DataGrid)w.FindName("GridUpdates");
+        grid.Columns[2].Width = new DataGridLength(3000);
+        Pump(() => true);
+        MainWindow.Refit(grid);
+        Pump(() => true);
+        Assert.True(grid.Columns.Sum(c => c.ActualWidth) <= grid.ActualWidth, $"{grid.Columns.Sum(c => c.ActualWidth)} > {grid.ActualWidth}");
+        Assert.Equal(80, grid.Columns[^1].ActualWidth);
+        Assert.False(grid.CanUserReorderColumns);
         all.IsChecked = false;
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
         var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };

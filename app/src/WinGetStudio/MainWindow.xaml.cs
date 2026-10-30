@@ -1,8 +1,11 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Threading;
 using WinGetStudio.ViewModels;
 
@@ -26,6 +29,15 @@ public partial class MainWindow : Window
         installed.Filter = o => vm.Installed.Matches((PackageItem)o);
         vm.Installed.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(InstalledViewModel.FilterText)) installed.Refresh(); };
 
+        // Angoli arrotondati: il binario del template Fluent e' un rettangolo.
+        Progress.SizeChanged += (_, e) => Progress.Clip = new RectangleGeometry(new Rect(e.NewSize), 5, 5);
+
+        // Dopo ogni ridimensionamento a mano (trascinamento o doppio clic sul bordo) le colonne
+        // elastiche tornano a '*' nelle proporzioni scelte: i bordi non si spostano e le colonne
+        // fisse (spunta, Pin, Result) non escono dalla griglia.
+        AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, e) => RefitColumns(e.OriginalSource)), true);
+        AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler((_, e) => RefitColumns(e.OriginalSource)), true);
+
         ContentRendered += async (_, _) =>
         {
             var ready = (DateTime.Now - Process.GetCurrentProcess().StartTime).TotalSeconds;
@@ -35,6 +47,27 @@ public partial class MainWindow : Window
     }
 
     public MainViewModel ViewModel { get; }
+
+    // Solo se l'evento viene da un'intestazione di colonna; dopo il layout, quando le larghezze
+    // nuove sono quelle vere.
+    private void RefitColumns(object source)
+    {
+        if (source is not DependencyObject d || FindAncestor<DataGridColumnHeader>(d) is null || FindAncestor<DataGrid>(d) is not { } grid) return;
+        Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => Refit(grid));
+    }
+
+    internal static void Refit(DataGrid grid)
+    {
+        foreach (var c in grid.Columns.Where(c => c.CanUserResize))
+            c.Width = new DataGridLength(Math.Max(c.ActualWidth, c.MinWidth), DataGridLengthUnitType.Star);
+    }
+
+    private static T? FindAncestor<T>(DependencyObject d) where T : DependencyObject
+    {
+        for (var p = d; p is not null; p = p is Visual or System.Windows.Media.Media3D.Visual3D ? VisualTreeHelper.GetParent(p) : LogicalTreeHelper.GetParent(p))
+            if (p is T t) return t;
+        return null;
+    }
 
     // Velo sotto un dialogo (ADR 0020).
     internal void SetDim(bool on) => DialogDim.Visibility = on ? Visibility.Visible : Visibility.Collapsed;

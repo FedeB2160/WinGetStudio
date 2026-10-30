@@ -122,7 +122,7 @@
                         <DataTemplate>
                             <!-- Il padding Fluent della linguetta e' fisso a 6 px nel template: il
                                  resto dello spazio attorno al nome sta qui. Non attive in grigio,
-                                 l'attiva in grassetto e 2 px piu' grande: qui e non sulla TabItem,
+                                 l'attiva in grassetto pieno (piu' grande scendeva sotto l'icona): qui e non sulla TabItem,
                                  da cui passerebbero al contenuto della scheda. -->
                             <StackPanel Orientation="Horizontal" Margin="6,0">
                                 <StackPanel.Style>
@@ -131,7 +131,6 @@
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
                                                 <Setter Property="TextElement.FontWeight" Value="Bold"/>
-                                                <Setter Property="TextElement.FontSize" Value="15"/>
                                                 <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
@@ -181,6 +180,8 @@
             <Style x:Key="Grid" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
                 <Setter Property="AutoGenerateColumns" Value="False"/>
                 <Setter Property="CanUserAddRows" Value="False"/>
+                <!-- Le colonne non si spostano: spunta, Pin e Result restano dove sono. -->
+                <Setter Property="CanUserReorderColumns" Value="False"/>
                 <Setter Property="IsReadOnly" Value="True"/>
                 <Setter Property="HeadersVisibility" Value="Column"/>
                 <Setter Property="SelectionMode" Value="Extended"/>
@@ -444,9 +445,12 @@
                 </Style>
             </DockPanel.Style>
             <TextBlock DockPanel.Dock="Left" Text="{Binding State.ProgressText}" Margin="0,0,12,0" VerticalAlignment="Center"
-                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="480"/>
-            <ProgressBar VerticalAlignment="Center" Value="{Binding State.ProgressValue, Mode=OneWay}"
+                       TextTrimming="CharacterEllipsis" MaxWidth="480"/>
+            <!-- 10 px, angoli arrotondati (Clip nel codice), accento del tema sul binario del tratto
+                 forte: si nota in tutti e due i temi. -->
+            <ProgressBar x:Name="Progress" Height="10" VerticalAlignment="Center" Value="{Binding State.ProgressValue, Mode=OneWay}"
                          Maximum="{Binding State.ProgressMaximum}" IsIndeterminate="{Binding State.ProgressIndeterminate}"
+                         Background="{DynamicResource ControlStrongStrokeColorDisabledBrush}"
                          AutomationProperties.Name="{Binding State.ProgressText}"/>
         </DockPanel>
 
