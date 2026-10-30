@@ -40,6 +40,10 @@ public sealed partial class InstalledViewModel : PackageListViewModel
     [ObservableProperty] public partial string CountText { get; private set; }
     [ObservableProperty] public partial string InfoText { get; private set; }
 
+    // "Seleziona tutto" solo sulle righe visibili: spuntare righe nascoste dal filtro per poi
+    // disinstallarle e' proprio cio' che la conferma deve segnalare, non provocare.
+    protected override IEnumerable<PackageItem> Selectable => Items.Where(Matches);
+
     public bool Matches(PackageItem item)
     {
         var f = FilterText.Trim();
@@ -64,12 +68,10 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         Items.Clear();
         EmptyText = "";
         Loading = true;
-        State.ProgressIndeterminate = true;
         // I pin nella stessa operazione: due winget insieme fanno fallire uno dei due.
         var read = await State.Backend.GetInstalledAsync();
         var pins = await State.Backend.GetPinsAsync();
         Loading = false;
-        State.ProgressIndeterminate = false;
         if (read.Success) Fill(read.Rows, outcomes);
         if (Items.Count == 0)
         {
@@ -117,7 +119,6 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         // Di nuovo: fra la scelta del file e qui puo' essere rientrata una ricerca.
         if (file is null || !State.TryBegin()) return;
         Loading = true;
-        State.ProgressIndeterminate = true;
         State.Log.Write($"Exporting the package list to {file} ...");
         try
         {

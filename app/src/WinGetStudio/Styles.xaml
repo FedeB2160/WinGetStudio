@@ -8,7 +8,7 @@
     <!-- Un'area della finestra: sfondo e bordo delle card di Windows 11. -->
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceStrokeColorDefaultBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{DynamicResource OverlayCornerRadius}"/>
         <Setter Property="Padding" Value="16"/>
@@ -31,18 +31,26 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="Margin" Value="12,0,0,0"/>
     </Style>
-    <Style x:Key="Busy" TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
-        <Setter Property="IsIndeterminate" Value="True"/>
-        <Setter Property="Width" Value="60"/>
-        <Setter Property="Margin" Value="12,0,0,0"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
+    <!-- Pulsante con glifo (Tag, Segoe Fluent Icons) e nome: Settings e About in alto a destra.
+         Basso abbastanza da non toccare il riquadro delle schede. -->
+    <Style x:Key="PageButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+        <Setter Property="Padding" Value="10,3"/>
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"
+                                   Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}"/>
+                        <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
-    <!-- Pulsante a sola icona: glifo Segoe Fluent Icons, il nome per l'accessibilita' nel ToolTip. -->
-    <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
-        <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
-        <Setter Property="FontSize" Value="16"/>
-        <Setter Property="Padding" Value="8"/>
-        <Setter Property="MinWidth" Value="0"/>
-        <Setter Property="AutomationProperties.Name" Value="{Binding ToolTip, RelativeSource={RelativeSource Self}}"/>
-    </Style>
+
+    <!-- Hover dei pulsanti: quello Fluent nel tema scuro passa dal 6 all'8% di bianco e non si
+         vede. Stesse chiavi che il template Fluent legge, ridefinite con colori Fluent piu'
+         marcati del tema corrente (le chiavi Color cambiano col tema, ADR 0028). -->
+    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{DynamicResource ControlStrongStrokeColorDisabled}"/>
+    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{DynamicResource SurfaceStrokeColorDefault}"/>
 </ResourceDictionary>

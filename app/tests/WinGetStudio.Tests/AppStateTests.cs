@@ -56,6 +56,22 @@ public class AppStateTests
         Assert.Equal(1, h.WinGet.MaxRunning);
     }
 
+    // La barra condivisa e' per le code: una scansione ha lo spinner della sua scheda.
+    [Fact]
+    public async Task SharedProgressBarOnlyForQueues()
+    {
+        var shown = new List<(string, bool, bool)>();
+        using var h = new Harness(h => h.WinGet.Respond = a => FakeWinGet.Result(0, a[0] == "upgrade" ? FakeWinGet.Upgrades(A) : ""));
+        h.WinGet.Before = a => { shown.Add((a[0], h.State.ShowProgress, h.Vm.Updates.Loading)); return Task.CompletedTask; };
+        await h.Vm.Updates.LoadAsync();
+        h.Vm.Updates.Items[0].Selected = true;
+        await h.Vm.Updates.UpdateAsync();
+        // Scansione: spinner, niente barra. Coda: barra.
+        Assert.Contains(("upgrade", false, true), shown);
+        Assert.Contains(("upgrade", true, false), shown);
+        Assert.False(h.State.ShowProgress);
+    }
+
     [Fact]
     public async Task QueueShowsProgressAndTicksInTheLog()
     {

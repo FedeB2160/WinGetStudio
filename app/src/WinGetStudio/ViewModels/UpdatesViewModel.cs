@@ -51,27 +51,14 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     public IAsyncRelayCommand UpdateCommand { get; }
 
     private bool OurQueue => State.IsBusy && State.QueueVerb == Core.QueueVerb.Update;
-    private IEnumerable<PackageItem> Selectable => Items.Where(i => !i.Pinned);
-    private bool AllSelected => Selectable.Any() && Selectable.All(i => i.Selected);
+    // I pinnati restano fuori da "seleziona tutto": spuntarli sarebbe una promessa che la coda non
+    // puo' mantenere.
+    protected override IEnumerable<PackageItem> Selectable => Items.Where(i => !i.Pinned);
     private bool UpdateEnabled => OurQueue ? !State.Cancelling : State.IsIdle && !Stale && Items.Any(i => i.Selected);
 
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private Task Check() => LoadAsync();
 
-    // La spunta nell'intestazione della griglia: true tutte, false nessuna, null alcune. Un clic
-    // su "alcune" le spunta tutte. I pinnati restano fuori: spuntarli sarebbe una promessa che la
-    // coda non puo' mantenere.
-    public bool? AllChecked
-    {
-        get => AllSelected ? true : Selectable.Any(i => i.Selected) ? null : false;
-        set
-        {
-            var on = value == true;
-            foreach (var i in Selectable) i.Selected = on;
-        }
-    }
-
-    public bool CanCheckAll => State.IsIdle && Items.Count > 0;
 
     public async Task LoadAsync(bool keepOutcome = false)
     {
@@ -92,12 +79,10 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         Items.Clear();
         EmptyText = "";
         Loading = true;
-        State.ProgressIndeterminate = true;
         // I pin nella stessa operazione, dopo: due winget insieme fanno fallire uno dei due.
         var read = await State.Backend.GetUpgradesAsync(IncludeUnknown);
         var pins = await State.Backend.GetPinsAsync();
         Loading = false;
-        State.ProgressIndeterminate = false;
         // WinGet Studio resta fuori: winget non sovrascrive un exe in esecuzione, quindi spuntarlo
         // fallirebbe sempre. Ci si aggiorna da Settings (ADR 0013).
         if (read.Success) Fill(read.Rows.Where(r => !SelfUpdate.IsSelfPackage(r.Id)), outcomes);
@@ -158,8 +143,6 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         AvailableText = total switch { 0 => "", 1 => "1 update available", _ => $"{total} updates available" };
         // A lista vecchia il contatore cede il posto al motivo per cui Update e' spento.
         SelectedText = Stale ? "list out of date - press Check" : selected > 0 ? $"{selected} selected" : "";
-        OnPropertyChanged(nameof(AllChecked));
-        OnPropertyChanged(nameof(CanCheckAll));
         UpdateButtonText = OurQueue ? State.Cancelling ? "Cancelling..." : "Cancel" : "Update";
         UpdateButtonToolTip = OurQueue ? "Finish the package in progress, then stop without starting the others" : null;
         UpdateCommand?.NotifyCanExecuteChanged();

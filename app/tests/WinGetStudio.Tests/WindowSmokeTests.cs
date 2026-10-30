@@ -40,11 +40,16 @@ public class WindowSmokeTests
         Assert.Equal(["Install", "Installed", "Updates"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
         Assert.Equal(MainViewModel.UpdatesTab, tabs.SelectedIndex);
         // Seleziona tutto e' la spunta nell'intestazione della griglia (ADR 0028).
-        var all = FindChild<DataGridColumnHeadersPresenter>((DataGrid)w.FindName("GridUpdates")) is { } headers ? FindChild<CheckBox>(headers) : null;
+        var headers = FindChild<DataGridColumnHeadersPresenter>((DataGrid)w.FindName("GridUpdates"));
+        Assert.NotNull(headers);
+        var all = FindChild<CheckBox>(headers);
         Assert.NotNull(all);
         Assert.True(all.IsEnabled);
         all.IsChecked = true;
         Assert.True(h.Vm.Updates.Items[0].Selected);
+        // Titoli delle colonne al centro (ADR 0028).
+        var name = FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Name");
+        Assert.Equal(HorizontalAlignment.Center, name.HorizontalContentAlignment);
         all.IsChecked = false;
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
         var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };
@@ -78,6 +83,16 @@ public class WindowSmokeTests
         w.Close();
         app.Shutdown();
     });
+
+    private static IEnumerable<T> FindAll<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var c = VisualTreeHelper.GetChild(parent, i);
+            if (c is T t) yield return t;
+            foreach (var d in FindAll<T>(c)) yield return d;
+        }
+    }
 
     private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
     {

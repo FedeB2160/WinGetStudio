@@ -52,7 +52,26 @@ list on all four sides.
    with the colour of the desktop wallpaper, which read as blue in the dark theme. The runtime
    switch `Switch.System.Windows.Appearance.DisableFluentThemeWindowBackdrop` (in the project file)
    makes the Fluent theme use its `WindowBackground`, the plain Windows dark or light grey.
-8. Shared styles live in `Styles.xaml`, merged into each window's resources rather than into
+8. **States that can be seen.** Several Fluent defaults vanish on the dark theme (the card stroke is
+   black at 10%, a hovered button goes from 6% to 8% white). The app redefines, in its own
+   resources, the keys the Fluent templates already read, with brushes bound to other Fluent
+   *Color* keys of the current theme, so they follow a theme change: `ButtonBackgroundPointerOver`
+   (`ControlStrongStrokeColorDisabled`), `ButtonBorderBrushPointerOver` and
+   `TabViewSelectedItemBorderBrush` (`SurfaceStrokeColorDefault`). Cards, tabs and the tab area use
+   `SurfaceStrokeColorDefaultBrush` as border. Each tab has its border and 6 px around and between;
+   the selected one has the tab area's background and a semi-bold title (set in the header
+   template: on the `TabItem` it would reach the content). Settings and About show glyph and name.
+9. **Loading has a spinner, queues a bar.** Scans, searches, export and the update check show a
+   spinner next to their button (`Spinner`, an arc drawn and turned by the app, still when Windows
+   animations are off). The shared progress bar shows only during a queue or a long operation
+   without a spinner of its own (`AppState.ShowProgress`), hidden otherwise without moving the log.
+10. **Every grid has Select all in its header** (on, off, indeterminate), on the rows the tab allows:
+    all in Install, the non-pinned ones in Updates, the visible ones in Installed (never rows the
+    filter hides). The check box, pin and result columns cannot be resized. Column titles are
+    centred through an implicit `DataGridColumnHeader` style: with the Fluent theme the headers take
+    the style by type and ignore the grid's `ColumnHeaderStyle`. Truncated cell text shows in full
+    in a tooltip.
+11. Shared styles live in `Styles.xaml`, merged into each window's resources rather than into
    `App.xaml`, because the window smoke test runs under an `Application` of its own.
 
 ## Consequences

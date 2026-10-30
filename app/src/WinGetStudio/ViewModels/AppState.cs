@@ -34,13 +34,13 @@ public sealed partial class AppState : ObservableObject
 
     // winget non regge due processi insieme (ADR 0003): un'operazione in corso spegne i comandi
     // di TUTTE le schede.
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsIdle), nameof(IsWinGetBusy))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsIdle), nameof(IsWinGetBusy), nameof(ShowProgress))]
     public partial bool IsBusy { get; private set; }
 
     public bool IsIdle => !IsBusy;
 
     // Quale coda gira, o null: solo chi l'ha avviata offre Cancel.
-    [ObservableProperty] public partial QueueVerb? QueueVerb { get; private set; }
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowProgress))] public partial QueueVerb? QueueVerb { get; private set; }
     [ObservableProperty] public partial bool Cancelling { get; private set; }
 
     // Le ricerche NON alzano lo stato occupato (la digitazione resta fluida), ma sono un winget:
@@ -52,7 +52,11 @@ public sealed partial class AppState : ObservableObject
 
     [ObservableProperty] public partial double ProgressValue { get; set; }
     [ObservableProperty] public partial double ProgressMaximum { get; set; }
-    [ObservableProperty] public partial bool ProgressIndeterminate { get; set; }
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowProgress))] public partial bool ProgressIndeterminate { get; set; }
+
+    // La barra condivisa: solo per una coda (quanti pacchetti mancano, da ogni scheda) o per
+    // un'operazione lunga senza un indicatore suo. Le scansioni hanno lo spinner della scheda.
+    public bool ShowProgress => IsBusy && (QueueVerb is not null || ProgressIndeterminate);
 
     // Le liste sono una fotografia della macchina: un'azione da un'altra scheda le rende vecchie.
     public event Action? PinsChanged, UpdatesStale, InstalledStale;
