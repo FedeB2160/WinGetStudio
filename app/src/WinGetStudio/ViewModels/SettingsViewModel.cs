@@ -27,6 +27,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         var style = state.Prefs.GetString(Preferences.TabHeaderStyle, "Icon + Text");
         _tabStyle = TabStyles.Contains(style) ? style : "Icon + Text";
         _checkAtStartup = state.Prefs.GetBool(Preferences.CheckAtStartup, true);
+        _startElevated = state.Prefs.GetBool(Preferences.StartElevated, false);
         VersionText = $"v{host.AppVersion}";
         UpdateAppText = UpdateWinGetText = UpdateStatus = WinGetStatus = WinGetVersionText = ThemeHint = "";
         RefreshThemeHint();
@@ -136,11 +137,89 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
     private bool IsIdle() => State.IsIdle;
 
+    // Elevata (ADR 0024): un UAC all'apertura invece di uno per installer. Non nel portable: estrae
+    // le sue librerie in una cartella scrivibile dall'utente, che un'app elevata non deve caricare
+    // (ADR 0026).
+    public bool CanStartElevated => Elevation.CanRestartElevated(_host.Channel);
+    public bool CanRestartElevated => !State.IsElevated && CanStartElevated;
+    public string StartElevatedHint =>
+        !CanStartElevated ? "Only in the installed version: the portable exe unpacks its libraries into a folder your account can write to, and an elevated app must not load them."
+        : State.IsElevated || StartElevated ? "Windows asks for administrator approval every time you open WinGet Studio, but not when it starts with Windows."
+        : "To turn this on, restart as administrator first.";
+
+    // Si accende solo da elevata: chi la sceglie ha gia' visto l'app da amministratore. Si spegne
+    // sempre, anche non elevata: chi rifiuta l'UAC a ogni avvio deve poterla togliere.
+    public bool CanToggleStartElevated => CanStartElevated && (State.IsElevated || StartElevated);
+
+    // Always start as administrator: si salva, e se l'app non e' gia' nel modo scelto propone di
+    // riavviarla subito (No: vale dal prossimo avvio). Mai sopra una coda.
+    private bool _startElevated;
+    public bool StartElevated
+    {
+        get => _startElevated;
+        set
+        {
+            if (!CanToggleStartElevated || !SetProperty(ref _startElevated, value)) return;
+            State.Prefs.Set(Preferences.StartElevated, value);
+            OnPropertyChanged(nameof(CanToggleStartElevated));
+            OnPropertyChanged(nameof(StartElevatedHint));
+            if (value == State.IsElevated) return;
+            var mode = value ? "as administrator" : "without administrator rights";
+            if (!State.IsIdle)
+            {
+                State.Log.Write($"WinGet Studio will start {mode} next time.");
+                return;
+            }
+            var answer = State.Dialogs.Show($"Restart WinGet Studio {mode} now?\n\nOtherwise it starts {mode} next time.",
+                "Start as administrator", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            if (answer != MessageBoxResult.Yes) return;
+            if (value) RestartElevated();
+            else State.Fire(RestartUnelevatedAsync);
+        }
+    }
+
+    // All'avvio, prima della finestra: con la spunta si rilancia elevata e questa copia si chiude
+    // (true). UAC rifiutato: resta non elevata. automatic: avviata da Start with Windows, che non
+    // chiede l'UAC all'accesso; il pulsante in Settings eleva quando serve.
+    public bool ElevateAtStartup(bool automatic = false)
+    {
+        if (automatic || !StartElevated || State.IsElevated || !CanStartElevated) return false;
+        if (_host.RestartElevated()) return true;
+        State.Log.Write("Starting without administrator rights: the administrator prompt was declined.");
+        return false;
+    }
+
+    // Da elevata il token non elevato arriva da un'attivita' pianificata (ADR 0018); un errore lo
+    // scrive Fire nel log, e la finestra resta.
+    private async Task RestartUnelevatedAsync()
+    {
+        State.Log.Write("Restarting without administrator rights...");
+        await _host.RestartUnelevatedAsync();
+        CloseRequested?.Invoke();
+    }
+
+    // Restart as administrator una tantum, da Settings e dal menu della finestra. Mai sopra una coda: chiudere
+    // l'app la lascerebbe a meta'.
+    [RelayCommand(CanExecute = nameof(CanRestartNow))]
+    private void RestartElevated()
+    {
+        State.Log.Write("Restarting as administrator...");
+        if (!_host.RestartElevated())
+        {
+            State.Log.Write("Restart cancelled at the administrator prompt.");
+            return;
+        }
+        CloseRequested?.Invoke();
+    }
+
+    private bool CanRestartNow() => CanRestartElevated && State.IsIdle;
+
     private void NotifyCommands()
     {
         CheckForUpdatesCommand.NotifyCanExecuteChanged();
         UpdateAppCommand.NotifyCanExecuteChanged();
         UpdateWinGetCommand.NotifyCanExecuteChanged();
+        RestartElevatedCommand.NotifyCanExecuteChanged();
     }
 
     // "Check for updates": l'app e winget, e riferisce SEMPRE l'esito.

@@ -15,6 +15,7 @@ public sealed class Preferences(string key = Preferences.DefaultKey)
     public const string IncludeUnknown = "IncludeUnknown";
     public const string IncludeStore = "IncludeStore";
     public const string InstallScope = "InstallScope";     // Auto | User | Machine
+    public const string StartElevated = "StartElevated";   // 2.0: ogni avvio chiede l'UAC (ADR 0024)
 
     public string GetString(string name, string defaultValue) => Read(name) as string ?? defaultValue;
 

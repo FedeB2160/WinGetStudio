@@ -12,6 +12,7 @@ public sealed record LastQueue(QueueResult Result, Func<Task>? Then);
 public sealed partial class AppState : ObservableObject
 {
     private CancellationTokenSource? _cancel;
+    private bool _waitingApproval;
 
     public AppState(WinGetCli cli, LogViewModel log, IDialogService dialogs, Preferences prefs)
     {
@@ -31,6 +32,16 @@ public sealed partial class AppState : ObservableObject
     public Preferences Prefs { get; }
     public PinState Pins { get; } = new();
     public LastQueue? Last { get; private set; }
+
+    // Riavviata come amministratore (ADR 0024): lo dice un banner, e Retry as administrator non
+    // c'e' (sarebbe lo stesso livello).
+    public bool IsElevated => Cli.Elevation.IsElevated;
+    public string? ElevatedBanner => IsElevated
+        ? $"Running as administrator ({Cli.Elevation.Account}): winget runs elevated, and per-user packages are those of this account."
+        : null;
+
+    // La riga e la riga di stato mentre l'UAC di Retry as administrator aspetta una risposta.
+    public const string WaitingForApproval = "Waiting for administrator approval";
 
     // winget non regge due processi insieme (ADR 0003): un'operazione in corso spegne i comandi
     // di TUTTE le schede.
@@ -112,8 +123,9 @@ public sealed partial class AppState : ObservableObject
     // UNICO passaggio di update, install, uninstall e pin: prende lo stato occupato, scrive
     // l'esito nelle righe di items, e tiene lo stato occupato anche durante then (la ricarica
     // della lista, la rilettura dei pin): un winget lanciato nel mezzo sarebbe il secondo.
-    // null se un altro winget e' in corso.
-    public async Task<QueueResult?> RunQueueAsync(QueueRequest request, IEnumerable<PackageItem> items, Func<Task>? then)
+    // null se un altro winget e' in corso. elevated: Retry as administrator, tutte le righe in un
+    // solo runas (ADR 0024); le righe aspettano l'UAC finche' il primo passo non parte.
+    public async Task<QueueResult?> RunQueueAsync(QueueRequest request, IEnumerable<PackageItem> items, Func<Task>? then, bool elevated = false)
     {
         if (IsWinGetBusy)
         {
@@ -127,8 +139,11 @@ public sealed partial class AppState : ObservableObject
         _cancel = new CancellationTokenSource();
         var rows = new Dictionary<PackageRow, PackageItem>(ReferenceEqualityComparer.Instance);
         foreach (var i in items) rows[i.Row] = i;
+        var previous = Last?.Result.Outcomes;
         foreach (var r in request.Rows)
-            if (rows.TryGetValue(r, out var i)) { i.Status = RowStatus.None; i.StatusDetail = ""; }
+            if (rows.TryGetValue(r, out var i)) (i.Status, i.StatusDetail) = elevated ? (RowStatus.Running, WaitingForApproval) : (RowStatus.None, "");
+        if (elevated) ProgressText = WaitingForApproval;
+        _waitingApproval = elevated;
         ProgressIndeterminate = false;
         ProgressValue = 0;
         ProgressMaximum = request.Rows.Count;
@@ -139,12 +154,38 @@ public sealed partial class AppState : ObservableObject
                 Core.QueueVerb.Install => "Installing", Core.QueueVerb.Uninstall => "Uninstalling",
                 Core.QueueVerb.Pin => "Pinning", Core.QueueVerb.Unpin => "Unpinning", _ => "Updating",
             };
-            var result = await Queue.RunAsync(request, Log.Write, (row, outcome) =>
+            var approved = false;
+            void Changed(PackageRow row, PackageOutcome? outcome)
             {
+                // Il primo passo parte: l'UAC ha detto si', le altre righe non aspettano piu' lui.
+                if (elevated && !approved && outcome is null)
+                {
+                    approved = true;
+                    _waitingApproval = false;
+                    foreach (var r in request.Rows)
+                        if (rows.TryGetValue(r, out var waiting)) (waiting.Status, waiting.StatusDetail) = (RowStatus.None, "");
+                }
                 if (rows.TryGetValue(row, out var item)) item.SetOutcome(outcome);
                 if (outcome is not null) ProgressValue++;
                 else ProgressText = $"{verbing} {ProgressValue + 1} of {ProgressMaximum}: {row.Name}";
-            }, _cancel.Token);
+            }
+            var result = elevated
+                ? await Queue.RunElevatedAsync(request, Log.Write, Changed, _cancel.Token)
+                : await Queue.RunAsync(request, Log.Write, Changed, _cancel.Token);
+            _waitingApproval = false;
+            // Annullato a meta' del batch elevato: le righe non partite tengono l'esito di prima,
+            // e con lui la possibilita' di ripeterle.
+            if (elevated && previous is not null && result.Cancelled)
+            {
+                var merged = new Dictionary<string, PackageOutcome>(result.Outcomes);
+                foreach (var r in request.Rows.Where(r => !merged.ContainsKey(r.Id)))
+                    if (previous.TryGetValue(r.Id, out var p))
+                    {
+                        merged[r.Id] = p;
+                        if (rows.TryGetValue(r, out var item)) item.SetOutcome(p);
+                    }
+                result = result with { Outcomes = merged };
+            }
             Last = new LastQueue(result, then);
             QueueVerb = null;
             Cancelling = false;
@@ -156,12 +197,17 @@ public sealed partial class AppState : ObservableObject
 
     // Finisce il pacchetto in corso e non parte col prossimo: un installer interrotto a meta'
     // lascia la macchina in uno stato che nessuno sa descrivere.
+    // Durante l'attesa dell'UAC si smette solo di aspettare: il prompt di Windows puo' restare
+    // aperto (nella barra delle applicazioni), ma approvarlo dopo non fa nulla. Il log PRIMA
+    // dell'annullamento, che puo' chiudere la coda subito.
     public void CancelQueue()
     {
         if (QueueVerb is null || Cancelling) return;
-        _cancel?.Cancel();
         Cancelling = true;
-        Log.Write("Cancelling: the package in progress will finish, then the queue stops.");
+        Log.Write(_waitingApproval
+            ? "Cancelling: no longer waiting for administrator approval. If the Windows prompt is still open, approving it now does nothing."
+            : "Cancelling: the package in progress will finish, then the queue stops.");
+        _cancel?.Cancel();
     }
 
     // Righe da ripetere in un elenco: fallite nell'ultima coda, per Id (dopo la ricarica le
@@ -184,6 +230,27 @@ public sealed partial class AppState : ObservableObject
             "Retry failed", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
         if (answer != MessageBoxResult.Yes) return;
         await RunQueueAsync(last.Result.Request with { Rows = [.. retry.Select(r => r.Row)] }, items, last.Then);
+    }
+
+    // Righe che l'elevazione puo' risolvere (ADR 0024), come RetryItems; mai da elevata.
+    public IReadOnlyList<PackageItem> ElevateItems(IEnumerable<PackageItem> items)
+    {
+        if (Last is null || IsElevated) return [];
+        var ids = Last.Result.ElevatableIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return items.Where(i => i.Status == RowStatus.Error && ids.Contains(i.Id)).ToList();
+    }
+
+    // Le stesse righe di comando in un solo runas, con lo stesso passo finale della coda.
+    public async Task RetryElevatedAsync(IReadOnlyList<PackageItem> items)
+    {
+        var retry = ElevateItems(items);
+        if (retry.Count == 0 || Last is not { } last) return;
+        var verb = last.Result.Request.Verb.ToString().ToLowerInvariant();
+        var answer = Dialogs.Show($"Retry the {verb} of {retry.Count} package{(retry.Count == 1 ? "" : "s")} as administrator?\n\n" +
+            "Windows asks once for administrator approval, for all of them.\n\n" + NameList(retry.Select(r => r.Name)),
+            "Retry as administrator", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        if (answer != MessageBoxResult.Yes) return;
+        await RunQueueAsync(last.Result.Request with { Rows = [.. retry.Select(r => r.Row)] }, items, last.Then, elevated: true);
     }
 
     // La lista nuova se la lettura e' riuscita, altrimenti l'ultima buona e l'errore nel log.

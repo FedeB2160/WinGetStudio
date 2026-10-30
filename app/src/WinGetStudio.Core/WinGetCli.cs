@@ -2,7 +2,7 @@ namespace WinGetStudio.Core;
 
 // winget attraverso la sua CLI (ADR 0025): argomenti come lista, mai una shell; tabelle lette
 // per posizione di colonna (ADR 0006).
-public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null) : IWinGetBackend
+public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null, IElevation? elevation = null) : IWinGetBackend
 {
     // Un solo processo winget alla volta in tutta l'app: due invocazioni concorrenti fanno
     // fallire una delle due con exit 1 (ADR 0003). Statico perche' vale fra istanze.
@@ -10,6 +10,10 @@ public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null) 
 
     private readonly IProcessRunner _runner = runner ?? new ProcessRunner();
     private bool? _noProgress;
+
+    // Elevata o no, e i due modi di cambiare livello (ADR 0024, ADR 0018). Elevata si usa solo la
+    // CLI: la COM API non si attiva da un processo elevato (ADR 0025).
+    public IElevation Elevation { get; } = elevation ?? new Elevation();
 
     // Si aggiorna dopo che l'app ha installato winget (ADR 0019).
     public string WinGetPath { get; set; } = wingetPath;
@@ -131,14 +135,38 @@ public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null) 
     public async Task<ProcessResult> RunAsync(IReadOnlyList<string> arguments, Action<TimeSpan>? tick = null)
     {
         await Gate.WaitAsync();
+        try { return await _runner.RunAsync(WinGetPath, await WithOptionsAsync(arguments), tick); }
+        finally { Gate.Release(); }
+    }
+
+    // Retry as administrator: tutte le righe in un solo runas, sotto il lock anche mentre l'UAC
+    // aspetta (ADR 0024).
+    public async Task<ElevatedRun> RunElevatedAsync(IReadOnlyList<IReadOnlyList<string>> commands, Action<int, ProcessResult?>? step, CancellationToken cancel)
+    {
+        await Gate.WaitAsync();
         try
         {
-            // --no-progress dalla 1.29 (accettato anche se --help non lo elenca); prima restano i
-            // frame \r, che il parser riduce all'ultimo segmento.
-            _noProgress ??= await SupportsNoProgressAsync();
-            return await _runner.RunAsync(WinGetPath, _noProgress.Value ? [.. arguments, "--no-progress"] : arguments, tick);
+            var lines = new List<IReadOnlyList<string>>();
+            foreach (var c in commands) lines.Add(await WithOptionsAsync(c));
+            return await Elevation.RunElevatedAsync(WinGetPath, lines, step, cancel);
         }
         finally { Gate.Release(); }
+    }
+
+    // La stessa riga senza elevazione, dopo che winget l'ha rifiutata da amministratore (ADR 0018).
+    public async Task<ProcessResult> RunUnelevatedAsync(IReadOnlyList<string> arguments, Action<TimeSpan>? tick = null)
+    {
+        await Gate.WaitAsync();
+        try { return await Elevation.RunUnelevatedAsync(WinGetPath, await WithOptionsAsync(arguments), tick); }
+        finally { Gate.Release(); }
+    }
+
+    // --no-progress dalla 1.29 (accettato anche se --help non lo elenca); prima restano i frame \r,
+    // che il parser riduce all'ultimo segmento. Dentro il lock.
+    private async Task<IReadOnlyList<string>> WithOptionsAsync(IReadOnlyList<string> arguments)
+    {
+        _noProgress ??= await SupportsNoProgressAsync();
+        return _noProgress.Value ? [.. arguments, "--no-progress"] : arguments;
     }
 
     // "v1.29.380". Una versione illeggibile vale come vecchia: senza l'opzione si legge lo stesso.

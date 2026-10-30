@@ -20,6 +20,12 @@ public partial class App : Application
         var dialogs = new DialogService();
         var cli = new WinGetCli(winget ?? "winget.exe");
         var vm = new MainViewModel(cli, prefs, dialogs, new UpdateHost(cli), winget is not null, SynchronizationContext.Current);
+        // Always start as administrator (ADR 0024): la copia elevata prende il posto di questa.
+        if (vm.Settings.ElevateAtStartup(automatic: e.Args.Contains(Autostart.StartupArgument)))
+        {
+            Shutdown();
+            return;
+        }
         // A caldo: ThemeMode ridipinge la finestra senza ricrearla (ADR 0027).
         vm.Settings.ApplyTheme = name => ThemeMode = Theme(name);
         var window = new MainWindow(vm);

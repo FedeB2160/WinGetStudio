@@ -26,4 +26,10 @@ public interface IUpdateHost
 
     // register: prima la registrazione dell'App Installer di Windows. null se riuscito.
     Task<string?> InstallWinGetAsync(bool register, Action<string> log);
+
+    // Rilancia l'app con runas (ADR 0024). false se l'UAC e' stato rifiutato.
+    bool RestartElevated();
+
+    // Da elevata: rilancia l'app senza diritti, con un'attivita' pianificata (ADR 0018).
+    Task RestartUnelevatedAsync();
 }

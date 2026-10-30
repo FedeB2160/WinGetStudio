@@ -29,3 +29,41 @@ internal sealed class FakeRunner : IProcessRunner
         finally { Interlocked.Decrement(ref Running); }
     }
 }
+
+// Elevazione finta: Batches registra ogni runas (le righe di comando di tutti i passi), Unelevated
+// ogni attivita' non elevata. Approved false = UAC rifiutato; Respond null = passo non partito.
+internal sealed class FakeElevation : IElevation
+{
+    public bool IsElevated { get; set; }
+    public bool OtherAccount { get; set; }
+    public string Account { get; set; } = @"PC\admin";
+    public bool Approved = true;
+    public Func<IReadOnlyList<string>, ProcessResult?> Respond = _ => FakeRunner.Result(0, "");
+    public Func<IReadOnlyList<string>, ProcessResult> RespondUnelevated = _ => FakeRunner.Result(0, "");
+    public readonly List<string[][]> Batches = [];
+    public readonly List<string[]> Unelevated = [];
+
+    public Task<ElevatedRun> RunElevatedAsync(string exePath, IReadOnlyList<IReadOnlyList<string>> commands, Action<int, ProcessResult?>? step, CancellationToken cancel)
+    {
+        Batches.Add([.. commands.Select(c => c.ToArray())]);
+        if (!Approved) return Task.FromResult(new ElevatedRun(false, [.. commands.Select(_ => (ProcessResult?)null)]));
+        var results = new List<ProcessResult?>();
+        for (var i = 0; i < commands.Count; i++)
+        {
+            if (cancel.IsCancellationRequested) { results.Add(null); continue; }
+            step?.Invoke(i, null);
+            var r = Respond(commands[i]);
+            results.Add(r);
+            if (r is not null) step?.Invoke(i, r);
+        }
+        return Task.FromResult(new ElevatedRun(true, results));
+    }
+
+    public Task<ProcessResult> RunUnelevatedAsync(string exePath, IReadOnlyList<string> arguments, Action<TimeSpan>? tick)
+    {
+        Unelevated.Add([.. arguments]);
+        return Task.FromResult(RespondUnelevated(arguments));
+    }
+
+    public Task StartUnelevatedAsync(string exePath) => Task.CompletedTask;
+}

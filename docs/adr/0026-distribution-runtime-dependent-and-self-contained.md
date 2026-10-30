@@ -40,7 +40,8 @@ Measured on 2026-10-29 with the .NET 10 prototype (win-x64, signed with the proj
    Microsoft.DotNet.DesktopRuntime.10`.
 4. **Portable: self-contained, compressed single-file.** Its elevated restart (ADR 0024) must not load
    native libraries from a user-writable folder: it sets the extraction folder to a protected location,
-   or the elevated restart is offered only in the installed channel. Decided while porting, with a test.
+   or the elevated restart is offered only in the installed channel. Decided while porting, with a test:
+   **offered only in the installed channel** (ADR 0024, note of 2026-10-30).
 5. **win-x64 only** in 2.0; win-arm64 later if asked. The SDK is pinned with `global.json`.
 
 ## Consequences
