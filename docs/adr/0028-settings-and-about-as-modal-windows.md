@@ -85,7 +85,8 @@ list on all four sides.
     columns go back to `*` widths in the proportions chosen: a column widened to pixels used to push
     Result out of the grid. Settings is compact, in two columns (Appearance and Startup, Updates) so
     that new settings widen it instead of making it taller, with outcomes and notes on their own
-    wrapped line. The count of updates is a badge on the Updates tab, in the accent colour, seen
+    wrapped line. The count of updates is a badge overlaid on the top-right corner of the Updates tab (drawn
+    shifted, so the tab keeps its width), in the accent colour, seen
     from every tab (grey, as if disabled, when another tab is active), instead of a
     "N updates available" line inside it. Check for updates is never
     disabled by a queue (it talks to GitHub and asks `winget --version` under the lock); installing
