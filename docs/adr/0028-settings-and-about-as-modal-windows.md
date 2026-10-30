@@ -58,8 +58,10 @@ list on all four sides.
    *Color* keys of the current theme, so they follow a theme change: `ButtonBackgroundPointerOver`
    (`ControlStrongStrokeColorDisabled`), `ButtonBorderBrushPointerOver` and
    `TabViewSelectedItemBorderBrush` (`SurfaceStrokeColorDefault`). Cards, tabs and the tab area use
-   `SurfaceStrokeColorDefaultBrush` as border. Each tab has its border and 6 px around and between;
-   the selected one has the tab area's background and a semi-bold title (set in the header
+   `SurfaceStrokeColorDefaultBrush` as border. Each tab has its border and 6 px around its name, and
+   no horizontal margin: `TabPanel` lays tabs out without it and clips each tab's right border by
+   that much. Grids and tab names use 13 px (`ListFontSize`, one below Fluent's 14), and column
+   headers have no vertical separators, like the rows. The selected one has the tab area's background and a semi-bold title (set in the header
    template: on the `TabItem` it would reach the content). Settings and About show glyph and name.
 9. **Loading has a spinner, queues a bar.** Scans, searches, export and the update check show a
    spinner next to their button (`Spinner`, an arc drawn and turned by the app, still when Windows

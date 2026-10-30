@@ -112,10 +112,12 @@
             <SolidColorBrush x:Key="TabViewSelectedItemBorderBrush" Color="{DynamicResource SurfaceStrokeColorDefault}"/>
             <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
                 <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource Self}}"/>
-                <!-- Ogni linguetta col suo bordo e 6 px dalla successiva; -1 in basso: copre la riga
-                     del riquadro sotto la selezionata, che ha lo stesso sfondo. -->
+                <!-- Ogni linguetta col suo bordo; -1 in basso: copre la riga del riquadro sotto la
+                     selezionata, che ha lo stesso sfondo. Nessun margine orizzontale: TabPanel
+                     dispone le linguette senza contarlo e taglierebbe il bordo destro. -->
                 <Setter Property="BorderBrush" Value="{DynamicResource SurfaceStrokeColorDefaultBrush}"/>
-                <Setter Property="Margin" Value="0,0,6,-1"/>
+                <Setter Property="Margin" Value="0,0,0,-1"/>
+                <Setter Property="FontSize" Value="{StaticResource ListFontSize}"/>
                 <Setter Property="HeaderTemplate">
                     <Setter.Value>
                         <DataTemplate>
@@ -203,6 +205,7 @@
                     </Setter.Value>
                 </Setter>
                 <Setter Property="SelectionUnit" Value="FullRow"/>
+                <Setter Property="FontSize" Value="{StaticResource ListFontSize}"/>
                 <!-- Solo i bordi sopra e sotto: ai lati la griglia resta aperta (ADR 0028). Senza
                      sfondo: quello Fluent, arrotondato, disegnava i lati anche senza bordo. Solo
                      le righe orizzontali fra le righe. -->
@@ -219,6 +222,8 @@
                  col tema Fluent le intestazioni prendono lo stile per tipo e ignorano quello. -->
             <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <!-- Niente separatori verticali: come le righe, solo linee orizzontali. -->
+                <Setter Property="SeparatorVisibility" Value="Collapsed"/>
                 <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
                      rispetto a quelle delle righe. Centrati, i titoli non ne hanno bisogno. -->
                 <Setter Property="Padding" Value="0"/>

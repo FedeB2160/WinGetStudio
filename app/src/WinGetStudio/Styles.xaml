@@ -2,8 +2,11 @@
      propri (ADR 0027, ADR 0028). Unito nelle Resources di ogni finestra e non in App.xaml: lo
      smoke test apre le finestre con un'Application sua. -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
     <BooleanToVisibilityConverter x:Key="Visible"/>
+    <!-- Testo delle griglie e delle linguette: un punto sotto i 14 di Fluent, piu' righe a vista. -->
+    <sys:Double x:Key="ListFontSize">13</sys:Double>
 
     <!-- Un'area della finestra: sfondo e bordo delle card di Windows 11. -->
     <Style x:Key="Card" TargetType="Border">
