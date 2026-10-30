@@ -7,6 +7,10 @@ namespace WinGetStudio.ViewModels;
 public interface IUpdateHost
 {
     InstallChannel Channel { get; }
+
+    // L'exe pubblicato in esecuzione, o null in una build di sviluppo; e l'avvio con Windows.
+    string? ExePath { get; }
+    bool StartsWithWindows { get; set; }
     string AppVersion { get; }
     Task<Release?> GetLatestReleaseAsync(string repo, string assetName);
 

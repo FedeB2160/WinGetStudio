@@ -64,8 +64,7 @@
                  senza distinguere i colori. Il ToolTip sta sul glifo: c'e' solo con un esito. -->
             <DataTemplate x:Key="ResultCell" DataType="{x:Type vm:PackageItem}">
                 <Grid HorizontalAlignment="Center">
-                    <ProgressBar x:Name="running" IsIndeterminate="True" Width="36" VerticalAlignment="Center" Visibility="Collapsed"
-                                 AutomationProperties.Name="In progress"/>
+                    <local:Spinner x:Name="running" Width="16" Height="16" Visibility="Collapsed" AutomationProperties.Name="In progress"/>
                     <TextBlock x:Name="icon" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16"
                                VerticalAlignment="Center" Visibility="Collapsed" ToolTip="{Binding StatusDetail}"
                                AutomationProperties.Name="No result yet"/>
@@ -109,27 +108,31 @@
             <!-- La linguetta selezionata: bordo come il riquadro, sfondo come il riquadro (chiave
                  Fluent TabViewItemHeaderBackgroundSelected, SolidBackgroundFillColorTertiary), cosi'
                  si unisce a lui. Il bordo Fluent era nero al 10%, invisibile sul tema scuro. -->
-            <SolidColorBrush x:Key="TabViewSelectedItemBorderBrush" Color="{DynamicResource SurfaceStrokeColorDefault}"/>
+            <SolidColorBrush x:Key="TabViewSelectedItemBorderBrush" Color="{DynamicResource ControlStrongStrokeColorDefault}" Opacity="0.55"/>
             <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
                 <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource Self}}"/>
                 <!-- Ogni linguetta col suo bordo; -1 in basso: copre la riga del riquadro sotto la
                      selezionata, che ha lo stesso sfondo. Nessun margine orizzontale: TabPanel
                      dispone le linguette senza contarlo e taglierebbe il bordo destro. -->
-                <Setter Property="BorderBrush" Value="{DynamicResource SurfaceStrokeColorDefaultBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AreaStrokeBrush}"/>
                 <Setter Property="Margin" Value="0,0,0,-1"/>
                 <Setter Property="FontSize" Value="{StaticResource ListFontSize}"/>
                 <Setter Property="HeaderTemplate">
                     <Setter.Value>
                         <DataTemplate>
                             <!-- Il padding Fluent della linguetta e' fisso a 6 px nel template: il
-                                 resto dello spazio attorno al nome sta qui. Il grassetto della
-                                 selezionata solo qui: sulla TabItem passerebbe al contenuto. -->
+                                 resto dello spazio attorno al nome sta qui. Non attive in grigio,
+                                 l'attiva in grassetto e 2 px piu' grande: qui e non sulla TabItem,
+                                 da cui passerebbero al contenuto della scheda. -->
                             <StackPanel Orientation="Horizontal" Margin="6,0">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
+                                        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
-                                                <Setter Property="TextElement.FontWeight" Value="SemiBold"/>
+                                                <Setter Property="TextElement.FontWeight" Value="Bold"/>
+                                                <Setter Property="TextElement.FontSize" Value="15"/>
+                                                <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
@@ -206,10 +209,11 @@
                 </Setter>
                 <Setter Property="SelectionUnit" Value="FullRow"/>
                 <Setter Property="FontSize" Value="{StaticResource ListFontSize}"/>
-                <!-- Solo i bordi sopra e sotto: ai lati la griglia resta aperta (ADR 0028). Senza
-                     sfondo: quello Fluent, arrotondato, disegnava i lati anche senza bordo. Solo
-                     le righe orizzontali fra le righe. -->
-                <Setter Property="BorderThickness" Value="0,1"/>
+                <!-- Chiusa sui quattro lati col bordo arrotondato del template Fluent: aperta ai lati,
+                     l'intestazione finiva nel nulla (ADR 0028). Sfondo trasparente e solo le righe
+                     orizzontali: il contenuto resta libero. -->
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource AreaStrokeBrush}"/>
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="GridLinesVisibility" Value="Horizontal"/>
                 <!-- Ancorata ai due lati: allargare una colonna stringe le altre a '*', non spinge
@@ -276,7 +280,7 @@
         <!-- Il riquadro delle schede: bordo e sfondo delle card, che il template Fluent usa gia'
              (ADR 0028). -->
         <TabControl x:Name="TabMain" SelectedIndex="{Binding SelectedTab}" BorderThickness="1"
-                    BorderBrush="{DynamicResource SurfaceStrokeColorDefaultBrush}" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}">
+                    BorderBrush="{DynamicResource AreaStrokeBrush}" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}">
             <TabItem Header="Install" Tag="&#xE896;" DataContext="{Binding Install}"
                      AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
                 <Grid Margin="12">
@@ -426,20 +430,25 @@
 
         <!-- Avanzamento della coda in corso, condiviso da tutte le schede. -->
         <!-- 8 px e non i 4 Fluent: e' l'unico segno, da ogni scheda, che una coda sta lavorando. -->
-        <!-- Solo durante una coda o un'operazione lunga senza spinner suo (AppState.ShowProgress).
-             Hidden e non Collapsed: il log non salta quando compare. -->
-        <ProgressBar Grid.Row="1" Height="8" Margin="0,10,0,6" Value="{Binding State.ProgressValue, Mode=OneWay}"
-                     Maximum="{Binding State.ProgressMaximum}" IsIndeterminate="{Binding State.ProgressIndeterminate}">
-            <ProgressBar.Style>
-                <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+        <!-- Riga di stato: cosa sta facendo la coda e a che punto ("Updating 2 of 3: LibreOffice"),
+             con una barra sottile, da qualunque scheda. Solo durante una coda o un'operazione lunga
+             senza spinner suo (AppState.ShowProgress). Hidden e non Collapsed: il log non salta. -->
+        <DockPanel Grid.Row="1" Margin="2,10,0,6" MinHeight="20">
+            <DockPanel.Style>
+                <Style TargetType="DockPanel">
                     <Style.Triggers>
                         <DataTrigger Binding="{Binding State.ShowProgress}" Value="False">
                             <Setter Property="Visibility" Value="Hidden"/>
                         </DataTrigger>
                     </Style.Triggers>
                 </Style>
-            </ProgressBar.Style>
-        </ProgressBar>
+            </DockPanel.Style>
+            <TextBlock DockPanel.Dock="Left" Text="{Binding State.ProgressText}" Margin="0,0,12,0" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" MaxWidth="480"/>
+            <ProgressBar VerticalAlignment="Center" Value="{Binding State.ProgressValue, Mode=OneWay}"
+                         Maximum="{Binding State.ProgressMaximum}" IsIndeterminate="{Binding State.ProgressIndeterminate}"
+                         AutomationProperties.Name="{Binding State.ProgressText}"/>
+        </DockPanel>
 
         <TextBlock Grid.Row="2" Text="Log" Margin="0,4,0,4" FontWeight="SemiBold"/>
         <!-- Il menu proprio sostituisce quello del TextBox: Copy e Select all vanno rimessi. -->

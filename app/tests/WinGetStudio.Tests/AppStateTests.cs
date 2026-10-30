@@ -62,7 +62,8 @@ public class AppStateTests
     {
         var shown = new List<(string, bool, bool)>();
         using var h = new Harness(h => h.WinGet.Respond = a => FakeWinGet.Result(0, a[0] == "upgrade" ? FakeWinGet.Upgrades(A) : ""));
-        h.WinGet.Before = a => { shown.Add((a[0], h.State.ShowProgress, h.Vm.Updates.Loading)); return Task.CompletedTask; };
+        var text = new List<string>();
+        h.WinGet.Before = a => { shown.Add((a[0], h.State.ShowProgress, h.Vm.Updates.Loading)); text.Add(h.State.ProgressText); return Task.CompletedTask; };
         await h.Vm.Updates.LoadAsync();
         h.Vm.Updates.Items[0].Selected = true;
         await h.Vm.Updates.UpdateAsync();
@@ -70,6 +71,8 @@ public class AppStateTests
         Assert.Contains(("upgrade", false, true), shown);
         Assert.Contains(("upgrade", true, false), shown);
         Assert.False(h.State.ShowProgress);
+        // Accanto alla barra: cosa sta facendo e a che punto, da qualunque scheda.
+        Assert.Contains("Updating 1 of 1: App A", text);
     }
 
     [Fact]

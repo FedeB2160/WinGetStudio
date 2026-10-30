@@ -88,6 +88,8 @@ internal sealed class FakeDialogs : IDialogService
 internal sealed class FakeUpdateHost : IUpdateHost
 {
     public InstallChannel Channel { get; set; } = InstallChannel.Portable;
+    public string? ExePath { get; set; } = @"C:\Tools\WinGetStudio.exe";
+    public bool StartsWithWindows { get; set; }
     public string AppVersion { get; set; } = "2.0.0";
     public readonly Dictionary<string, Release?> Releases = [];
     public readonly List<string> Requests = [];

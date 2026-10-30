@@ -35,6 +35,16 @@
             </Grid>
         </Border>
 
+        <!-- Avvio con Windows: la voce Run dell'utente. Spenta in una build di sviluppo. -->
+        <TextBlock Text="Startup" Style="{StaticResource SectionHeader}" Margin="2,20,0,8"/>
+        <Border Style="{StaticResource Card}">
+            <StackPanel Orientation="Horizontal">
+                <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows}" IsEnabled="{Binding CanStartWithWindows}"
+                          ToolTip="Open WinGet Studio when you sign in to Windows (a Run entry for your account only)"/>
+                <TextBlock Style="{StaticResource Hint}" Text="{Binding StartWithWindowsHint}"/>
+            </StackPanel>
+        </Border>
+
         <TextBlock Text="Updates" Style="{StaticResource SectionHeader}" Margin="2,20,0,8"/>
         <Border Style="{StaticResource Card}">
             <Grid>

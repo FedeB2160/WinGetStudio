@@ -58,6 +58,9 @@ public sealed partial class AppState : ObservableObject
     // un'operazione lunga senza un indicatore suo. Le scansioni hanno lo spinner della scheda.
     public bool ShowProgress => IsBusy && (QueueVerb is not null || ProgressIndeterminate);
 
+    // Accanto alla barra durante una coda: "Updating 2 of 3: LibreOffice".
+    [ObservableProperty] public partial string ProgressText { get; private set; } = "";
+
     // Le liste sono una fotografia della macchina: un'azione da un'altra scheda le rende vecchie.
     public event Action? PinsChanged, UpdatesStale, InstalledStale;
     public void MarkUpdatesStale() => UpdatesStale?.Invoke();
@@ -85,6 +88,7 @@ public sealed partial class AppState : ObservableObject
     // Il verbo si azzera PRIMA dello stato occupato: chi reagisce vede lo stato finale.
     public void End()
     {
+        ProgressText = "";
         QueueVerb = null;
         Cancelling = false;
         ProgressIndeterminate = false;
@@ -130,10 +134,16 @@ public sealed partial class AppState : ObservableObject
         ProgressMaximum = request.Rows.Count;
         try
         {
+            var verbing = request.Verb switch
+            {
+                Core.QueueVerb.Install => "Installing", Core.QueueVerb.Uninstall => "Uninstalling",
+                Core.QueueVerb.Pin => "Pinning", Core.QueueVerb.Unpin => "Unpinning", _ => "Updating",
+            };
             var result = await Queue.RunAsync(request, Log.Write, (row, outcome) =>
             {
                 if (rows.TryGetValue(row, out var item)) item.SetOutcome(outcome);
                 if (outcome is not null) ProgressValue++;
+                else ProgressText = $"{verbing} {ProgressValue + 1} of {ProgressMaximum}: {row.Name}";
             }, _cancel.Token);
             Last = new LastQueue(result, then);
             QueueVerb = null;

@@ -73,7 +73,17 @@ list on all four sides.
     centred through an implicit `DataGridColumnHeader` style: with the Fluent theme the headers take
     the style by type and ignore the grid's `ColumnHeaderStyle`. Truncated cell text shows in full
     in a tooltip.
-11. Shared styles live in `Styles.xaml`, merged into each window's resources rather than into
+11. **Third review (2026-10-30).** Borders of areas, tabs, grids and buttons use the theme's strong
+    stroke (`ControlStrongStrokeColorDefault`, white on dark and black on light) at 55%: the Fluent
+    grey, the same in both themes, made the window read as one block. Grids are closed on all four
+    sides by the rounded Fluent border again (open sides left the header ending in nothing),
+    with horizontal lines only inside. Inactive tabs are grey; the active one is bold and 2 px
+    larger. The shared progress bar becomes a status line, "Updating 2 of 3: LibreOffice" with a
+    thin bar, and the Result column shows the spinner while a row runs. Check for updates is never
+    disabled by a queue (it talks to GitHub and asks `winget --version` under the lock); installing
+    the update still waits. Settings gains **Start with Windows**: a `Run` entry for the user, which
+    is itself the state, off in a development build.
+12. Shared styles live in `Styles.xaml`, merged into each window's resources rather than into
    `App.xaml`, because the window smoke test runs under an `Application` of its own.
 
 ## Consequences

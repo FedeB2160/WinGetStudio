@@ -11,7 +11,7 @@
     <!-- Un'area della finestra: sfondo e bordo delle card di Windows 11. -->
     <Style x:Key="Card" TargetType="Border">
         <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource SurfaceStrokeColorDefaultBrush}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource AreaStrokeBrush}"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="{DynamicResource OverlayCornerRadius}"/>
         <Setter Property="Padding" Value="16"/>
@@ -55,5 +55,11 @@
          vede. Stesse chiavi che il template Fluent legge, ridefinite con colori Fluent piu'
          marcati del tema corrente (le chiavi Color cambiano col tema, ADR 0028). -->
     <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{DynamicResource ControlStrongStrokeColorDisabled}"/>
-    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{DynamicResource SurfaceStrokeColorDefault}"/>
+    <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{DynamicResource ControlStrongStrokeColorDefault}" Opacity="0.85"/>
+
+    <!-- Bordo delle aree (card, riquadro delle schede, linguette, griglie) e dei pulsanti: il tratto
+         forte del tema corrente, bianco nello scuro e nero nel chiaro, al 55%. Quello Fluent, grigio
+         uguale nei due temi, faceva di tutto un blocco unico. -->
+    <SolidColorBrush x:Key="AreaStrokeBrush" Color="{DynamicResource ControlStrongStrokeColorDefault}" Opacity="0.55"/>
+    <SolidColorBrush x:Key="ButtonBorderBrush" Color="{DynamicResource ControlStrongStrokeColorDefault}" Opacity="0.55"/>
 </ResourceDictionary>
