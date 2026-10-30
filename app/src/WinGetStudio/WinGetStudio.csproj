@@ -4,6 +4,8 @@
     <OutputType>WinExe</OutputType>
     <UseWPF>true</UseWPF>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- La versione che il self-update confronta col tag dell'ultima release (ADR 0013). -->
+    <Version>2.0.0</Version>
     <!-- ThemeMode e' ancora sperimentale in .NET 10 (ADR 0027). -->
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
   </PropertyGroup>

@@ -314,5 +314,6 @@ Version 2.0, being written in `app/` (the decisions below apply to 2.0; the ADRs
 - [ADR 0025](docs/adr/0025-winget-backends-cli-then-com.md) — winget through its CLI first (started without `cmd`), then its COM API, unelevated only, for structured reads and per-row progress.
 - [ADR 0026](docs/adr/0026-distribution-runtime-dependent-and-self-contained.md) — Same assets and signing key, so 1.x updates itself to 2.0; runtime-dependent installer, self-contained portable.
 - [ADR 0027](docs/adr/0027-fluent-theme-with-thememode.md) — WPF's Fluent theme through `ThemeMode`, no templates or colours of its own; Mica, accent and high contrast from the theme.
+- [ADR 0029](docs/adr/0029-winget-setup-without-the-winrt-projection.md) — 2.0: winget version from `winget --version` under the lock, Store from the per-user package repository, Add-AppxPackage through Windows PowerShell -EncodedCommand; no WinRT projection.
 
 The rule: **a decision that shapes the architecture gets a new numbered ADR**, written from [docs/adr/TEMPLATE.md](docs/adr/TEMPLATE.md); a superseded or withdrawn ADR is kept and its number never reused. **A spec in `docs\superpowers\specs\` is deleted once it is implemented**, after its decisions have been moved into an ADR.

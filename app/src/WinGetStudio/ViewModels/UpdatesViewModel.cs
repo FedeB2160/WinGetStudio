@@ -95,7 +95,11 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         var pins = await State.Backend.GetPinsAsync();
         Loading = false;
         State.ProgressIndeterminate = false;
-        if (read.Success) Fill(read.Rows, outcomes);
+        // WinGet Studio resta fuori: winget non sovrascrive un exe in esecuzione, quindi spuntarlo
+        // fallirebbe sempre. Ci si aggiorna da Settings (ADR 0013).
+        if (read.Success) Fill(read.Rows.Where(r => !SelfUpdate.IsSelfPackage(r.Id)), outcomes);
+        if (read.Rows.Any(r => SelfUpdate.IsSelfPackage(r.Id)))
+            State.Log.Write("An update for WinGet Studio itself is available: update it from the Settings tab.");
         if (Items.Count == 0)
         {
             // Mai "nessun aggiornamento" quando winget non ha risposto.
