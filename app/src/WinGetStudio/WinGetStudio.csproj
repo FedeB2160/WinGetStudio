@@ -10,6 +10,19 @@
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
   </PropertyGroup>
 
+  <!-- Icona dell'exe e della finestra, e il logo di About: gli stessi file della 1.x (ADR 0017). -->
+  <PropertyGroup>
+    <ApplicationIcon>..\..\..\assets\icon.ico</ApplicationIcon>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="..\..\..\assets\icon\icon-128.png" Link="Assets\icon-128.png" />
+  </ItemGroup>
+
+  <!-- Sfondo pieno di Windows invece di Mica, che prende il colore dallo sfondo del desktop (ADR 0028). -->
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="Switch.System.Windows.Appearance.DisableFluentThemeWindowBackdrop" Value="true" />
+  </ItemGroup>
+
   <ItemGroup>
     <InternalsVisibleTo Include="WinGetStudio.Tests" />
   </ItemGroup>

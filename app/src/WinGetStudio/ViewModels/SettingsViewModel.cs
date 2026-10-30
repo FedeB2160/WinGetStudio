@@ -112,7 +112,28 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] public partial string UpdateWinGetText { get; private set; }
     [ObservableProperty] public partial string? UpdateWinGetToolTip { get; private set; }
 
-    private bool CanCheck() => State.IsIdle && !Checking;
+    // Mai bloccato da una coda: parla con GitHub e chiede winget --version, che il lock mette in
+    // fila. E' l'installazione dell'aggiornamento ad aspettare (IsIdle).
+    private bool CanCheck() => !Checking;
+
+    // Avvio con Windows: la voce Run e' lo stato. Una build di sviluppo non ha un exe da avviare.
+    public bool CanStartWithWindows => _host.ExePath is not null;
+    public string StartWithWindowsHint => CanStartWithWindows ? "" : "Available in the published app, not in a development build.";
+
+    public bool StartWithWindows
+    {
+        get => _host.StartsWithWindows;
+        set
+        {
+            if (!CanStartWithWindows || value == _host.StartsWithWindows) return;
+            try { _host.StartsWithWindows = value; }
+            catch (Exception e) when (e is System.Security.SecurityException or System.IO.IOException or UnauthorizedAccessException)
+            {
+                State.Log.Write($"Could not change Start with Windows: {e.Message}");
+            }
+            OnPropertyChanged();
+        }
+    }
     private bool IsIdle() => State.IsIdle;
 
     private void NotifyCommands()

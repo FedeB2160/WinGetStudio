@@ -45,6 +45,24 @@ public class InstalledViewModelTests
         Assert.Equal(1, h.WinGet.Count("list"));
     }
 
+    // Seleziona tutto spunta solo cio' che il filtro mostra: una riga nascosta non si disinstalla
+    // per sbaglio. I pin non contano: bloccano gli aggiornamenti, non la rimozione.
+    [Fact]
+    public async Task SelectAllTicksOnlyTheRowsTheFilterShows()
+    {
+        using var h = Create([A, B]);
+        var vm = h.Vm.Installed;
+        await vm.LoadAsync();
+        vm.FilterText = "beta";
+        Assert.True(vm.CanCheckAll);
+        vm.AllChecked = true;
+        Assert.Equal([false, true], vm.Items.Select(i => i.Selected));
+        Assert.True(vm.AllChecked);
+
+        vm.FilterText = "";
+        Assert.Null(vm.AllChecked);
+    }
+
     [Fact]
     public async Task FilterMatchesNameOrIdAndTellsAboutHiddenSelections()
     {

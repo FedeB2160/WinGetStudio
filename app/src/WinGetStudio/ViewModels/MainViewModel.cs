@@ -4,11 +4,11 @@ using WinGetStudio.Core;
 
 namespace WinGetStudio.ViewModels;
 
-// La finestra: cinque schede sopra lo stato condiviso, log in fondo.
+// La finestra: tre schede sopra lo stato condiviso, log in fondo; Settings e About in finestre a parte.
 public sealed partial class MainViewModel : ObservableObject
 {
-    // Indici delle schede, nell'ordine della 1.x: Settings e About in fondo.
-    public const int InstallTab = 0, InstalledTab = 1, UpdatesTab = 2, SettingsTab = 3, AboutTab = 4;
+    // Indici delle schede, nell'ordine della 1.x.
+    public const int InstallTab = 0, InstalledTab = 1, UpdatesTab = 2;
 
     private readonly bool _wingetFound;
 
@@ -42,7 +42,6 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (value == UpdatesTab && Updates.Stale) State.Fire(() => Updates.LoadAsync());
         else if (value == InstalledTab && !Installed.Loaded) State.Fire(() => Installed.LoadAsync());
-        else if (value == SettingsTab) Settings.RefreshThemeHint();
     }
 
     // Al primo rendering. Senza winget si propone di installarlo (ADR 0019); con winget la
@@ -59,6 +58,18 @@ public sealed partial class MainViewModel : ObservableObject
         InstalledTab => Installed.LoadAsync(),
         _ => Task.CompletedTask,
     };
+
+    // Modali sopra la finestra (ADR 0028). Il suggerimento del tema si rilegge all'apertura: il
+    // tema di Windows puo' essere cambiato nel frattempo.
+    [RelayCommand]
+    private void OpenSettings()
+    {
+        Settings.RefreshThemeHint();
+        State.Dialogs.ShowSettings(Settings);
+    }
+
+    [RelayCommand]
+    private void OpenAbout() => State.Dialogs.ShowAbout(Settings.VersionText.TrimStart('v'));
 
     [RelayCommand]
     private void SaveLog()

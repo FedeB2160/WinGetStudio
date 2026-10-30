@@ -23,7 +23,12 @@ public partial class App : Application
         // A caldo: ThemeMode ridipinge la finestra senza ricrearla (ADR 0027).
         vm.Settings.ApplyTheme = name => ThemeMode = Theme(name);
         var window = new MainWindow(vm);
-        vm.Settings.CloseRequested += window.Close;
+        // Prima Settings, se e' aperta: la richiesta puo' venire da li'.
+        vm.Settings.CloseRequested += () =>
+        {
+            foreach (var owned in window.OwnedWindows.OfType<Window>().ToList()) owned.Close();
+            window.Close();
+        };
         dialogs.Owner = window;
         // Un errore imprevisto finisce nel log invece di chiudere l'app a meta' di una coda.
         DispatcherUnhandledException += (_, args) =>
