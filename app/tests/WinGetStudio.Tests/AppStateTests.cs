@@ -70,6 +70,16 @@ public class AppStateTests
         // Scansione: spinner, niente barra. Coda: barra.
         Assert.Contains(("upgrade", false, true), shown);
         Assert.Contains(("upgrade", true, false), shown);
+
+        // I dettagli: niente barra, lo spinner nella colonna Result della riga, poi l'esito di prima.
+        var item = h.Vm.Updates.Items[0];
+        item.Status = RowStatus.Error;
+        var during = RowStatus.None;
+        h.WinGet.Before = a => { if (a is ["list", ..]) during = item.Status; shown.Add((a[0], h.State.ShowProgress, false)); return Task.CompletedTask; };
+        await h.State.ShowDetailsAsync(item, installed: true);
+        Assert.Equal(RowStatus.Running, during);
+        Assert.Contains(("list", false, false), shown);
+        Assert.Equal(RowStatus.Error, item.Status);
         Assert.False(h.State.ShowProgress);
         // Accanto alla barra: cosa sta facendo e a che punto, da qualunque scheda.
         Assert.Contains("Updating 1 of 1: App A", text);

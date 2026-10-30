@@ -29,8 +29,10 @@ public partial class MainWindow : Window
         installed.Filter = o => vm.Installed.Matches((PackageItem)o);
         vm.Installed.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(InstalledViewModel.FilterText)) installed.Refresh(); };
 
-        // Angoli arrotondati: il binario del template Fluent e' un rettangolo.
-        Progress.SizeChanged += (_, e) => Progress.Clip = new RectangleGeometry(new Rect(e.NewSize), 5, 5);
+        // Angoli arrotondati a pillola: il binario del template Fluent e' un rettangolo con 1 px di
+        // margine, quindi il ritaglio segue lui e non il controllo.
+        Progress.SizeChanged += (_, e) => Progress.Clip = new RectangleGeometry(
+            new Rect(1, 1, Math.Max(0, e.NewSize.Width - 2), Math.Max(0, e.NewSize.Height - 2)), (e.NewSize.Height - 2) / 2, (e.NewSize.Height - 2) / 2);
 
         // Dopo ogni ridimensionamento a mano (trascinamento o doppio clic sul bordo) le colonne
         // elastiche tornano a '*' nelle proporzioni scelte: i bordi non si spostano e le colonne

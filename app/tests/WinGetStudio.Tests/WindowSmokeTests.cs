@@ -91,6 +91,15 @@ public class WindowSmokeTests
         Assert.Same(w.FindResource("AccentButtonStyle"), buttons[1].Style);
         dialog.Close();
 
+        // I dettagli (testo coi link): il font della finestra e non il serif del FlowDocument,
+        // piu' piccolo e piu' largo del resto.
+        var details = new AppDialog("Name: App A\nHomepage: https://example.com", "App A - details", MessageBoxButton.OK,
+            MessageBoxImage.None, MessageBoxResult.None, null, links: true);
+        var rich = ((StackPanel)details.FindName("DlgBody")).Children.OfType<RichTextBox>().First();
+        Assert.Equal(details.FontFamily, rich.Document.FontFamily);
+        Assert.Equal((12d, 680d), (rich.Document.FontSize, rich.Width));
+        details.Close();
+
         settings.Close();
         w.Close();
         app.Shutdown();

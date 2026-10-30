@@ -214,13 +214,20 @@ public sealed partial class AppState : ObservableObject
     // come gli altri.
     public async Task ShowDetailsAsync(PackageItem? item, bool installed)
     {
+        // Senza la barra condivisa: lo spinner nella colonna Result della riga, poi torna l'esito
+        // che c'era (un errore di prima non si perde aprendo i dettagli).
         if (item is null || !TryBegin()) return;
-        ProgressIndeterminate = true;
         Log.Write($"Reading the details of {item.Name} [{item.Id}]...");
+        var (status, detail) = (item.Status, item.StatusDetail);
+        item.Status = RowStatus.Running;
         string text;
         try { text = await Backend.GetDetailsAsync(item.Id, item.Source, installed); }
         catch (ArgumentException e) { text = e.Message; }
-        finally { End(); }
+        finally
+        {
+            (item.Status, item.StatusDetail) = (status, detail);
+            End();
+        }
         Dialogs.Show(text.Length > 0 ? text : "winget returned no details for this package.", $"{item.Name} - details", links: true);
     }
 }
