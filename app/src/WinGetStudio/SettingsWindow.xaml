@@ -73,6 +73,16 @@
                 <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows}" IsEnabled="{Binding CanStartWithWindows}"
                           ToolTip="Open WinGet Studio when you sign in to Windows (a Run entry for your account only)"/>
                 <TextBlock Style="{StaticResource Note}" Text="{Binding StartWithWindowsHint}"/>
+                <!-- Always start as administrator (ADR 0024): un UAC a ogni apertura. Spenta nel
+                     portable, con la nota che dice perche'. -->
+                <CheckBox Content="Always start as administrator" Margin="0,10,0,0" IsChecked="{Binding StartElevated}" IsEnabled="{Binding CanToggleStartElevated}"
+                          ToolTip="One Windows prompt when WinGet Studio opens, instead of one per installer. Turning it on needs the app running as administrator; turning it off offers to restart now"/>
+                <TextBlock Style="{StaticResource Note}" Text="{Binding StartElevatedHint}"/>
+                <!-- Una tantum (ADR 0024): sparisce da elevata e nel portable, dove la nota dice perche'. -->
+                <Button Style="{StaticResource PageButton}" Padding="11,5,11,6" Margin="0,10,0,0" HorizontalAlignment="Left" Tag="&#xEA18;"
+                        Content="Restart as administrator" Command="{Binding RestartElevatedCommand}"
+                        Visibility="{Binding CanRestartElevated, Converter={StaticResource Visible}}"
+                        ToolTip="Close WinGet Studio and open it again as administrator, after one Windows prompt"/>
             </StackPanel>
         </Border>
 

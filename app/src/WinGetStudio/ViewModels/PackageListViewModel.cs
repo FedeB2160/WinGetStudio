@@ -32,6 +32,35 @@ public abstract partial class PackageListViewModel : ObservableObject
 
     public string RetryText => $"Retry failed ({RetryCount})";
     public bool RetryVisible => RetryCount > 0;
+
+    // Retry as administrator (ADR 0024): mentre il suo batch gira il pulsante diventa Cancel, che
+    // puo' anche smettere di aspettare l'UAC. Solo nella scheda che l'ha avviato.
+    private bool _elevating;
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RetryAdminText), nameof(RetryAdminVisible))]
+    public partial int RetryAdminCount { get; private set; }
+
+    public string RetryAdminText => _elevating ? State.Cancelling ? "Cancelling..." : "Cancel" : $"Retry as administrator ({RetryAdminCount})";
+    public bool RetryAdminVisible => _elevating || RetryAdminCount > 0;
+
+    [RelayCommand(CanExecute = nameof(CanRetryAdmin), AllowConcurrentExecutions = true)]
+    public async Task RetryAdminAsync()
+    {
+        if (_elevating)
+        {
+            State.CancelQueue();
+            return;
+        }
+        _elevating = true;
+        try { await State.RetryElevatedAsync(Items); }
+        finally
+        {
+            _elevating = false;
+            Refresh();
+        }
+    }
+
+    private bool CanRetryAdmin() => _elevating ? !State.Cancelling : State.IsIdle;
     public bool HasItems => Items.Count > 0;
     public bool IsEmpty => Items.Count == 0;
 
@@ -98,9 +127,13 @@ public abstract partial class PackageListViewModel : ObservableObject
         OnPropertyChanged(nameof(AllChecked));
         OnPropertyChanged(nameof(CanCheckAll));
         RetryCount = State.RetryItems(Items).Count;
+        RetryAdminCount = State.ElevateItems(Items).Count;
+        OnPropertyChanged(nameof(RetryAdminText));
+        OnPropertyChanged(nameof(RetryAdminVisible));
         OnPropertyChanged(nameof(HasItems));
         OnPropertyChanged(nameof(IsEmpty));
         RetryCommand.NotifyCanExecuteChanged();
+        RetryAdminCommand.NotifyCanExecuteChanged();
         PinCommand.NotifyCanExecuteChanged();
         UnpinCommand.NotifyCanExecuteChanged();
         DetailsCommand.NotifyCanExecuteChanged();

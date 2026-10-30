@@ -62,6 +62,52 @@ Measured on 2026-10-29 with winget 1.29.380 from an unelevated process (standard
   elevated restart would load them from a user-writable folder. The elevated restart of the portable
   must point the extraction to a protected folder, or be offered only in the installed channel (ADR 0026).
 
+## Note 2026-10-30 — as built in phase 1 (PR 5)
+
+- **One `runas` of `cmd.exe /d /v:off /s /c`** for every row, with a hidden window. Before each step
+  the batch checks a cancel marker file; each step redirects winget's output to files and then
+  writes its exit code with `>"file" call echo %^errorlevel%`. The process handle has one exit code,
+  the last command's, so with several rows **each code comes from its own file** and the handle only
+  says when the batch is over. The redirect goes before `echo`: `echo 3>file` would redirect handle 3.
+- **The app creates the output files before the elevation and holds them open** without
+  `FILE_SHARE_DELETE` until the batch is over, so an unelevated process cannot swap one for a link
+  that the elevated `cmd` would follow. The handle is read-only, because `cmd`'s redirect does not
+  share write access.
+- `cmd` is back in an elevated path, so arguments with `%`, a quote or a control character are refused,
+  as in 1.x (v1.13): `cmd` expands `%VAR%` even between quotes.
+- Retryable as administrator: `0x8A150030`, `0x8A150019`, and `1223`. A declined UAC, or Cancel while
+  the UAC waits, gives every row *Cancelled at the administrator prompt* with exit 1223, so it stays
+  retryable. Cancel stops the wait but cannot close the prompt: `ShellExecuteEx` stays blocked on its
+  thread, and an approval given later finds the marker and runs nothing; the files stay held until
+  that process exits. With the secure desktop the window cannot be clicked while the prompt is up;
+  the case is a prompt left waiting in the taskbar. Cancel during the batch stops the steps not yet
+  started, and their rows keep their earlier outcome.
+- **Point 4 covers only this app's own `runas`.** A UAC raised by an installer through winget is not
+  detected, and its wait cannot be cancelled: the only way to stop it is to kill winget, which
+  ADR 0003 rules out.
+- **Settings has "Always start as administrator"** under Startup (preference `StartElevated`), which
+  goes beyond point 5's one UAC per session, by the user's choice. Each start relaunches the app with
+  `runas` before the window opens; a declined prompt leaves it unelevated. **Start with Windows
+  ignores it**: the `Run` entry passes `--startup`, so no prompt appears at sign-in, and the app
+  started that way is elevated with the button below when needed. **It can be ticked only while the app runs elevated**, so whoever turns it on has
+  already seen the app as administrator; it can always be unticked, or a user who declines the prompt
+  at every start could not turn it off. Unticking it while elevated offers to restart now without
+  rights, with No as the default; No means "from the next start". The restart goes through a scheduled task that starts the exe
+  directly, with no console, and is deleted as soon as the exe has started (deleting the task does
+  not stop the process). **"Restart as administrator"**, a one-off, is a button under the box (hidden
+  once elevated) and an item of the window's system menu. Both are offered only in the installed channel and in a development build. The portable is
+  left out (ADR 0026, point 4): the single-file host extracts the native libraries before any code of
+  the app runs, so the app cannot move them to a protected folder itself, and no protected folder
+  exists that an unelevated process could prepare for it. The test is
+  `ElevationTests.RestartElevatedOnlyWhereNoLibraryIsExtracted`; Settings says why the box is off.
+- **Elevated mode:** a banner names the account; Retry as administrator is not offered. ADR 0018's
+  retry runs through the Task Scheduler COM API (`Schedule.Service`) with the 1.x settings. The
+  other-account check reads the user of this process's session (`WTSQuerySessionInformation`, also
+  over Remote Desktop), where 1.x read the console user from WMI; Install warns once, as in 1.x.
+- **Not verified:** a real UAC (the tests run the same batch without `runas`), and elevation with
+  another account's credentials, where the batch runs as that account with the signed-in user's
+  winget alias and `%TEMP%`.
+
 ## Alternatives considered
 
 1. **Keep `requireAdministrator`** (ADR 0002) — simplest, but keeps every cost listed in the context.

@@ -244,6 +244,8 @@ dotnet run --project app\src\WinGetStudio
 
 The Core tests are the 1.x fixtures of `Test-InvokeWinGet.ps1`, rewritten: no test runs winget (the readers get a fake runner), while the process runner tests start real `cmd.exe` and `ping`. CI runs them in their own `dotnet` job, alongside the PowerShell suites.
 
+The elevated batch of "Retry as administrator" (ADR 0024) runs in the tests without `runas`, so no UAC appears. The unelevated retry through a real scheduled task (ADR 0018) is skipped unless `WINGETSTUDIO_LIVE=1` is set: it opens a console for a moment, and a CI runner has no interactive session to run it in.
+
 ## Knowledge graph
 
 `graphify-out\` holds a knowledge graph of this repository: 361 nodes and 590 edges over the code (extracted from the AST) plus the concepts and rationale from the documentation, grouped into 42 communities. `.graphifyignore` keeps the generated icon PNGs out of it.

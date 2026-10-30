@@ -9,13 +9,17 @@ public static class Autostart
     public const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
     public const string ValueName = "WinGetStudio";
 
-    // Accesa solo se la voce avvia QUESTO exe: quella di un'altra copia vale come spenta.
+    // L'app avviata da Windows lo riceve: ignora "Always start as administrator" (ADR 0024).
+    public const string StartupArgument = "--startup";
+
+    // Accesa solo se la voce avvia QUESTO exe: quella di un'altra copia vale come spenta. Il
+    // percorso e' fra virgolette, gli argomenti dopo.
     public static bool IsOn(string exePath, string key = RunKey)
     {
         try
         {
             using var k = Registry.CurrentUser.OpenSubKey(key);
-            return k?.GetValue(ValueName) is string v && string.Equals(v.Trim('"'), exePath, StringComparison.OrdinalIgnoreCase);
+            return k?.GetValue(ValueName) is string v && string.Equals(v.Split('"', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim(), exePath, StringComparison.OrdinalIgnoreCase);
         }
         catch (Exception e) when (e is System.Security.SecurityException or IOException or UnauthorizedAccessException) { return false; }
     }
@@ -24,7 +28,7 @@ public static class Autostart
     public static void Set(bool on, string exePath, string key = RunKey)
     {
         using var k = Registry.CurrentUser.CreateSubKey(key);
-        if (on) k.SetValue(ValueName, $"\"{exePath}\"", RegistryValueKind.String);
+        if (on) k.SetValue(ValueName, $"\"{exePath}\" {StartupArgument}", RegistryValueKind.String);
         else k.DeleteValue(ValueName, false);
     }
 }

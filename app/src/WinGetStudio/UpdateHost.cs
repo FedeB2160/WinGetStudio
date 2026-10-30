@@ -36,4 +36,8 @@ public sealed class UpdateHost(WinGetCli cli) : IUpdateHost
     public bool StoreUpdatesWinGet() => WinGetSetup.StoreUpdatesWinGet();
     public string? FindWinGet() => WinGetCli.FindWinGet();
     public Task<string?> InstallWinGetAsync(bool register, Action<string> log) => WinGetSetup.InstallAsync(register, log);
+
+    // ProcessPath e non ExePath: anche la build di sviluppo si riavvia (dal suo apphost).
+    public bool RestartElevated() => Elevation.RestartElevated(Environment.ProcessPath!);
+    public Task RestartUnelevatedAsync() => cli.Elevation.StartUnelevatedAsync(Environment.ProcessPath!);
 }

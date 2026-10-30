@@ -101,6 +101,22 @@ internal sealed class FakeUpdateHost : IUpdateHost
     public string? WinGetFoundAfterInstall = @"C:\WindowsApps\winget.exe";
     public string? InstallError;
     public readonly List<bool> Installs = [];
+    public bool RestartApproved = true;
+    public int Restarts;
+
+    public bool RestartElevated()
+    {
+        Restarts++;
+        return RestartApproved;
+    }
+
+    public int UnelevatedRestarts;
+
+    public Task RestartUnelevatedAsync()
+    {
+        UnelevatedRestarts++;
+        return Task.CompletedTask;
+    }
 
     public async Task<Release?> GetLatestReleaseAsync(string repo, string assetName)
     {
@@ -131,6 +147,55 @@ internal sealed class FakeUpdateHost : IUpdateHost
         new(tag, tag.TrimStart('v'), name, $"https://example.invalid/{name}", 2048, sha256);
 }
 
+// Diritti di amministratore finti (ADR 0024): Batches registra ogni runas, Unelevated ogni
+// attivita' non elevata. Approval, se impostato, e' l'UAC che aspetta una risposta: true approvato,
+// false rifiutato; Cancel lo interrompe. Respond risponde ai passi del batch.
+internal sealed class FakeElevation : IElevation
+{
+    public bool IsElevated { get; set; }
+    public bool OtherAccount { get; set; }
+    public string Account { get; set; } = @"PC\admin";
+    public TaskCompletionSource<bool>? Approval;
+    public bool Approved = true;
+    public Func<string[], ProcessResult> Respond = _ => FakeWinGet.Result(0, "");
+    public Func<string[], ProcessResult> RespondUnelevated = _ => FakeWinGet.Result(0, "");
+    public readonly List<string[][]> Batches = [];
+    public readonly List<string[]> Unelevated = [];
+
+    public async Task<ElevatedRun> RunElevatedAsync(string exePath, IReadOnlyList<IReadOnlyList<string>> commands, Action<int, ProcessResult?>? step, CancellationToken cancel)
+    {
+        var notRun = new ElevatedRun(false, [.. commands.Select(_ => (ProcessResult?)null)]);
+        var approved = Approved;
+        if (Approval is not null)
+        {
+            try { approved = await Approval.Task.WaitAsync(cancel); }
+            catch (OperationCanceledException) { return notRun; }
+        }
+        if (!approved) return notRun;
+        var lines = commands.Select(c => c.Where(x => x != "--no-progress").ToArray()).ToArray();
+        Batches.Add(lines);
+        var results = new List<ProcessResult?>();
+        for (var i = 0; i < lines.Length; i++)
+        {
+            if (cancel.IsCancellationRequested) { results.Add(null); continue; }
+            step?.Invoke(i, null);
+            var r = Respond(lines[i]);
+            results.Add(r);
+            step?.Invoke(i, r);
+        }
+        return new ElevatedRun(true, results);
+    }
+
+    public Task<ProcessResult> RunUnelevatedAsync(string exePath, IReadOnlyList<string> arguments, Action<TimeSpan>? tick)
+    {
+        var a = arguments.Where(x => x != "--no-progress").ToArray();
+        Unelevated.Add(a);
+        return Task.FromResult(RespondUnelevated(a));
+    }
+
+    public Task StartUnelevatedAsync(string exePath) => Task.CompletedTask;
+}
+
 // La finestra senza finestra: MainViewModel su winget e dialoghi finti, preferenze in una
 // chiave di registro propria del test, cancellata alla fine.
 internal sealed class Harness : IDisposable
@@ -139,6 +204,7 @@ internal sealed class Harness : IDisposable
     public readonly FakeWinGet WinGet = new();
     public readonly FakeDialogs Dialogs = new();
     public readonly FakeUpdateHost Host = new();
+    public readonly FakeElevation Elevation = new();
     public readonly Preferences Prefs;
     public readonly MainViewModel Vm;
     public bool WinGetFound = true;
@@ -147,7 +213,7 @@ internal sealed class Harness : IDisposable
     {
         Prefs = new Preferences(_key);
         setup?.Invoke(this);
-        Vm = new MainViewModel(new WinGetCli("winget.exe", WinGet), Prefs, Dialogs, Host, WinGetFound);
+        Vm = new MainViewModel(new WinGetCli("winget.exe", WinGet, Elevation), Prefs, Dialogs, Host, WinGetFound);
     }
 
     public AppState State => Vm.State;

@@ -282,6 +282,17 @@
                 <Setter Property="Visibility" Value="{Binding RetryVisible, Converter={StaticResource Visible}}"/>
                 <Setter Property="ToolTip" Value="Run the last operation again on the packages in this list where it failed"/>
             </Style>
+            <!-- Retry as administrator (ADR 0024): solo per i fallimenti che l'elevazione puo' risolvere,
+                 col glifo dello scudo; mentre il suo batch gira e' il Cancel che smette di aspettare l'UAC. -->
+            <Style x:Key="RetryAdmin" TargetType="Button" BasedOn="{StaticResource PageButton}">
+                <Setter Property="Padding" Value="11,5,11,6"/>
+                <Setter Property="Margin" Value="0,0,8,0"/>
+                <Setter Property="Tag" Value="&#xEA18;"/>
+                <Setter Property="Content" Value="{Binding RetryAdminText}"/>
+                <Setter Property="Command" Value="{Binding RetryAdminCommand}"/>
+                <Setter Property="Visibility" Value="{Binding RetryAdminVisible, Converter={StaticResource Visible}}"/>
+                <Setter Property="ToolTip" Value="Run the failed operation again as administrator: one Windows prompt for all of these packages"/>
+            </Style>
             <!-- Pin e Unpin sulle righe EVIDENZIATE, non sulle spuntate: la spunta di una riga con
                  un pin e' spenta, e con le spunte il pin non si toglierebbe piu'. Ognuna compare
                  solo se ha qualcosa da fare (PinMenu_Opened). -->
@@ -299,15 +310,35 @@
     <!-- Schede nello spazio elastico; avanzamento e log fuori, condivisi da tutte. -->
     <Grid Margin="12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="140"/>
         </Grid.RowDefinitions>
 
+        <!-- Riavviata come amministratore (ADR 0024): lo si dice sopra tutto, finche' dura. -->
+        <Border Margin="0,0,0,10" Padding="12,8" CornerRadius="{DynamicResource ControlCornerRadius}" BorderThickness="1"
+                Background="{DynamicResource SystemFillColorCautionBackgroundBrush}" BorderBrush="{DynamicResource AreaStrokeBrush}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding State.ElevatedBanner}" Value="{x:Null}">
+                            <Setter Property="Visibility" Value="Collapsed"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel Orientation="Horizontal">
+                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="16" Text="&#xEA18;" VerticalAlignment="Center"
+                           Foreground="{DynamicResource SystemFillColorCautionBrush}" Margin="0,0,10,0"/>
+                <TextBlock Text="{Binding State.ElevatedBanner}" VerticalAlignment="Center" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
+
         <!-- Settings e About: finestre modali, aperte da qui, a destra della striscia (ADR 0028).
              ZIndex: sopra la striscia delle schede, che a destra e' vuota. -->
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="1">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Panel.ZIndex="1">
             <Button Style="{StaticResource PageButton}" Tag="&#xE713;" Content="Settings" Command="{Binding OpenSettingsCommand}"
                     ToolTip="Theme, tab strip, version and updates"/>
             <Button Style="{StaticResource PageButton}" Tag="&#xE946;" Content="About" Command="{Binding OpenAboutCommand}" Margin="6,0,0,0"
@@ -316,7 +347,7 @@
 
         <!-- Il riquadro delle schede: bordo e sfondo delle card, che il template Fluent usa gia'
              (ADR 0028). -->
-        <TabControl x:Name="TabMain" SelectedIndex="{Binding SelectedTab}" BorderThickness="1"
+        <TabControl x:Name="TabMain" Grid.Row="1" SelectedIndex="{Binding SelectedTab}" BorderThickness="1"
                     BorderBrush="{DynamicResource AreaStrokeBrush}" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}">
             <TabItem Header="Install" Tag="&#xE896;" DataContext="{Binding Install}"
                      AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
@@ -342,7 +373,10 @@
                                       ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"/>
                             <local:Spinner Margin="12,0,0,0" Visibility="{Binding Searching, Converter={StaticResource Visible}}"/>
                         </StackPanel>
-                        <Button Style="{StaticResource Retry}" HorizontalAlignment="Right"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Style="{StaticResource RetryAdmin}"/>
+                            <Button Style="{StaticResource Retry}"/>
+                        </StackPanel>
                     </Grid>
 
                     <DataGrid x:Name="GridSearch" Grid.Row="1" Style="{StaticResource Grid}">
@@ -396,7 +430,10 @@
                             <local:Spinner Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
                             <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding CountText}"/>
                         </StackPanel>
-                        <Button Style="{StaticResource Retry}" HorizontalAlignment="Right"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Style="{StaticResource RetryAdmin}"/>
+                            <Button Style="{StaticResource Retry}"/>
+                        </StackPanel>
                     </Grid>
 
                     <DataGrid x:Name="GridInstalled" Grid.Row="1" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
@@ -441,6 +478,7 @@
                                   ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"/>
                         <local:Spinner DockPanel.Dock="Left" Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
                         <Button DockPanel.Dock="Right" Style="{StaticResource Retry}"/>
+                        <Button DockPanel.Dock="Right" Style="{StaticResource RetryAdmin}"/>
                     </DockPanel>
 
                     <DataGrid x:Name="GridUpdates" Grid.Row="1" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
@@ -470,7 +508,7 @@
         <!-- Riga di stato: cosa sta facendo la coda e a che punto ("Updating 2 of 3: LibreOffice"),
              con una barra sottile, da qualunque scheda. Solo durante una coda o un'operazione lunga
              senza spinner suo (AppState.ShowProgress). Hidden e non Collapsed: il log non salta. -->
-        <DockPanel Grid.Row="1" Margin="2,10,0,6" MinHeight="20">
+        <DockPanel Grid.Row="2" Margin="2,10,0,6" MinHeight="20">
             <DockPanel.Style>
                 <Style TargetType="DockPanel">
                     <Style.Triggers>
@@ -490,9 +528,9 @@
                          AutomationProperties.Name="{Binding State.ProgressText}"/>
         </DockPanel>
 
-        <TextBlock Grid.Row="2" Text="Log" Margin="0,4,0,4" FontWeight="SemiBold"/>
+        <TextBlock Grid.Row="3" Text="Log" Margin="0,4,0,4" FontWeight="SemiBold"/>
         <!-- Il menu proprio sostituisce quello del TextBox: Copy e Select all vanno rimessi. -->
-        <TextBox x:Name="TxtLog" Grid.Row="3" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
+        <TextBox x:Name="TxtLog" Grid.Row="4" IsReadOnly="True" FontFamily="Consolas" FontSize="12"
                  TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
                  VerticalContentAlignment="Top" AutomationProperties.Name="Log">
             <TextBox.ContextMenu>
@@ -506,7 +544,7 @@
         </TextBox>
 
         <!-- Velo sotto un dialogo (ADR 0020): copre tutta la finestra, margine compreso. -->
-        <Border x:Name="DialogDim" Grid.RowSpan="4" Margin="-10" Panel.ZIndex="100" Visibility="Collapsed"
+        <Border x:Name="DialogDim" Grid.RowSpan="5" Margin="-10" Panel.ZIndex="100" Visibility="Collapsed"
                 Background="{DynamicResource SmokeFillColorDefaultBrush}"/>
     </Grid>
 </Window>

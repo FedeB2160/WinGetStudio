@@ -20,6 +20,20 @@ public static class ExitCodes
         1641,       // ERROR_SUCCESS_REBOOT_INITIATED
     ];
 
+    // Da amministratore winget rifiuta i pacchetti per utente: si ripete senza elevazione (ADR 0018).
+    public const int AdminContextProhibited = unchecked((int)0x8A15007D);
+
+    // Fallimenti che l'elevazione puo' risolvere: Retry as administrator (ADR 0024). ERROR_CANCELLED
+    // e' l'UAC rifiutato: la riga resta ripetibile.
+    private static readonly HashSet<uint> NeedAdmin =
+    [
+        0x8A150030, // EXEC_UNINSTALL_COMMAND_FAILED: la disinstallazione per-machine silenziosa senza UAC
+        0x8A150019, // COMMAND_REQUIRES_ADMIN
+        1223,       // ERROR_CANCELLED
+    ];
+
+    public static bool ElevationCanFix(int? code) => code is int c && NeedAdmin.Contains(unchecked((uint)c));
+
     public static OperationStatus Classify(int code) =>
         code == 0 ? OperationStatus.Ok
         : Benign.Contains(unchecked((uint)code)) ? OperationStatus.Warning

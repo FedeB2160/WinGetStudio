@@ -15,6 +15,7 @@ public sealed partial class InstallViewModel : PackageListViewModel
     private bool _includeStore;
     private InstallScope _scope;
     private CancellationTokenSource? _typeahead;
+    private bool _scopeWarned;
 
     public InstallViewModel(AppState state) : base(state)
     {
@@ -160,6 +161,14 @@ public sealed partial class InstallViewModel : PackageListViewModel
     private Task InstallRowsAsync(IReadOnlyList<PackageItem> items)
     {
         var scope = _scope;
+        // Elevata con un altro account i pacchetti per utente vanno nel suo profilo (1.x, ADR 0018):
+        // una volta per sessione, e solo se l'ambito lo permette.
+        if (!_scopeWarned && scope != InstallScope.Machine && State.IsElevated && State.Cli.Elevation.OtherAccount)
+        {
+            _scopeWarned = true;
+            State.Log.Write($"WARNING: running elevated as {State.Cli.Elevation.Account}, not as the signed-in user.");
+            State.Log.Write("         Per-user packages will install into that profile. Use Scope: Machine to install for all users.");
+        }
         return State.RunQueueAsync(new QueueRequest(Core.QueueVerb.Install, [.. items.Select(i => i.Row)], r => WinGetCommands.Install(r, scope)), Items, () =>
         {
             State.MarkUpdatesStale();
