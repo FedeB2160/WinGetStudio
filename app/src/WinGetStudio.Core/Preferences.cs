@@ -16,6 +16,8 @@ public sealed class Preferences(string key = Preferences.DefaultKey)
     public const string IncludeStore = "IncludeStore";
     public const string InstallScope = "InstallScope";     // Auto | User | Machine
     public const string StartElevated = "StartElevated";   // 2.0: ogni avvio chiede l'UAC (ADR 0024)
+    public const string CloseToTray = "CloseToTray";       // 2.0: la X nasconde nell'area di notifica (ADR 0030)
+    public const string CheckInterval = "CheckInterval";   // 2.0: Never | Every hour | Every 6 hours | Every 24 hours
 
     public string GetString(string name, string defaultValue) => Read(name) as string ?? defaultValue;
 

@@ -89,6 +89,21 @@
         </StackPanel>
 
         <StackPanel Grid.Column="2">
+        <!-- Area di notifica (ADR 0030): la X che nasconde e il controllo periodico. -->
+        <TextBlock Text="Notification area" Style="{StaticResource Section}"/>
+        <Border Style="{StaticResource CompactCard}">
+            <StackPanel>
+                <CheckBox Content="Close to tray" IsChecked="{Binding CloseToTray}"
+                          ToolTip="The close button hides the window and WinGet Studio keeps running in the notification area. Close in the icon's menu closes it"/>
+                <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                    <TextBlock Text="Check for package updates" Style="{StaticResource Label}"/>
+                    <ComboBox Width="150" ItemsSource="{Binding CheckIntervals}" SelectedItem="{Binding SelectedCheckInterval}"
+                              AutomationProperties.Name="Check for package updates"
+                              ToolTip="Look for package updates in the background while WinGet Studio runs, never over another winget operation. New updates show a notification when the window is not in front"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
         <TextBlock Text="Updates" Style="{StaticResource Section}"/>
         <Border Style="{StaticResource CompactCard}">
             <Grid>

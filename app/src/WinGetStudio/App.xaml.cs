@@ -32,6 +32,7 @@ public partial class App : Application
         // Prima Settings, se e' aperta: la richiesta puo' venire da li'.
         vm.Settings.CloseRequested += () =>
         {
+            vm.BeginExit();
             foreach (var owned in window.OwnedWindows.OfType<Window>().ToList()) owned.Close();
             window.Close();
         };
@@ -42,7 +43,40 @@ public partial class App : Application
             vm.Log.Write($"ERROR: {args.Exception.Message}");
             args.Handled = true;
         };
-        window.Show();
+
+        // Area di notifica (ADR 0030). Close to tray: la X nasconde; Exit chiude davvero.
+        _tray = new TrayIcon(vm, window, () =>
+        {
+            vm.BeginExit();
+            Shutdown();
+        });
+        window.Closing += (_, args) =>
+        {
+            if (!vm.HidesOnClose) return;
+            args.Cancel = true;
+            window.Hide();
+        };
+        // La fine della sessione di Windows non deve trovare la X che nasconde.
+        SessionEnding += (_, _) => vm.BeginExit();
+        // Una finestra dell'app in primo piano: le notifiche tacciono.
+        // Visibile E attiva: una finestra nascosta col fuoco non mostra nulla all'utente.
+        void Active() => vm.Tray.WindowActive = Windows.OfType<Window>().Any(w => w.IsVisible && w.IsActive);
+        Activated += (_, _) => Active();
+        Deactivated += (_, _) => Active();
+        window.IsVisibleChanged += (_, _) => Active();
+
+        // Da Start with Windows parte nell'area di notifica: la scansione gira lo stesso.
+        if (vm.StartsHidden(e.Args)) vm.State.Fire(vm.StartAsync);
+        else window.Show();
+    }
+
+    private TrayIcon? _tray;
+
+    // Senza, l'icona resta nell'area di notifica finche' il mouse non ci passa sopra.
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _tray?.Dispose();
+        base.OnExit(e);
     }
 
     // La preferenza Theme della 1.x: System | Light | Dark (ADR 0027).

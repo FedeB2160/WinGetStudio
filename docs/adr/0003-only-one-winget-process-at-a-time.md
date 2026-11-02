@@ -3,7 +3,7 @@
 - **Status:** Accepted
 - **Date:** 2026-08-04 (in place since v1.9.0 or earlier; the single choke point, the search counter and cancellation came in v1.10.0)
 - **Depends on:** ADR 0008
-- **Referenced by:** ADR 0004, ADR 0007, ADR 0011 (controls follow the busy state), ADR 0013 (`Start-SelfUpdate` guards), ADR 0016
+- **Referenced by:** ADR 0004, ADR 0007, ADR 0011 (controls follow the busy state), ADR 0013 (`Start-SelfUpdate` guards), ADR 0016, ADR 0030 (periodic check)
 
 ## Context
 
