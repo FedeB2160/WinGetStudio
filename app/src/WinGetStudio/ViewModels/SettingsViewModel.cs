@@ -28,6 +28,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         _tabStyle = TabStyles.Contains(style) ? style : "Icon + Text";
         _checkAtStartup = state.Prefs.GetBool(Preferences.CheckAtStartup, true);
         _startElevated = state.Prefs.GetBool(Preferences.StartElevated, false);
+        _closeToTray = state.Prefs.GetBool(Preferences.CloseToTray, false);
+        var interval = state.Prefs.GetString(Preferences.CheckInterval, "Never");
+        _checkInterval = CheckIntervals.Contains(interval) ? interval : "Never";
         VersionText = $"v{host.AppVersion}";
         UpdateAppText = UpdateWinGetText = UpdateStatus = WinGetStatus = WinGetVersionText = ThemeHint = "";
         RefreshThemeHint();
@@ -87,6 +90,38 @@ public sealed partial class SettingsViewModel : ObservableObject
             OnPropertyChanged(nameof(TabTextVisible));
         }
     }
+
+    // Close to tray (ADR 0030): spenta, la X chiude l'app come sempre.
+    private bool _closeToTray;
+    public bool CloseToTray
+    {
+        get => _closeToTray;
+        set { if (SetProperty(ref _closeToTray, value)) State.Prefs.Set(Preferences.CloseToTray, value); }
+    }
+
+    // Controllo periodico degli aggiornamenti (ADR 0030); Never di default: winget non parte da solo
+    // se non lo si chiede.
+    public IReadOnlyList<string> CheckIntervals { get; } = ["Never", "Every hour", "Every 6 hours", "Every 24 hours"];
+
+    private string _checkInterval;
+    public string SelectedCheckInterval
+    {
+        get => _checkInterval;
+        set
+        {
+            if (value is null || !SetProperty(ref _checkInterval, value)) return;
+            State.Prefs.Set(Preferences.CheckInterval, value);
+            OnPropertyChanged(nameof(CheckEvery));
+        }
+    }
+
+    public TimeSpan? CheckEvery => _checkInterval switch
+    {
+        "Every hour" => TimeSpan.FromHours(1),
+        "Every 6 hours" => TimeSpan.FromHours(6),
+        "Every 24 hours" => TimeSpan.FromHours(24),
+        _ => null,
+    };
 
     public bool TabIconVisible => _tabStyle != "Text";
     public bool TabTextVisible => _tabStyle != "Icon";

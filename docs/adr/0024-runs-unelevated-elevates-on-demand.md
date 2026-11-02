@@ -3,7 +3,7 @@
 - **Status:** Accepted (for 2.0; supersedes ADR 0002 there, the 1.x line keeps ADR 0002)
 - **Date:** 2026-10-29
 - **Depends on:** ADR 0002, ADR 0003, ADR 0018, ADR 0022, ADR 0023
-- **Referenced by:** ADR 0025, ADR 0026
+- **Referenced by:** ADR 0025, ADR 0026, ADR 0030 (`--startup` opens in the tray)
 
 ## Context
 

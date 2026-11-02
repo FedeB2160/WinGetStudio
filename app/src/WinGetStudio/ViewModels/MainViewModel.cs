@@ -24,6 +24,7 @@ public sealed partial class MainViewModel : ObservableObject
         Installed = new InstalledViewModel(State);
         Settings = new SettingsViewModel(State, updates);
         Settings.WinGetInstalled += () => Updates.LoadAsync();
+        Tray = new TrayViewModel(State, Updates);
         // Si apre su Updates: la scansione all'avvio popola proprio questa.
         SelectedTab = UpdatesTab;
     }
@@ -34,6 +35,7 @@ public sealed partial class MainViewModel : ObservableObject
     public InstallViewModel Install { get; }
     public InstalledViewModel Installed { get; }
     public SettingsViewModel Settings { get; }
+    public TrayViewModel Tray { get; }
 
     [ObservableProperty] public partial int SelectedTab { get; set; }
 
@@ -47,9 +49,27 @@ public sealed partial class MainViewModel : ObservableObject
     // Al primo rendering. Senza winget si propone di installarlo (ADR 0019); con winget la
     // scansione e i controlli degli aggiornamenti partono insieme: solo la scansione usa winget
     // prima che i controlli chiedano la sua versione, e il lock li mette in fila.
-    public Task StartAsync() => _wingetFound
-        ? Task.WhenAll(Updates.LoadAsync(), Settings.CheckAsync(manual: false))
-        : Settings.InstallWinGetAsync(missing: true);
+    // Una volta sola: partita nascosta, aprire la finestra dopo non la ripete (ADR 0030).
+    public Task StartAsync()
+    {
+        if (_started) return Task.CompletedTask;
+        _started = true;
+        return _wingetFound
+            ? Task.WhenAll(Updates.LoadAsync(), Settings.CheckAsync(manual: false))
+            : Settings.InstallWinGetAsync(missing: true);
+    }
+
+    private bool _started, _exiting;
+
+    // Start with Windows (--startup) parte nell'area di notifica. Senza winget la finestra serve:
+    // propone di installarlo.
+    public bool StartsHidden(IEnumerable<string> args) => _wingetFound && args.Contains(Autostart.StartupArgument);
+
+    // Close to tray: la X nasconde, salvo quando l'app si sta chiudendo davvero (Exit, un
+    // aggiornamento, la fine della sessione di Windows).
+    public bool HidesOnClose => Settings.CloseToTray && !_exiting;
+
+    public void BeginExit() => _exiting = true;
 
     // F5: la scheda che si sta guardando. Le letture rifiutano gia' di partire sopra un winget.
     public Task RefreshCurrentAsync() => SelectedTab switch

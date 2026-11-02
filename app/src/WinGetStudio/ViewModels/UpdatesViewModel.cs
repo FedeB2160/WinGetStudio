@@ -100,7 +100,11 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         else State.Log.Write($"Found {Items.Count} updates.");
         State.ApplyPins(pins);
         Refresh();
+        Scanned?.Invoke();
     }
+
+    // Fine di ogni scansione, riuscita o no: l'area di notifica decide se annunciarla (ADR 0030).
+    public event Action? Scanned;
 
     // Il pulsante: Update, o Cancel se la coda in corso e' questa.
     public Task UpdateAsync()

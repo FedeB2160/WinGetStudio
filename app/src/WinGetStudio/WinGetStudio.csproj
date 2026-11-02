@@ -3,6 +3,8 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <UseWPF>true</UseWPF>
+    <!-- Solo per NotifyIcon, l'icona nell'area di notifica (ADR 0030). -->
+    <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- La versione che il self-update confronta col tag dell'ultima release (ADR 0013). -->
     <Version>2.0.0</Version>
@@ -16,6 +18,15 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="..\..\..\assets\icon\icon-128.png" Link="Assets\icon-128.png" />
+    <!-- La base dell'icona nell'area di notifica, col pallino disegnato sopra (ADR 0030). -->
+    <Resource Include="..\..\..\assets\icon.ico" Link="Assets\icon.ico" />
+  </ItemGroup>
+
+  <!-- WinForms non entra negli using impliciti: Application, MessageBox e altri nomi
+       si scontrerebbero con quelli di WPF. Chi lo usa lo importa con un alias. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
   </ItemGroup>
 
   <!-- Sfondo pieno di Windows invece di Mica, che prende il colore dallo sfondo del desktop (ADR 0028). -->
