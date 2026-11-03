@@ -75,6 +75,11 @@ public class WindowSmokeTests
         viewer.ScrollToVerticalOffset(5);
         Pump(() => true);
         Assert.Equal(5, bar.Value);
+        // Bordi opachi (sovrapposti non si sommano); linguetta attiva a 2 px, le altre a 1.
+        Assert.Equal(255, ((SolidColorBrush)w.FindResource("AreaStrokeBrush")).Color.A);
+        Assert.Equal(255, ((SolidColorBrush)w.FindResource("TabStrokeInactiveBrush")).Color.A);
+        Assert.Equal([2d, 1d, 1d], tabs.Items.Cast<TabItem>().OrderByDescending(t => t.IsSelected)
+            .Select(t => ((Border)t.Template.FindName("Border", t)).BorderThickness.Top));
         Assert.False(grid.CanUserReorderColumns);
         all.IsChecked = false;
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.

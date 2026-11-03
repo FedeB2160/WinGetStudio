@@ -20,6 +20,21 @@ public partial class MainWindow : Window
         ViewModel = vm;
         DataContext = vm;
         InitializeComponent();
+        // Bordo della linguetta attiva a 2 px come il riquadro, le altre a 1 (ADR 0028). Il template
+        // Fluent lo ha fisso a 1 sul suo Border interno, che non legge BorderThickness: si cambia li'.
+        void TabBorders()
+        {
+            foreach (var tab in TabMain.Items.OfType<TabItem>())
+                if (tab.Template?.FindName("Border", tab) is Border b)
+                    b.BorderThickness = tab.IsSelected ? new Thickness(2, 2, 2, 0) : new Thickness(1, 1, 1, 0);
+        }
+        foreach (var tab in TabMain.Items.OfType<TabItem>()) tab.Loaded += (_, _) => TabBorders();
+        // Solo il cambio di scheda: SelectionChanged sale anche dalle griglie dentro.
+        TabMain.SelectionChanged += (_, e) => { if (e.OriginalSource == TabMain) TabBorders(); };
+
+        // Colori dei bordi opachi, seguendo il tema (le due chiavi Color cambiano con lui).
+        SetResourceReference(StrokeColorProperty, "ControlStrongStrokeColorDefault");
+        SetResourceReference(BaseColorProperty, "SolidBackgroundFillColorBase");
 
         // Il log si aggiunge riga per riga, non si rilega tutto il testo a ogni riga.
         TxtLog.AppendText(vm.Log.Text);
@@ -57,6 +72,33 @@ public partial class MainWindow : Window
     }
 
     public MainViewModel ViewModel { get; }
+
+    // I bordi di riquadro e linguette sono il tratto forte del tema in trasparenza: dove si
+    // sovrappongono (la linguetta attiva sulla riga del riquadro) i colori si sommano e restano
+    // punti chiari. Qui diventano gli stessi colori gia' fusi sullo sfondo della finestra, opachi.
+    private static readonly DependencyProperty StrokeColorProperty = DependencyProperty.Register(
+        "StrokeColor", typeof(Color), typeof(MainWindow), new PropertyMetadata(default(Color), (d, _) => ((MainWindow)d).SolidStrokes()));
+    private static readonly DependencyProperty BaseColorProperty = DependencyProperty.Register(
+        "BaseColor", typeof(Color), typeof(MainWindow), new PropertyMetadata(default(Color), (d, _) => ((MainWindow)d).SolidStrokes()));
+
+    private void SolidStrokes()
+    {
+        var stroke = (Color)GetValue(StrokeColorProperty);
+        var back = (Color)GetValue(BaseColorProperty);
+        if (stroke.A == 0 || back.A == 0) return;
+        SolidColorBrush Blend(double opacity)
+        {
+            var a = stroke.A / 255.0 * opacity;
+            byte Mix(byte s, byte b) => (byte)Math.Round(b + (s - b) * a);
+            var brush = new SolidColorBrush(Color.FromRgb(Mix(stroke.R, back.R), Mix(stroke.G, back.G), Mix(stroke.B, back.B)));
+            brush.Freeze();
+            return brush;
+        }
+        // Stesse opacita' di Styles.xaml (55% le aree e l'attiva, 25% le non attive).
+        Resources["AreaStrokeBrush"] = Blend(0.55);
+        Resources["TabViewSelectedItemBorderBrush"] = Blend(0.55);
+        Resources["TabStrokeInactiveBrush"] = Blend(0.25);
+    }
 
     // Pin solo se fra le righe evidenziate ce n'e' una senza pin, Remove pin solo se ce n'e' una
     // con: una voce che non farebbe nulla non si mostra.
