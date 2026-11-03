@@ -111,12 +111,13 @@
             <SolidColorBrush x:Key="TabViewSelectedItemBorderBrush" Color="{DynamicResource ControlStrongStrokeColorDefault}" Opacity="0.55"/>
             <Style TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
                 <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource Self}}"/>
-                <!-- Ogni linguetta col suo bordo; -1 in basso: copre la riga del riquadro sotto la
-                     selezionata, che ha lo stesso sfondo. Nessun margine orizzontale: TabPanel
-                     dispone le linguette senza contarlo e taglierebbe il bordo destro. Bordo tenue
-                     sulle non attive: l'attiva prende TabViewSelectedItemBorderBrush dal template. -->
+                <!-- Ogni linguetta col suo bordo. Solo la selezionata scende sulla riga del riquadro e
+                     la copre (stesso sfondo, stesso colore del bordo): le altre finiscono sopra, cosi'
+                     i bordi non si sovrappongono. Nessun margine orizzontale: TabPanel dispone le
+                     linguette senza contarlo e taglierebbe il bordo destro. Bordo tenue sulle non
+                     attive: l'attiva prende TabViewSelectedItemBorderBrush dal template. -->
                 <Setter Property="BorderBrush" Value="{DynamicResource TabStrokeInactiveBrush}"/>
-                <Setter Property="Margin" Value="0,0,0,-1"/>
+                <Setter Property="Margin" Value="0"/>
                 <Setter Property="FontSize" Value="{StaticResource BaseFontSize}"/>
                 <Setter Property="HeaderTemplate">
                     <Setter.Value>
@@ -193,6 +194,9 @@
                     </Setter.Value>
                 </Setter>
                 <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Margin" Value="0,0,0,-2"/>
+                    </Trigger>
                     <MultiTrigger>
                         <MultiTrigger.Conditions>
                             <Condition Property="IsMouseOver" Value="True"/>
@@ -365,7 +369,7 @@
 
         <!-- Il riquadro delle schede: bordo e sfondo delle card, che il template Fluent usa gia'
              (ADR 0028). -->
-        <TabControl x:Name="TabMain" Grid.Row="1" SelectedIndex="{Binding SelectedTab}" BorderThickness="1" AlternationCount="3"
+        <TabControl x:Name="TabMain" Grid.Row="1" SelectedIndex="{Binding SelectedTab}" BorderThickness="2" AlternationCount="3"
                     BorderBrush="{DynamicResource AreaStrokeBrush}" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}">
             <TabItem Header="Install" Tag="&#xE896;" DataContext="{Binding Install}"
                      AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">

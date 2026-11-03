@@ -125,6 +125,12 @@ list on all four sides.
     a button at its top collapses it to icons only (names in tooltips), sliding in 150 ms when
     Windows animations are on, not saved between openings. It always opens on Appearance.
     Close sits in a band at the bottom, the same as the dialogs. The view model is unchanged.
+15. **Tab borders (2026-11-03).** The tab area's border and the active tab's are 2 px, the inactive
+    tabs' 1 px (the Fluent tab template fixes its border at 1 px on an inner `Border` that ignores
+    `BorderThickness`, so the code sets it there). The strokes were translucent, and where they
+    overlapped (tab edges on the area's top line) their light added up into bright dots: the main
+    window now uses the same colours already blended on the window background, opaque, recomputed
+    when the theme changes. Inactive tabs end above the area's line; only the active one covers it.
 
 ## Consequences
 
