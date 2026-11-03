@@ -5,7 +5,7 @@
         xmlns:local="clr-namespace:WinGetStudio"
         Title="WinGet Studio"
         Width="900" Height="620" MinWidth="760" MinHeight="520"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen" FontSize="{DynamicResource BaseFontSize}">
     <!-- Solo il tema Fluent (ADR 0027): nessun template ne' colore proprio. Le risorse qui sotto
          danno significato (esito, pin) con chiavi Fluent, mai un colore. -->
     <Window.Resources>
@@ -33,7 +33,7 @@
                  In un template e non come Header diretto: un controllo messo li' viene legato
                  prima di entrare nell'albero e non trova la griglia. -->
             <DataTemplate x:Key="SelectAllHeader">
-                <!-- 6 px a destra: l'intestazione Fluent tiene a destra lo spazio della freccia di
+                <!-- 7 px a destra: l'intestazione Fluent tiene a destra lo spazio della freccia di
                      ordinamento anche nascosta, e la spunta finiva a sinistra di quelle sotto. Un
                      margine non ci sta nella colonna stretta: si sposta solo il disegno. -->
                 <CheckBox Style="{StaticResource RowCheck}" AutomationProperties.Name="Select all"
@@ -41,7 +41,7 @@
                           IsChecked="{Binding DataContext.AllChecked, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                           IsEnabled="{Binding DataContext.CanCheckAll, RelativeSource={RelativeSource AncestorType=DataGrid}}">
                     <CheckBox.RenderTransform>
-                        <TranslateTransform X="6"/>
+                        <TranslateTransform X="7"/>
                     </CheckBox.RenderTransform>
                 </CheckBox>
             </DataTemplate>
@@ -113,31 +113,32 @@
                 <Setter Property="AutomationProperties.Name" Value="{Binding Header, RelativeSource={RelativeSource Self}}"/>
                 <!-- Ogni linguetta col suo bordo; -1 in basso: copre la riga del riquadro sotto la
                      selezionata, che ha lo stesso sfondo. Nessun margine orizzontale: TabPanel
-                     dispone le linguette senza contarlo e taglierebbe il bordo destro. -->
-                <Setter Property="BorderBrush" Value="{DynamicResource AreaStrokeBrush}"/>
+                     dispone le linguette senza contarlo e taglierebbe il bordo destro. Bordo tenue
+                     sulle non attive: l'attiva prende TabViewSelectedItemBorderBrush dal template. -->
+                <Setter Property="BorderBrush" Value="{DynamicResource TabStrokeInactiveBrush}"/>
                 <Setter Property="Margin" Value="0,0,0,-1"/>
-                <Setter Property="FontSize" Value="{StaticResource ListFontSize}"/>
+                <Setter Property="FontSize" Value="{StaticResource BaseFontSize}"/>
                 <Setter Property="HeaderTemplate">
                     <Setter.Value>
                         <DataTemplate>
                             <!-- Il padding Fluent della linguetta e' fisso a 6 px nel template: il
-                                 resto dello spazio attorno al nome sta qui. Non attive in grigio,
-                                 l'attiva in grassetto pieno (piu' grande scendeva sotto l'icona): qui e non sulla TabItem,
+                                 resto dello spazio attorno al nome sta qui. Non attive spente
+                                 (testo terziario, bordo tenue), l'attiva in SemiBold (piu' grande scendeva sotto l'icona): qui e non sulla TabItem,
                                  da cui passerebbero al contenuto della scheda. -->
                             <Grid>
                             <StackPanel Orientation="Horizontal" Margin="6,0">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
-                                        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
-                                                <Setter Property="TextElement.FontWeight" Value="Bold"/>
+                                                <Setter Property="TextElement.FontWeight" Value="SemiBold"/>
                                                 <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </StackPanel.Style>
-                                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center"
+                                <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center"
                                            Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=TabItem}}" ToolTip="{Binding}"
                                            Visibility="{Binding DataContext.Settings.TabIconVisible, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource Visible}}">
                                     <TextBlock.Style>
@@ -199,6 +200,20 @@
                         </MultiTrigger.Conditions>
                         <Setter Property="Background" Value="{DynamicResource ButtonBackgroundPointerOver}"/>
                     </MultiTrigger>
+                    <!-- 2 px fra una linguetta e l'altra (attaccate, gli angoli arrotondati vicini
+                         facevano una V): il margine TabPanel non lo conta, si sposta solo il disegno
+                         della seconda e della terza. AlternationCount="3" sul TabControl.
+                         shortcut: vale per tre linguette, una quarta va aggiunta qui. -->
+                    <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                        <Setter Property="RenderTransform">
+                            <Setter.Value><TranslateTransform X="2"/></Setter.Value>
+                        </Setter>
+                    </Trigger>
+                    <Trigger Property="ItemsControl.AlternationIndex" Value="2">
+                        <Setter Property="RenderTransform">
+                            <Setter.Value><TranslateTransform X="4"/></Setter.Value>
+                        </Setter>
+                    </Trigger>
                 </Style.Triggers>
             </Style>
     
@@ -222,7 +237,7 @@
                 <Setter Property="SelectionMode" Value="Extended"/>
                 <!-- Righe piu' basse di quelle Fluent (32 px): a finestra di default si vedono quasi
                      tante righe quante nella 1.x (ADR 0027, punto 5). Testo centrato come la spunta. -->
-                <Setter Property="RowHeight" Value="28"/>
+                <Setter Property="RowHeight" Value="{StaticResource ListRowHeight}"/>
                 <Setter Property="CellStyle">
                     <Setter.Value>
                         <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
@@ -244,7 +259,7 @@
                     </Setter.Value>
                 </Setter>
                 <Setter Property="SelectionUnit" Value="FullRow"/>
-                <Setter Property="FontSize" Value="{StaticResource ListFontSize}"/>
+                <Setter Property="FontSize" Value="{StaticResource BaseFontSize}"/>
                 <!-- Chiusa sui quattro lati col bordo arrotondato del template Fluent: aperta ai lati,
                      l'intestazione finiva nel nulla (ADR 0028). Sfondo trasparente e solo le righe
                      orizzontali: il contenuto resta libero. -->
@@ -255,6 +270,8 @@
                 <!-- Ancorata ai due lati: allargare una colonna stringe le altre a '*', non spinge
                      la griglia oltre il bordo con una barra orizzontale. -->
                 <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+                <!-- La verticale la disegna la ScrollBar accanto alla griglia: qui solo rotellina e tastiera. -->
+                <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Hidden"/>
                 <Setter Property="ItemsSource" Value="{Binding Items}"/>
                 <Setter Property="Visibility" Value="{Binding HasItems, Converter={StaticResource Visible}}"/>
             </Style>
@@ -264,6 +281,7 @@
                 <Setter Property="HorizontalContentAlignment" Value="Center"/>
                 <!-- Niente separatori verticali: come le righe, solo linee orizzontali. -->
                 <Setter Property="SeparatorVisibility" Value="Collapsed"/>
+                <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
                 <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
                      rispetto a quelle delle righe. Centrati, i titoli non ne hanno bisogno. -->
                 <Setter Property="Padding" Value="0"/>
@@ -347,7 +365,7 @@
 
         <!-- Il riquadro delle schede: bordo e sfondo delle card, che il template Fluent usa gia'
              (ADR 0028). -->
-        <TabControl x:Name="TabMain" Grid.Row="1" SelectedIndex="{Binding SelectedTab}" BorderThickness="1"
+        <TabControl x:Name="TabMain" Grid.Row="1" SelectedIndex="{Binding SelectedTab}" BorderThickness="1" AlternationCount="3"
                     BorderBrush="{DynamicResource AreaStrokeBrush}" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}">
             <TabItem Header="Install" Tag="&#xE896;" DataContext="{Binding Install}"
                      AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
@@ -379,28 +397,37 @@
                         </StackPanel>
                     </Grid>
 
-                    <DataGrid x:Name="GridSearch" Grid.Row="1" Style="{StaticResource Grid}">
-                        <!-- Doppio clic: installa quel pacchetto, senza passare dalle spunte. -->
-                        <DataGrid.InputBindings>
-                            <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding InstallOneCommand}"
-                                          CommandParameter="{Binding SelectedItem, ElementName=GridSearch}"/>
-                        </DataGrid.InputBindings>
-                        <DataGrid.ContextMenu>
-                            <ContextMenu>
-                                <MenuItem Header="Details of highlighted package" Command="{Binding DetailsCommand}"
-                                          CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
-                            </ContextMenu>
-                        </DataGrid.ContextMenu>
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="44" CanUserResize="False" HeaderTemplate="{StaticResource SelectAllHeader}" CellTemplate="{StaticResource SelectCell}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Name" Width="2*" Binding="{Binding Name}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Version" Width="1.2*" Binding="{Binding Version}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Id" Width="2.4*" Binding="{Binding Id}"/>
-                            <!-- Con MS Store i risultati vengono da due sorgenti: l'installazione usa quella della riga. -->
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Source" Width="90" Binding="{Binding Source}"/>
-                            <DataGridTemplateColumn Header="Result" Width="80" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <!-- La barra di scorrimento sta fuori dalla griglia, in uno spazio sempre riservato:
+                         le colonne non si spostano quando compare (AttachScrollBar nel codice). -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <DataGrid x:Name="GridSearch" Style="{StaticResource Grid}">
+                            <!-- Doppio clic: installa quel pacchetto, senza passare dalle spunte. -->
+                            <DataGrid.InputBindings>
+                                <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding InstallOneCommand}"
+                                              CommandParameter="{Binding SelectedItem, ElementName=GridSearch}"/>
+                            </DataGrid.InputBindings>
+                            <DataGrid.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Details of highlighted package" Command="{Binding DetailsCommand}"
+                                              CommandParameter="{Binding PlacementTarget.SelectedItem, RelativeSource={RelativeSource AncestorType=ContextMenu}}"/>
+                                </ContextMenu>
+                            </DataGrid.ContextMenu>
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Width="44" CanUserResize="False" HeaderTemplate="{StaticResource SelectAllHeader}" CellTemplate="{StaticResource SelectCell}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package Name" Width="2*" Binding="{Binding Name}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package ID" Width="2.4*" Binding="{Binding Id}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Version" Width="1.2*" Binding="{Binding Version}"/>
+                                <!-- Con MS Store i risultati vengono da due sorgenti: l'installazione usa quella della riga. -->
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Source" Width="90" Binding="{Binding Source}"/>
+                                <DataGridTemplateColumn Header="Result" Width="56" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <ScrollBar x:Name="BarSearch" Grid.Column="1" Margin="4,0,0,0" Visibility="Hidden"/>
+                    </Grid>
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding Message}"/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">
@@ -436,18 +463,25 @@
                         </StackPanel>
                     </Grid>
 
-                    <DataGrid x:Name="GridInstalled" Grid.Row="1" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
-                        <DataGrid.Columns>
-                            <!-- Qui la spunta resta attiva sui pinnati: il pin blocca gli
-                                 aggiornamenti, non la disinstallazione. -->
-                            <DataGridTemplateColumn Width="44" CanUserResize="False" HeaderTemplate="{StaticResource SelectAllHeader}" CellTemplate="{StaticResource SelectCell}"/>
-                            <DataGridTemplateColumn Header="Pin" Width="48" CanUserResize="False" CellTemplate="{StaticResource PinCell}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Name" Width="2*" Binding="{Binding Name}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Version" Width="1.2*" Binding="{Binding Version}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Id" Width="2.4*" Binding="{Binding Id}"/>
-                            <DataGridTemplateColumn Header="Result" Width="80" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <DataGrid x:Name="GridInstalled" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
+                            <DataGrid.Columns>
+                                <!-- Qui la spunta resta attiva sui pinnati: il pin blocca gli
+                                     aggiornamenti, non la disinstallazione. -->
+                                <DataGridTemplateColumn Width="44" CanUserResize="False" HeaderTemplate="{StaticResource SelectAllHeader}" CellTemplate="{StaticResource SelectCell}"/>
+                                <DataGridTemplateColumn Header="Pin" Width="48" CanUserResize="False" CellTemplate="{StaticResource PinCell}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package Name" Width="2*" Binding="{Binding Name}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package ID" Width="2.4*" Binding="{Binding Id}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Version" Width="1.2*" Binding="{Binding Version}"/>
+                                <DataGridTemplateColumn Header="Result" Width="56" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <ScrollBar x:Name="BarInstalled" Grid.Column="1" Margin="4,0,0,0" Visibility="Hidden"/>
+                    </Grid>
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding EmptyText}"/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">
@@ -481,17 +515,24 @@
                         <Button DockPanel.Dock="Right" Style="{StaticResource RetryAdmin}"/>
                     </DockPanel>
 
-                    <DataGrid x:Name="GridUpdates" Grid.Row="1" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
-                        <DataGrid.Columns>
-                            <DataGridTemplateColumn Width="44" CanUserResize="False" HeaderTemplate="{StaticResource SelectAllHeader}" CellTemplate="{StaticResource SelectUnpinnedCell}"/>
-                            <DataGridTemplateColumn Header="Pin" Width="48" CanUserResize="False" CellTemplate="{StaticResource PinCell}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Name" Width="2*" Binding="{Binding Name}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Installed version" Width="1.2*" Binding="{Binding Version}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Available version" Width="1.2*" Binding="{Binding Available}"/>
-                            <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Id" Width="2*" Binding="{Binding Id}"/>
-                            <DataGridTemplateColumn Header="Result" Width="80" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <DataGrid x:Name="GridUpdates" Style="{StaticResource Grid}" ContextMenu="{StaticResource PinMenu}">
+                            <DataGrid.Columns>
+                                <DataGridTemplateColumn Width="44" CanUserResize="False" HeaderTemplate="{StaticResource SelectAllHeader}" CellTemplate="{StaticResource SelectUnpinnedCell}"/>
+                                <DataGridTemplateColumn Header="Pin" Width="48" CanUserResize="False" CellTemplate="{StaticResource PinCell}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package Name" Width="2*" Binding="{Binding Name}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package ID" Width="2*" Binding="{Binding Id}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Installed Version" Width="1.2*" Binding="{Binding Version}"/>
+                                <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Available Version" Width="1.2*" Binding="{Binding Available}"/>
+                                <DataGridTemplateColumn Header="Result" Width="56" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                        <ScrollBar x:Name="BarUpdates" Grid.Column="1" Margin="4,0,0,0" Visibility="Hidden"/>
+                    </Grid>
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding EmptyText}"/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">

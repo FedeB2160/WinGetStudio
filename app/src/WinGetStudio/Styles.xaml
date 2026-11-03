@@ -5,8 +5,13 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:sys="clr-namespace:System;assembly=System.Runtime">
     <BooleanToVisibilityConverter x:Key="Visible"/>
-    <!-- Testo delle griglie e delle linguette: un punto sotto i 14 di Fluent, piu' righe a vista. -->
-    <sys:Double x:Key="ListFontSize">13</sys:Double>
+    <!-- Testo di tutte le finestre (FontSize della Window, ereditato): uno solo, non i 14 di
+         Fluent in alcune e un altro valore nelle schede. Intestazioni di colonna e note allo stesso
+         valore (CaptionFontSize, per poterle separare); i titoli di sezione un gradino sopra. -->
+    <sys:Double x:Key="BaseFontSize">12</sys:Double>
+    <sys:Double x:Key="CaptionFontSize">12</sys:Double>
+    <sys:Double x:Key="SectionFontSize">14</sys:Double>
+    <sys:Double x:Key="ListRowHeight">28</sys:Double>
 
     <!-- Un'area della finestra: sfondo e bordo delle card di Windows 11. -->
     <Style x:Key="Card" TargetType="Border">
@@ -17,7 +22,7 @@
         <Setter Property="Padding" Value="16"/>
     </Style>
     <Style x:Key="SectionHeader" TargetType="TextBlock">
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontSize" Value="{StaticResource SectionFontSize}"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Margin" Value="2,0,0,8"/>
     </Style>
@@ -26,6 +31,7 @@
         <Setter Property="Margin" Value="0,0,16,0"/>
     </Style>
     <Style x:Key="Subtle" TargetType="TextBlock">
+        <Setter Property="LineHeight" Value="18"/>
         <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
         <Setter Property="TextWrapping" Value="Wrap"/>
     </Style>
@@ -42,7 +48,7 @@
             <Setter.Value>
                 <DataTemplate>
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14" VerticalAlignment="Center" Margin="0,0,8,0"
+                        <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"
                                    Text="{Binding Tag, RelativeSource={RelativeSource AncestorType=Button}}"/>
                         <TextBlock Text="{Binding}" VerticalAlignment="Center"/>
                     </StackPanel>
@@ -62,4 +68,6 @@
          uguale nei due temi, faceva di tutto un blocco unico. -->
     <SolidColorBrush x:Key="AreaStrokeBrush" Color="{DynamicResource ControlStrongStrokeColorDefault}" Opacity="0.55"/>
     <SolidColorBrush x:Key="ButtonBorderBrush" Color="{DynamicResource ControlStrongStrokeColorDefault}" Opacity="0.55"/>
+    <!-- Linguette non attive: lo stesso tratto, spento. -->
+    <SolidColorBrush x:Key="TabStrokeInactiveBrush" Color="{DynamicResource ControlStrongStrokeColorDefault}" Opacity="0.25"/>
 </ResourceDictionary>

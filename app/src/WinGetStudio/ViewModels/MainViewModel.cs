@@ -79,14 +79,9 @@ public sealed partial class MainViewModel : ObservableObject
         _ => Task.CompletedTask,
     };
 
-    // Modali sopra la finestra (ADR 0028). Il suggerimento del tema si rilegge all'apertura: il
-    // tema di Windows puo' essere cambiato nel frattempo.
+    // Modali sopra la finestra (ADR 0028).
     [RelayCommand]
-    private void OpenSettings()
-    {
-        Settings.RefreshThemeHint();
-        State.Dialogs.ShowSettings(Settings);
-    }
+    private void OpenSettings() => State.Dialogs.ShowSettings(Settings);
 
     [RelayCommand]
     private void OpenAbout() => State.Dialogs.ShowAbout(Settings.VersionText.TrimStart('v'));

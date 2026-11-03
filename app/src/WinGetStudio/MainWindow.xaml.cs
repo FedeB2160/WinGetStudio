@@ -42,6 +42,10 @@ public partial class MainWindow : Window
         AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, e) => RefitColumns(e.OriginalSource)), true);
         AddHandler(Control.MouseDoubleClickEvent, new MouseButtonEventHandler((_, e) => RefitColumns(e.OriginalSource)), true);
 
+        AttachScrollBar(GridSearch, BarSearch);
+        AttachScrollBar(GridInstalled, BarInstalled);
+        AttachScrollBar(GridUpdates, BarUpdates);
+
         SourceInitialized += (_, _) => AddRestartToSystemMenu();
 
         ContentRendered += async (_, _) =>
@@ -83,8 +87,85 @@ public partial class MainWindow : Window
 
     internal static void Refit(DataGrid grid)
     {
-        foreach (var c in grid.Columns.Where(c => c.CanUserResize))
+        var flexible = grid.Columns.Where(c => c.CanUserResize).ToList();
+        // Le fisse contano per la larghezza dichiarata: schiacciate, anche loro scendono a 20 px.
+        var room = Descendants<ScrollViewer>(grid).FirstOrDefault()?.ViewportWidth
+            - grid.Columns.Where(c => !c.CanUserResize).Sum(c => c.Width.IsAbsolute ? c.Width.Value : c.ActualWidth);
+        // Doppio clic sul bordo: la colonna va ad Auto e, se non ci sta, il DataGrid schiaccia le
+        // altre ai suoi 20 px minimi. Salvate cosi' come proporzioni, restavano schiacciate.
+        if (flexible.Where(c => !c.Width.IsStar).ToList() is [var grown] && room > 0
+            && (grown.Width.IsAuto || flexible.Sum(c => c.ActualWidth) > room + 0.5))
+        {
+            FitAround(grid, grown, flexible.Where(c => c != grown).ToList(), room.Value);
+            return;
+        }
+        foreach (var c in flexible)
             c.Width = new DataGridLength(Math.Max(c.ActualWidth, c.MinWidth), DataGridLengthUnitType.Star);
+    }
+
+    // La colonna allargata tiene la sua larghezza; le altre si dividono il resto coi loro pesi '*',
+    // ma nessuna sotto il proprio titolo. Se nemmeno cosi' ci sta, si accorcia quella allargata.
+    private static void FitAround(DataGrid grid, DataGridColumn grown, List<DataGridColumn> others, double room)
+    {
+        var floor = others.ToDictionary(c => c, c => HeaderWidth(grid, c));
+        var width = Math.Max(grown.MinWidth, Math.Min(grown.ActualWidth, room - floor.Values.Sum()));
+        var share = new Dictionary<DataGridColumn, double>();
+        var free = others.ToList();
+        var rest = room - width;
+        // Chi scenderebbe sotto il titolo si ferma li'; il resto si ridivide fra gli altri.
+        while (free.Count > 0)
+        {
+            var weights = free.Sum(c => c.Width.Value);
+            var below = free.Where(c => rest * c.Width.Value / weights < floor[c]).ToList();
+            if (below.Count == 0) { foreach (var c in free) share[c] = rest * c.Width.Value / weights; break; }
+            foreach (var c in below) { share[c] = floor[c]; rest -= floor[c]; free.Remove(c); }
+        }
+        grown.Width = new DataGridLength(width, DataGridLengthUnitType.Star);
+        foreach (var c in others) c.Width = new DataGridLength(share[c], DataGridLengthUnitType.Star);
+    }
+
+    // Larghezza che il titolo chiede senza vincoli: lo spazio della freccia di ordinamento compreso.
+    private static double HeaderWidth(DataGrid grid, DataGridColumn column)
+    {
+        if (Descendants<DataGridColumnHeader>(grid).FirstOrDefault(h => h.Column == column) is not { } header) return column.MinWidth;
+        header.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        return Math.Max(header.DesiredSize.Width, column.MinWidth);
+    }
+
+    // La barra accanto alla griglia segue lo ScrollViewer del DataGrid (la sua e' nascosta) e lo
+    // muove. Nascosta e non Collapsed quando non serve: il suo spazio resta, le colonne stanno ferme.
+    private static void AttachScrollBar(DataGrid grid, ScrollBar bar)
+    {
+        ScrollViewer? attached = null;
+        grid.Loaded += (_, _) =>
+        {
+            // Loaded torna a ogni cambio di scheda: lo ScrollViewer si aggancia una volta sola. Senza
+            // righe la griglia e' Collapsed e il template non c'e' ancora: lo si applica qui.
+            grid.ApplyTemplate();
+            if (Descendants<ScrollViewer>(grid).FirstOrDefault() is not { } sv || sv == attached) return;
+            attached = sv;
+            void Sync()
+            {
+                bar.Maximum = sv.ScrollableHeight;
+                bar.ViewportSize = sv.ViewportHeight;
+                bar.LargeChange = Math.Max(1, sv.ViewportHeight);
+                bar.Value = sv.VerticalOffset;
+                bar.Visibility = sv.ScrollableHeight > 0 ? Visibility.Visible : Visibility.Hidden;
+            }
+            sv.ScrollChanged += (_, _) => Sync();
+            bar.Scroll += (_, e) => sv.ScrollToVerticalOffset(e.NewValue);
+            Sync();
+        };
+    }
+
+    private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
+    {
+        for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            var c = VisualTreeHelper.GetChild(parent, i);
+            if (c is T t) yield return t;
+            foreach (var d in Descendants<T>(c)) yield return d;
+        }
     }
 
     private static T? FindAncestor<T>(DependencyObject d) where T : DependencyObject

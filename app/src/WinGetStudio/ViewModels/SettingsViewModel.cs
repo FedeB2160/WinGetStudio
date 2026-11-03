@@ -1,7 +1,6 @@
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Microsoft.Win32;
 using WinGetStudio.Core;
 
 namespace WinGetStudio.ViewModels;
@@ -32,8 +31,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         var interval = state.Prefs.GetString(Preferences.CheckInterval, "Never");
         _checkInterval = CheckIntervals.Contains(interval) ? interval : "Never";
         VersionText = $"v{host.AppVersion}";
-        UpdateAppText = UpdateWinGetText = UpdateStatus = WinGetStatus = WinGetVersionText = ThemeHint = "";
-        RefreshThemeHint();
+        UpdateAppText = UpdateWinGetText = UpdateStatus = WinGetStatus = WinGetVersionText = "";
         state.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(AppState.IsBusy)) NotifyCommands(); };
     }
 
@@ -57,25 +55,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             if (value is null || !SetProperty(ref _theme, value)) return;
             State.Prefs.Set(Preferences.Theme, value);
             ApplyTheme?.Invoke(value);
-            RefreshThemeHint();
         }
-    }
-
-    // In System si dice quale dei due temi sta seguendo, altrimenti la scelta non spiega cosa si
-    // vede a schermo.
-    [ObservableProperty] public partial string ThemeHint { get; private set; }
-
-    public void RefreshThemeHint() => ThemeHint = _theme == "System" ? $"following the system: {(SystemIsDark() ? "dark" : "light")}" : "";
-
-    // AppsUseLightTheme = 0: scuro. Assente: chiaro.
-    private static bool SystemIsDark()
-    {
-        try
-        {
-            using var k = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-            return k?.GetValue("AppsUseLightTheme") is 0;
-        }
-        catch (Exception e) when (e is System.Security.SecurityException or System.IO.IOException or UnauthorizedAccessException) { return false; }
     }
 
     private string _tabStyle;

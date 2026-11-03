@@ -97,6 +97,24 @@ list on all four sides.
     is itself the state, off in a development build.
 12. Shared styles live in `Styles.xaml`, merged into each window's resources rather than into
    `App.xaml`, because the window smoke test runs under an `Application` of its own.
+13. **Fourth review (2026-11-03), after a measured comparison with 1.12.** The text sizes come from
+    one place: every window (main, Settings, About, dialogs) sets `FontSize` from `BaseFontSize`
+    (12, as 1.x and the Windows list views), instead of Fluent's 14 in some windows and 13 inside
+    the tabs. Column headers and notes use `CaptionFontSize` (12), section titles `SectionFontSize`
+    (14, semi-bold), the empty-list message 16, the About title 20; text is regular weight, titles
+    semi-bold, the active tab semi-bold rather than bold. Grid rows are 28 px (`ListRowHeight`): at
+    24 the row check box was clipped. Column titles are in Title Case ("Package Name", "Package
+    ID", "Installed Version"), and the ID column follows the name. Result is 56 px wide, the
+    title's own width plus a margin. The vertical scroll bar sits outside the grid's border, in a
+    column always reserved for it, so the columns do not move when it appears; the grid's own bar
+    is hidden and wheel and keys still scroll it. A double click on a header edge (auto-fit) no
+    longer ruins the grid: when the widened column does not fit, the others share the rest by
+    their `*` weights, none below its title's width (the Fluent DataGrid had squeezed them, fixed
+    columns included, to 20 px, and the refit saved that). Tabs stand 2 px apart (attached, the
+    rounded corners met in a V; `TabPanel` ignores margins, so only the drawing is shifted);
+    inactive tabs have a fainter border (25%) and tertiary text. Dialogs separate the buttons in a
+    band with its own background and a line above, as 1.x did. The theme hint ("following the
+    system: dark") is gone: it was clipped and the theme in use is on screen anyway.
 
 ## Consequences
 

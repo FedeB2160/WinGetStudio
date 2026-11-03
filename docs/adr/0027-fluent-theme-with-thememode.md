@@ -38,6 +38,8 @@ A prototype of the 1.x layout on .NET 10 (2026-10-29), with no template or colou
    on confirmations.
 5. **Column headers in sentence case** ("Installed version"), as Windows 11 writes them; row height and
    column widths set while porting, so that the Updates list shows as many rows as 1.x at the default size.
+   *2026-11-03: headers are in Title Case by the user's choice, and text sizes, row height and the
+   Result width changed; see ADR 0028, point 13.*
 6. **Mica, the Windows accent and high contrast come from the theme.** They are checked by hand before
    release (high contrast and accent changes need Windows settings); Windows 10 gets an opaque background.
 

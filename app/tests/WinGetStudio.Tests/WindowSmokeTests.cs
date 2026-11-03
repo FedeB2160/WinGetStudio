@@ -30,14 +30,16 @@ public class WindowSmokeTests
     public void WindowOpensLoadsAndSwitchesTheme() => RunSta(() =>
     {
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown, ThemeMode = ThemeMode.Light };
+        // Piu' righe di quante ne stanno: la barra di scorrimento serve.
+        var rows = Enumerable.Range(0, 30).Select(i => new PackageRow(i == 0 ? "App A" : $"App {i}", i == 0 ? "A.A" : $"A.{i}", "1.0", "2.0")).ToArray();
         using var h = new Harness(h => h.WinGet.Respond = a => FakeWinGet.Result(0,
-            a[0] == "upgrade" ? FakeWinGet.Upgrades(new PackageRow("App A", "A.A", "1.0", "2.0")) : ""));
+            a[0] == "upgrade" ? FakeWinGet.Upgrades(rows) : ""));
         var w = new MainWindow(h.Vm)
         {
             ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000,
         };
         w.Show();
-        Pump(() => !h.State.IsBusy && h.Vm.Updates.Items.Count == 1);
+        Pump(() => !h.State.IsBusy && h.Vm.Updates.Items.Count == rows.Length);
 
         var tabs = (TabControl)w.FindName("TabMain");
         Assert.Equal(["Install", "Installed", "Updates"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
@@ -51,17 +53,28 @@ public class WindowSmokeTests
         all.IsChecked = true;
         Assert.True(h.Vm.Updates.Items[0].Selected);
         // Titoli delle colonne al centro (ADR 0028).
-        var name = FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Name");
-        Assert.Equal(HorizontalAlignment.Center, name.HorizontalContentAlignment);
-        // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
-        // colonne, Result compresa, stanno dentro e le fisse non cambiano larghezza.
+        var name = FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Package Name");
+        Assert.Equal(HorizontalAlignment.Center, name.HorizontalContentAlignment);        // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
+        // colonne, Result compresa, stanno dentro e le fisse non cambiano larghezza. Le altre
+        // elastiche non restano schiacciate ai 20 px minimi del DataGrid: tengono almeno il titolo.
         var grid = (DataGrid)w.FindName("GridUpdates");
         grid.Columns[2].Width = new DataGridLength(3000);
         Pump(() => true);
         MainWindow.Refit(grid);
         Pump(() => true);
         Assert.True(grid.Columns.Sum(c => c.ActualWidth) <= grid.ActualWidth, $"{grid.Columns.Sum(c => c.ActualWidth)} > {grid.ActualWidth}");
-        Assert.Equal(80, grid.Columns[^1].ActualWidth);
+        foreach (var c in grid.Columns.Skip(3).Where(c => c.CanUserResize))
+            Assert.True(c.ActualWidth >= 60, $"{c.Header}: {c.ActualWidth}");
+        Assert.Equal(56, grid.Columns[^1].ActualWidth);
+        // La barra di scorrimento sta fuori dalla griglia: quella del DataGrid e' nascosta, la sua
+        // compare con piu' righe di quante ne stanno e segue lo scorrimento.
+        var bar = (ScrollBar)w.FindName("BarUpdates");
+        var viewer = FindAll<ScrollViewer>(grid).First();
+        Assert.Equal(ScrollBarVisibility.Hidden, viewer.VerticalScrollBarVisibility);
+        Assert.Equal(Visibility.Visible, bar.Visibility);
+        viewer.ScrollToVerticalOffset(5);
+        Pump(() => true);
+        Assert.Equal(5, bar.Value);
         Assert.False(grid.CanUserReorderColumns);
         all.IsChecked = false;
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
@@ -76,7 +89,7 @@ public class WindowSmokeTests
         Pump(() => true);
         Assert.Equal(h.Vm.Settings.Themes.Count, FindChild<ComboBox>(settings)!.Items.Count);
         h.Vm.Settings.ApplyTheme = name => app.ThemeMode = App.Theme(name);
-        Assert.Contains("Found 1 updates.", ((TextBox)w.FindName("TxtLog")).Text);
+        Assert.Contains("Found 30 updates.", ((TextBox)w.FindName("TxtLog")).Text);
         foreach (var key in FluentKeys) Assert.True(w.TryFindResource(key) is not null, key);
 
         var light = ((SolidColorBrush)w.FindResource("TextFillColorPrimaryBrush")).Color;
