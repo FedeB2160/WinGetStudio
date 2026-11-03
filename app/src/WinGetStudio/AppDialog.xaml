@@ -3,9 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:WinGetStudio.ViewModels"
         ShowInTaskbar="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight"
-        MinWidth="360" MaxWidth="560">
+        MinWidth="360" MaxWidth="560" FontSize="{DynamicResource BaseFontSize}">
     <!-- Dialogo dell'app (ADR 0020): finestra modale col tema Fluent di ThemeMode (ADR 0027). -->
     <Window.Resources>
+      <ResourceDictionary>
+        <!-- Dimensioni del testo uguali alle altre finestre (BaseFontSize). -->
+        <ResourceDictionary.MergedDictionaries>
+            <ResourceDictionary Source="Styles.xaml"/>
+        </ResourceDictionary.MergedDictionaries>
         <BooleanToVisibilityConverter x:Key="Visible"/>
         <!-- Anteprima dell'import: spunta, Id, sorgente, versione. Larghezze FISSE: il dialogo
              prende la misura del contenuto, e una colonna a '*' non avrebbe spazio da dividere. -->
@@ -22,7 +27,7 @@
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
-                        <DataGridTextColumn Header="Id" Width="200" Binding="{Binding Id}"/>
+                        <DataGridTextColumn Header="Package ID" Width="200" Binding="{Binding Id}"/>
                         <DataGridTextColumn Header="Source" Width="90" Binding="{Binding Source}"/>
                         <DataGridTextColumn Header="Version" Width="80" Binding="{Binding Version}"/>
                     </DataGrid.Columns>
@@ -34,13 +39,14 @@
                 </CheckBox>
             </StackPanel>
         </DataTemplate>
+      </ResourceDictionary>
     </Window.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
-        <Grid Margin="20,20,24,16">
+        <Grid Margin="20,20,24,20">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -50,11 +56,16 @@
             <!-- Il testo si seleziona e si copia: un TextBox in sola lettura (o un RichTextBox
                  coi link, aggiunto dal codice). -->
             <StackPanel x:Name="DlgBody" Grid.Column="1" VerticalAlignment="Center">
-                <TextBox x:Name="DlgText" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="480"
+                <TextBox x:Name="DlgText" IsReadOnly="True" TextWrapping="Wrap" MaxHeight="480" TextBlock.LineHeight="18"
                          VerticalScrollBarVisibility="Auto" BorderThickness="0" Background="Transparent" Padding="0"/>
                 <ContentControl x:Name="DlgContent" Focusable="False"/>
             </StackPanel>
         </Grid>
-        <StackPanel x:Name="DlgButtons" Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right" Margin="16,0,16,16"/>
+        <!-- Fascia dei pulsanti staccata dal testo, come nella 1.12: sfondo di un tono diverso e una
+             riga sopra. -->
+        <Border Grid.Row="1" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}"
+                BorderBrush="{DynamicResource AreaStrokeBrush}" BorderThickness="0,1,0,0" Padding="16,12">
+            <StackPanel x:Name="DlgButtons" Orientation="Horizontal" HorizontalAlignment="Right"/>
+        </Border>
     </Grid>
 </Window>

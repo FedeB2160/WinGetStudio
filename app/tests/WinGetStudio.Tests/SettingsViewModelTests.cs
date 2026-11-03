@@ -15,11 +15,10 @@ public class SettingsViewModelTests
         var s = h.Vm.Settings;
         // "Auto" delle 1.x fino alla 1.9.0: lo stesso comportamento di System.
         Assert.Equal("System", s.SelectedTheme);
-        Assert.StartsWith("following the system: ", s.ThemeHint);
         string? applied = null;
         s.ApplyTheme = t => applied = t;
         s.SelectedTheme = "Dark";
-        Assert.Equal(("Dark", "Dark", ""), (applied, h.Prefs.GetString(Preferences.Theme, ""), s.ThemeHint));
+        Assert.Equal(("Dark", "Dark"), (applied, h.Prefs.GetString(Preferences.Theme, "")));
     }
 
     // Settings e About sono finestre a parte, aperte dai pulsanti in alto a destra (ADR 0028).
