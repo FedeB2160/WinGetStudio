@@ -88,6 +88,24 @@ public class WindowSmokeTests
         settings.Show();
         Pump(() => true);
         Assert.Equal(h.Vm.Settings.Themes.Count, FindChild<ComboBox>(settings)!.Items.Count);
+        // Menu a sinistra (ADR 0028): tre sezioni, si apre sulla prima e mostra solo la sua pagina.
+        var nav = (ListBox)settings.FindName("Nav");
+        Assert.Equal(["Appearance", "General", "Updates"], nav.Items.Cast<ListBoxItem>().Select(i => (string)i.Content));
+        Assert.Equal(0, nav.SelectedIndex);
+        Assert.True(FindAll<CheckBox>(settings).All(c => !c.IsVisible));
+        nav.SelectedIndex = 1;
+        Pump(() => true);
+        Assert.Contains(FindAll<CheckBox>(settings), c => c.IsVisible && (string)c.Content == "Close to tray");
+        Assert.False(FindChild<ComboBox>(settings)!.IsVisible);
+        // Il pulsante in alto comprime il menu alle sole icone.
+        // Le voci restano alla stessa altezza: senza il nome non salgono.
+        var wide = nav.ActualWidth;
+        var last = (ListBoxItem)nav.ItemContainerGenerator.ContainerFromIndex(2);
+        var y = last.TranslatePoint(new Point(), nav).Y;
+        settings.NavCompact = true;
+        Pump(() => nav.ActualWidth < 60);
+        Assert.True(nav.ActualWidth < 60 && wide > 150, $"{wide} -> {nav.ActualWidth}");
+        Assert.Equal(y, last.TranslatePoint(new Point(), nav).Y);
         h.Vm.Settings.ApplyTheme = name => app.ThemeMode = App.Theme(name);
         Assert.Contains("Found 30 updates.", ((TextBox)w.FindName("TxtLog")).Text);
         foreach (var key in FluentKeys) Assert.True(w.TryFindResource(key) is not null, key);

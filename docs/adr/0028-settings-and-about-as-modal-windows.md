@@ -115,6 +115,16 @@ list on all four sides.
     inactive tabs have a fainter border (25%) and tertiary text. Dialogs separate the buttons in a
     band with its own background and a line above, as 1.x did. The theme hint ("following the
     system: dark") is gone: it was clipped and the theme in use is on screen anyway.
+14. **Settings with a menu on the left (2026-11-03)**, replacing the two columns of point 11: four
+    cards of different sizes side by side read as clutter. A fixed 760×460 window with three
+    sections, each a page: **Appearance** (theme, tab strip), **General** (Start with Windows,
+    Always start as administrator, Close to tray, the periodic check) and **Updates** (WinGet
+    Studio, winget, Check for updates). The menu is a Fluent `ListBox` with glyph and name, as in
+    the Windows 11 Settings app; the chosen entry has a subtle background (the keys its template
+    reads, redefined on Fluent subtle fills) and an accent bar. A line separates it from the page;
+    a button at its top collapses it to icons only (names in tooltips), sliding in 150 ms when
+    Windows animations are on, not saved between openings. It always opens on Appearance.
+    Close sits in a band at the bottom, the same as the dialogs. The view model is unchanged.
 
 ## Consequences
 
