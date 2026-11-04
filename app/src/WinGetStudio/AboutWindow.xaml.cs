@@ -8,6 +8,7 @@ public partial class AboutWindow : Window
     public AboutWindow(string version)
     {
         InitializeComponent();
+        TitleBar.Follow(this);
         TxtVersion.Text = $"Version {version}";
         DialogService.OpenLinks(this);
     }

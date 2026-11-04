@@ -20,6 +20,7 @@ public partial class MainWindow : Window
         ViewModel = vm;
         DataContext = vm;
         InitializeComponent();
+        TitleBar.Follow(this);
         // Bordo della linguetta attiva a 2 px come il riquadro, le altre a 1 (ADR 0028). Il template
         // Fluent lo ha fisso a 1 sul suo Border interno, che non legge BorderThickness: si cambia li'.
         void TabBorders()
