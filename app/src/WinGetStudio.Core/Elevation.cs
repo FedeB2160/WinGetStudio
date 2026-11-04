@@ -82,13 +82,14 @@ public sealed partial class Elevation : IElevation
         return $"/d /v:off /s /c \"{string.Join(" & ", steps)}\"";
     }
 
-    // verb "" nei test: lo stesso batch senza UAC.
+    // verb "" nei test: lo stesso batch senza UAC. directory nei test: una cartella loro, perche' i
+    // file del batch in %TEMP% non compaiano fra quelli che altri test contano.
     internal static async Task<ElevatedRun> RunBatchAsync(string exePath, IReadOnlyList<IReadOnlyList<string>> commands,
-        Action<int, ProcessResult?>? step, CancellationToken cancel, string verb = "runas")
+        Action<int, ProcessResult?>? step, CancellationToken cancel, string verb = "runas", string? directory = null)
     {
         var notRun = new ElevatedRun(false, [.. commands.Select(_ => (ProcessResult?)null)]);
         if (cancel.IsCancellationRequested) return notRun;
-        var files = new BatchFiles(Path.GetTempPath(), commands.Count);
+        var files = new BatchFiles(directory ?? Path.GetTempPath(), commands.Count);
         var line = BatchLine(exePath, commands, files);
         // I file li crea l'app PRIMA dell'elevazione e li tiene aperti senza FileShare.Delete fino
         // alla fine: in %TEMP% un processo non elevato potrebbe mettere al loro posto un link, e il
@@ -167,13 +168,14 @@ public sealed partial class Elevation : IElevation
         finally { Release(held, files, count); }
     }
 
-    // Il segnale resta: un batch approvato piu' tardi deve trovarlo. Lo pulisce l'avvio.
+    // Si arriva qui solo a batch finito o mai partito (ReleaseAfterAsync aspetta l'esito dell'UAC):
+    // il segnale non serve piu' e va via con gli altri. Se l'app muore prima, lo pulisce l'avvio.
     private static void Release(List<FileStream> held, BatchFiles files, int count)
     {
         foreach (var h in held) h.Dispose();
-        for (var i = 0; i < count; i++)
-            foreach (var f in new[] { files.Out(i), files.Err(i), files.Code(i) })
-                try { File.Delete(f); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        var all = Enumerable.Range(0, count).SelectMany(i => new[] { files.Out(i), files.Err(i), files.Code(i) }).Append(files.Cancel);
+        foreach (var f in all)
+            try { File.Delete(f); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
     private static void CreateMarker(string path)

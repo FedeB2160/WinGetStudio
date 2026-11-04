@@ -5,9 +5,15 @@ namespace WinGetStudio.Core.Tests;
 // Elevazione su richiesta (ADR 0024): un solo runas per tutte le righe, exit code di ogni passo,
 // annullamento cooperativo; il riavvio elevato solo dove l'exe non carica librerie native da una
 // cartella scrivibile dall'utente (ADR 0026). Il batch gira qui SENZA runas: stesso cmd, nessun UAC.
-public class ElevationTests
+// Collection "ping": mai in parallelo con ProcessRunnerTests, che uccide i PING che non sono suoi.
+[Collection("ping")]
+public sealed class ElevationTests : IDisposable
 {
     private static readonly string Cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
+    // I file del batch in una cartella del test: in %TEMP% li conterebbe ProcessRunnerTests.
+    private readonly string _dir = Directory.CreateTempSubdirectory("wgtest_").FullName;
+
+    public void Dispose() => Directory.Delete(_dir, true);
 
     [Theory]
     [InlineData(unchecked((int)0x8A150030), true)]  // EXEC_UNINSTALL_COMMAND_FAILED: disinstallazione per-machine
@@ -57,7 +63,7 @@ public class ElevationTests
     {
         var steps = new List<string>();
         var run = await Elevation.RunBatchAsync(Cmd, [["/d", "/c", "echo", "hello"], ["/d", "/c", "exit", "3"], ["/d", "/c", "exit", "-1978335184"]],
-            (i, r) => { lock (steps) steps.Add(r is null ? $"start {i}" : $"done {i}"); }, default, verb: "");
+            (i, r) => { lock (steps) steps.Add(r is null ? $"start {i}" : $"done {i}"); }, default, verb: "", directory: _dir);
 
         Assert.True(run.Approved);
         Assert.Equal([0, 3, -1978335184], run.Results.Select(r => r!.ExitCode));
@@ -65,6 +71,7 @@ public class ElevationTests
         Assert.Equal("start 0", steps[0]);
         Assert.Equal("done 2", steps[^1]);
         Assert.Equal(6, steps.Count);
+        Assert.Empty(Directory.GetFiles(_dir));
     }
 
     // Annullare ferma i passi non ancora partiti; quello in corso finisce (ADR 0003).
@@ -73,11 +80,13 @@ public class ElevationTests
     {
         using var cancel = new CancellationTokenSource();
         var run = await Elevation.RunBatchAsync(Cmd, [["/d", "/c", "ping", "-n", "3", "127.0.0.1"], ["/d", "/c", "exit", "5"]],
-            (i, r) => { if (i == 0 && r is null) cancel.Cancel(); }, cancel.Token, verb: "");
+            (i, r) => { if (i == 0 && r is null) cancel.Cancel(); }, cancel.Token, verb: "", directory: _dir);
 
         Assert.True(run.Approved);
         Assert.Equal(0, run.Results[0]!.ExitCode);
         Assert.Null(run.Results[1]);
+        // Anche il segnale di annullamento va via: il batch e' finito.
+        Assert.Empty(Directory.GetFiles(_dir));
     }
 
     // Cancel durante l'attesa dell'UAC: nulla parte, e se l'UAC viene approvato dopo il batch
@@ -87,7 +96,7 @@ public class ElevationTests
     {
         using var cancel = new CancellationTokenSource();
         cancel.Cancel();
-        var run = await Elevation.RunBatchAsync(Cmd, [["/d", "/c", "exit", "5"]], null, cancel.Token, verb: "");
+        var run = await Elevation.RunBatchAsync(Cmd, [["/d", "/c", "exit", "5"]], null, cancel.Token, verb: "", directory: _dir);
 
         Assert.False(run.Approved);
         Assert.Equal([null], run.Results);

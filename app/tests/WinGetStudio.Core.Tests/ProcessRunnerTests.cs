@@ -6,6 +6,8 @@ namespace WinGetStudio.Core.Tests;
 
 // Esecuzione senza cmd con output su file (ADR 0004, ADR 0025). Processi veri: cmd.exe qui e'
 // il programma sotto prova, non una shell fra l'app e winget.
+// Collection "ping": il primo test uccide ogni PING nuovo, anche quello di ElevationTests.
+[Collection("ping")]
 public class ProcessRunnerTests
 {
     private static readonly string Cmd = Path.Combine(Environment.SystemDirectory, "cmd.exe");
@@ -57,12 +59,16 @@ public class ProcessRunnerTests
         Assert.Equal("out\r\nerr", r.Output.TrimEnd());
     }
 
+    // Solo i .out/.err di ProcessRunner: altri wgt_* (l'import ridotto di WinGetStudio.Tests, che
+    // gira in parallelo in un altro processo) possono esistere per un attimo senza essere suoi.
     [Fact]
     public async Task OutputFilesAreRemoved()
     {
-        var before = Directory.GetFiles(Path.GetTempPath(), TempFiles.Prefix + "*").ToHashSet();
+        static string[] Files() => [.. Directory.GetFiles(Path.GetTempPath(), TempFiles.Prefix + "*")
+            .Where(f => Path.GetExtension(f) is ".out" or ".err")];
+        var before = Files().ToHashSet();
         await new ProcessRunner().RunAsync(Cmd, ["/c", "echo x"]);
-        Assert.DoesNotContain(Directory.GetFiles(Path.GetTempPath(), TempFiles.Prefix + "*"), f => !before.Contains(f));
+        Assert.DoesNotContain(Files(), f => !before.Contains(f));
     }
 
     // Nessun timeout: gli installer lenti non si troncano, si segnala solo il tempo passato.

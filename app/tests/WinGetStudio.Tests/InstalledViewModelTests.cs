@@ -147,10 +147,10 @@ public class InstalledViewModelTests
               {"PackageIdentifier":"A.A","Custom":"/evil"},
               {"PackageIdentifier":"B.B"}]}]}
             """);
-        string? imported = null;
+        string? imported = null, reduced = null;
         using var h = Create([], a =>
         {
-            if (a[0] == "import") imported = File.ReadAllText(a[2]);
+            if (a[0] == "import") imported = File.ReadAllText(reduced = a[2]);
             return null;
         });
         h.Dialogs.OpenFile = file;
@@ -171,6 +171,8 @@ public class InstalledViewModelTests
             Assert.Equal("Keep the installer arguments saved for 1 package (--custom, --override)", preview!.KeepStoredText);
             var package = Assert.Single(JsonNode.Parse(imported!)!["Sources"]![0]!["Packages"]!.AsArray())!;
             Assert.Equal("""{"PackageIdentifier":"A.A"}""", package.ToJsonString());
+            // Il file ridotto non resta in %TEMP%.
+            Assert.False(File.Exists(reduced));
             Assert.Contains("Importing 1 of the 2 packages in", h.Log);
             Assert.Contains("Installer arguments saved in", h.Log);
             // Dopo l'import: installati riletti, aggiornamenti vecchi.
