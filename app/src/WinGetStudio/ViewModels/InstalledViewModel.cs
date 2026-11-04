@@ -188,7 +188,12 @@ public sealed partial class InstalledViewModel : PackageListViewModel
             if (keep.Count < list.Packages.Count) State.Log.Write($"Importing {keep.Count} of the {list.Packages.Count} packages in {file}.");
             if (dropStored) State.Log.Write($"Installer arguments saved in {file} were left out.");
         }
-        await RunImportAsync(path, keep.Count);
+        try { await RunImportAsync(path, keep.Count); }
+        finally
+        {
+            // Il file ridotto serve solo a questo import; se resta, lo spazza TempFiles all'avvio.
+            if (path != file) try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        }
     }
 
     // Una sola invocazione lunga: e' winget a scorrere la lista, non c'e' un esito per riga.
