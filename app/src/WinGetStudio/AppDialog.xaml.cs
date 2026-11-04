@@ -27,6 +27,7 @@ public partial class AppDialog : Window
     public AppDialog(string text, string title, MessageBoxButton button, MessageBoxImage image, MessageBoxResult defaultResult, object? content, bool links)
     {
         InitializeComponent();
+        TitleBar.Follow(this);
         _button = button;
         Title = title;
         DlgText.Text = text;

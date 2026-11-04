@@ -11,6 +11,7 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
+        TitleBar.Follow(this);
         DialogService.OpenLinks(this, m => (DataContext as SettingsViewModel)?.State.Log.Write(m));
     }
 

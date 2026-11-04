@@ -31,6 +31,12 @@ A prototype of the 1.x layout on .NET 10 (2026-10-29), with no template or colou
 1. **`ThemeMode` only**, System by default, the user's choice kept in the 1.x preference `Theme`. No
    colour dictionaries, no re-templated controls, no DWM call for the title bar. `WPF0001` is suppressed
    and the SDK pinned (ADR 0026).
+   *2026-11-04: one DWM call after all. Every window's title bar takes the app's colour, as the
+   Windows Settings app does: the window background (`SolidBackgroundFillColorBase`) a little lighter
+   in the dark theme, a little darker in the light one, set with `DWMWA_CAPTION_COLOR` and
+   `DWMWA_TEXT_COLOR` and redone when the theme changes, so the title bar is no longer the accent
+   when Windows shows the accent on title bars. The window border stays Windows'; Windows 10 ignores
+   the attribute (`TitleBar.cs`).*
 2. **Own resources only for meaning**, and always as references to Fluent keys: result glyphs use
    `SystemFillColorSuccess/Caution/CriticalBrush`, hints `TextFillColorSecondaryBrush`.
 3. **Primary actions use `AccentButtonStyle`** (Update, Install, the default button of a dialog).
