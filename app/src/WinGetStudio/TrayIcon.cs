@@ -86,7 +86,8 @@ internal sealed class TrayIcon : IDisposable
                 Item("Settings", () => { if (ShowWindow(null)) _vm.OpenSettingsCommand.Execute(null); }),
                 Item("About", () => { if (ShowWindow(null)) _vm.OpenAboutCommand.Execute(null); }),
                 new Separator(),
-                Item("Close", exit),
+                // "Exit" e non "Close": con Close to tray la X della finestra non chiude l'app.
+                Item("Exit", exit),
             },
         };
     }
