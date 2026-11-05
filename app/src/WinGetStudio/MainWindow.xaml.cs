@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -61,6 +62,13 @@ public partial class MainWindow : Window
         AttachScrollBar(GridSearch, BarSearch);
         AttachScrollBar(GridInstalled, BarInstalled);
         AttachScrollBar(GridUpdates, BarUpdates);
+
+        // Cornice di fuoco sulla riga (ADR 0028, punto 16), in tutte e tre le griglie. Anche sugli
+        // eventi gia' gestiti: il DataGrid gestisce i suoi.
+        var focusMoved = new KeyboardFocusChangedEventHandler((_, e) =>
+            ShowRowFocus(e.NewFocus, InputManager.Current.MostRecentInputDevice is KeyboardDevice));
+        AddHandler(Keyboard.GotKeyboardFocusEvent, focusMoved, true);
+        AddHandler(Keyboard.LostKeyboardFocusEvent, focusMoved, true);
 
         SourceInitialized += (_, _) => AddRestartToSystemMenu();
 
@@ -201,6 +209,20 @@ public partial class MainWindow : Window
         };
     }
 
+    private RowFocusFrame? rowFocus;
+
+    // La cornice va sulla riga col fuoco se ci si e' arrivati con la tastiera (Tab, frecce, anche
+    // Ctrl+frecce, che non selezionano); un clic, o il fuoco fuori dalle griglie, la toglie.
+    internal void ShowRowFocus(object? focus, bool keyboard)
+    {
+        var row = keyboard && focus is DependencyObject d ? FindAncestor<DataGridRow>(d) : null;
+        if (row is not null && row == rowFocus?.AdornedElement) return;
+        // Dal livello che la contiene: la riga puo' essere gia' uscita dall'albero.
+        if (rowFocus is not null) (VisualTreeHelper.GetParent(rowFocus) as AdornerLayer)?.Remove(rowFocus);
+        rowFocus = null;
+        if (row is not null && AdornerLayer.GetAdornerLayer(row) is { } layer) layer.Add(rowFocus = new RowFocusFrame(row));
+    }
+
     private static IEnumerable<T> Descendants<T>(DependencyObject parent) where T : DependencyObject
     {
         for (var i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
@@ -271,5 +293,17 @@ public partial class MainWindow : Window
             Dispatcher.BeginInvoke(DispatcherPriority.Input, () => { TxtSearch.Focus(); TxtSearch.SelectAll(); });
             e.Handled = true;
         }
+        else if (e.Key == Key.Space && Keyboard.Modifiers == ModifierKeys.None && ToggleRowCheck(e.OriginalSource))
+            e.Handled = true;
+    }
+
+    // Spazio su una cella cambia la spunta della riga col fuoco (ADR 0028, punto 16), quella della
+    // cornice, non per forza la selezionata. Passa dalla CheckBox: spenta mentre winget lavora o su
+    // una riga con pin in Updates, non cambia. Sulla CheckBox col fuoco Spazio lo gestisce lei.
+    internal static bool ToggleRowCheck(object source)
+    {
+        if (source is not DataGridCell cell || FindAncestor<DataGridRow>(cell) is not { } row) return false;
+        if (Descendants<CheckBox>(row).FirstOrDefault() is { IsEnabled: true } check) check.IsChecked = check.IsChecked != true;
+        return true;
     }
 }
