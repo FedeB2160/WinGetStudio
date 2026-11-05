@@ -30,7 +30,8 @@ public abstract partial class PackageListViewModel : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(RetryText), nameof(RetryVisible))]
     public partial int RetryCount { get; private set; }
 
-    public string RetryText => $"Retry failed ({RetryCount})";
+    // "packages": "Retry failed (2)" si leggeva come uno stato, il nuovo tentativo fallito.
+    public string RetryText => $"Retry failed packages ({RetryCount})";
     public bool RetryVisible => RetryCount > 0;
 
     // Retry as administrator (ADR 0024): mentre il suo batch gira il pulsante diventa Cancel, che

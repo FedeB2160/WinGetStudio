@@ -240,7 +240,7 @@ public sealed partial class AppState : ObservableObject
         if (retry.Count == 0 || Last is not { } last) return;
         var verb = last.Result.Request.Verb.ToString().ToLowerInvariant();
         var answer = Dialogs.Show($"Retry the {verb} of {retry.Count} package{(retry.Count == 1 ? "" : "s")} that failed?\n\n" + NameList(retry.Select(r => r.Name)),
-            "Retry failed", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No, verbs: ("Retry", "Cancel"));
+            "Retry failed packages", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No, verbs: ("Retry", "Cancel"));
         if (answer != MessageBoxResult.Yes) return;
         await RunQueueAsync(last.Result.Request with { Rows = [.. retry.Select(r => r.Row)] }, items, last.Then);
     }

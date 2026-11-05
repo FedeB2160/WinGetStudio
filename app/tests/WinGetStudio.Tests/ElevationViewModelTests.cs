@@ -47,7 +47,7 @@ public class ElevationViewModelTests
 
         Assert.True(vm.RetryAdminVisible);
         Assert.Equal("Retry as administrator (1)", vm.RetryAdminText);
-        Assert.Equal("Retry failed (2)", vm.RetryText);
+        Assert.Equal("Retry failed packages (2)", vm.RetryText);
     }
 
     // Conferma con No predefinito; poi le stesse righe di comando in un solo runas, e la lista si

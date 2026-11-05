@@ -125,7 +125,7 @@ public class UpdatesViewModelTests
         Assert.Equal("List out of date: press Check for updates.", vm.SelectedText);
         Assert.False(vm.UpdateCommand.CanExecute(null));
         Assert.Equal(1, vm.RetryCount);
-        Assert.Equal("Retry failed (1)", vm.RetryText);
+        Assert.Equal("Retry failed packages (1)", vm.RetryText);
         Assert.True(vm.RetryCommand.CanExecute(null));
         Assert.False(h.State.IsBusy);
     }
@@ -209,7 +209,7 @@ public class UpdatesViewModelTests
         // Invio: No, quindi niente.
         await vm.RetryAsync();
         var ask = Assert.Single(h.Dialogs.Calls);
-        Assert.Equal((MessageBoxButton.YesNo, MessageBoxResult.No, "Retry failed"), (ask.Button, ask.Default, ask.Title));
+        Assert.Equal((MessageBoxButton.YesNo, MessageBoxResult.No, "Retry failed packages"), (ask.Button, ask.Default, ask.Title));
         Assert.StartsWith("Retry the update of 1 package that failed?\n\n  - App C", ask.Text);
         Assert.Equal(2, h.WinGet.Calls.Count(c => c[1] == "--id"));
 
