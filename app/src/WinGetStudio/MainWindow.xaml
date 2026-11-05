@@ -444,8 +444,18 @@
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding Message}"/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">
-                        <Button DockPanel.Dock="Left" MinWidth="124" Content="{Binding ScopeText}" ToolTip="{Binding ScopeToolTip}"
-                                Command="{Binding CycleScopeCommand}"/>
+                        <!-- Per chi installare (scope di winget): tre voci, ognuna col tooltip che dice cosa fa; sulla
+                             ComboBox quello della voce scelta. -->
+                        <TextBlock DockPanel.Dock="Left" Text="Install for" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="CmbScope" DockPanel.Dock="Left" MinWidth="124" ItemsSource="{Binding Scopes}" SelectedItem="{Binding SelectedScope}"
+                                  DisplayMemberPath="Label" ToolTip="{Binding SelectedScope.ToolTip}" IsEnabled="{Binding State.IsIdle}"
+                                  AutomationProperties.Name="Install for">
+                            <ComboBox.ItemContainerStyle>
+                                <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                                    <Setter Property="ToolTip" Value="{Binding ToolTip}"/>
+                                </Style>
+                            </ComboBox.ItemContainerStyle>
+                        </ComboBox>
                         <Button DockPanel.Dock="Left" MinWidth="96" Margin="8,0,0,0" Content="Install"
                                 Style="{StaticResource AccentButtonStyle}" Command="{Binding InstallCommand}"/>
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding InfoText}"/>

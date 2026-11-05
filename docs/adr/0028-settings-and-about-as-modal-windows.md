@@ -181,6 +181,10 @@ list on all four sides.
     - **A filter that hides everything says so.** In Installed the grid gives way to "No
       installed package matches 'x'." and, on its own line, "Clear the filter to see all N.", as an Install search with
       no result does.
+    - **Install for is a choice in sight.** The "Scope: Auto" button cycled through three values
+      it did not show. It is now a Fluent `ComboBox` labelled "Install for", with Auto, Current
+      user and All users; each item's tooltip says what it passes to winget. The saved values
+      (`InstallScope`: Auto, User, Machine) do not change.
 
 ## Consequences
 

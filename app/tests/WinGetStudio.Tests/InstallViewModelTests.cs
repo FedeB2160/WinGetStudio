@@ -98,8 +98,8 @@ public class InstallViewModelTests
         vm.SearchText = "7zip";
         await vm.SearchNowAsync();
 
-        vm.CycleScopeCommand.Execute(null);
-        Assert.Equal("Scope: User", vm.ScopeText);
+        vm.SelectedScope = vm.Scopes[1];
+        Assert.Equal(("Current user", "Install for the current user only (--scope user)"), (vm.SelectedScope.Label, vm.SelectedScope.ToolTip));
         Assert.Equal("User", h.Prefs.GetString(Preferences.InstallScope, ""));
         vm.Items[0].Selected = true;
         Assert.Equal("1 selected", vm.InfoText);
@@ -131,8 +131,10 @@ public class InstallViewModelTests
     public void ScopeIsReadFromThePreferences()
     {
         using var h = new Harness(h => h.Prefs.Set(Preferences.InstallScope, "Machine"));
-        Assert.Equal("Scope: Machine", h.Vm.Install.ScopeText);
-        h.Vm.Install.CycleScopeCommand.Execute(null);
-        Assert.Equal("Scope: Auto", h.Vm.Install.ScopeText);
+        var vm = h.Vm.Install;
+        Assert.Equal(["Auto", "Current user", "All users"], vm.Scopes.Select(s => s.Label));
+        Assert.Equal(InstallScope.Machine, vm.SelectedScope.Value);
+        vm.SelectedScope = vm.Scopes[0];
+        Assert.Equal("Auto", h.Prefs.GetString(Preferences.InstallScope, ""));
     }
 }

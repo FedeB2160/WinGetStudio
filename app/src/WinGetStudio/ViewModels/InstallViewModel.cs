@@ -13,14 +13,15 @@ public sealed partial class InstallViewModel : PackageListViewModel
 
     private string _searchText = "";
     private bool _includeStore;
-    private InstallScope _scope;
+    private ScopeChoice _scope;
     private CancellationTokenSource? _typeahead;
     private bool _scopeWarned;
 
     public InstallViewModel(AppState state) : base(state)
     {
         _includeStore = state.Prefs.GetBool(Preferences.IncludeStore, false);
-        _scope = Enum.TryParse<InstallScope>(state.Prefs.GetString(Preferences.InstallScope, "Auto"), out var s) ? s : InstallScope.Auto;
+        var saved = Enum.TryParse<InstallScope>(state.Prefs.GetString(Preferences.InstallScope, "Auto"), out var s) ? s : InstallScope.Auto;
+        _scope = Scopes.First(c => c.Value == saved);
         Message = Hint;
         InfoText = "";
         Refresh();
@@ -58,28 +59,26 @@ public sealed partial class InstallViewModel : PackageListViewModel
         set { if (SetProperty(ref _includeStore, value)) State.Prefs.Set(Preferences.IncludeStore, value); }
     }
 
-    public string ScopeText => $"Scope: {_scope}";
+    // "Install for" (--scope): le tre voci di una ComboBox, ognuna col suo tooltip.
+    public IReadOnlyList<ScopeChoice> Scopes { get; } =
+    [
+        new(InstallScope.Auto, "Auto", "Let winget decide (no --scope flag), same as the Updates tab does"),
+        new(InstallScope.User, "Current user", "Install for the current user only (--scope user)"),
+        new(InstallScope.Machine, "All users", "Install for all users (--scope machine). Packages that only ship a per-user installer will fail"),
+    ];
 
-    public string ScopeToolTip => _scope switch
+    // Salvata subito, coi valori di sempre (Auto, User, Machine). null arriva dalla ComboBox
+    // quando cambia l'elenco: si ignora.
+    public ScopeChoice SelectedScope
     {
-        InstallScope.User => "Install for the current user only (--scope user)",
-        InstallScope.Machine => "Install for all users (--scope machine). Packages that only ship a per-user installer will fail",
-        _ => "Let winget decide (no --scope flag), same as the Updates tab does",
-    };
+        get => _scope;
+        set { if (value is not null && SetProperty(ref _scope, value)) State.Prefs.Set(Preferences.InstallScope, value.Value.ToString()); }
+    }
 
     [ObservableProperty] public partial string Message { get; private set; }
     [ObservableProperty] public partial string InfoText { get; private set; }
 
     public bool Searching => State.SearchesInFlight > 0;
-
-    [RelayCommand(CanExecute = nameof(IsIdle))]
-    private void CycleScope()
-    {
-        _scope = _scope switch { InstallScope.Auto => InstallScope.User, InstallScope.User => InstallScope.Machine, _ => InstallScope.Auto };
-        State.Prefs.Set(Preferences.InstallScope, _scope.ToString());
-        OnPropertyChanged(nameof(ScopeText));
-        OnPropertyChanged(nameof(ScopeToolTip));
-    }
 
     // Invio o Search: subito, con lo Store se spuntato.
     [RelayCommand(CanExecute = nameof(IsIdle))]
@@ -160,14 +159,14 @@ public sealed partial class InstallViewModel : PackageListViewModel
     // prossima apertura.
     private Task InstallRowsAsync(IReadOnlyList<PackageItem> items)
     {
-        var scope = _scope;
+        var scope = _scope.Value;
         // Elevata con un altro account i pacchetti per utente vanno nel suo profilo (1.x, ADR 0018):
         // una volta per sessione, e solo se l'ambito lo permette.
         if (!_scopeWarned && scope != InstallScope.Machine && State.IsElevated && State.Cli.Elevation.OtherAccount)
         {
             _scopeWarned = true;
             State.Log.Write($"WARNING: running elevated as {State.Cli.Elevation.Account}, not as the signed-in user.");
-            State.Log.Write("         Per-user packages will install into that profile. Use Scope: Machine to install for all users.");
+            State.Log.Write("         Per-user packages will install into that profile. Choose Install for: All users to install for everyone.");
         }
         return State.RunQueueAsync(new QueueRequest(Core.QueueVerb.Install, [.. items.Select(i => i.Row)], r => WinGetCommands.Install(r, scope)), Items, () =>
         {
@@ -189,6 +188,8 @@ public sealed partial class InstallViewModel : PackageListViewModel
         InstallCommand?.NotifyCanExecuteChanged();
         InstallOneCommand?.NotifyCanExecuteChanged();
         SearchNowCommand?.NotifyCanExecuteChanged();
-        CycleScopeCommand?.NotifyCanExecuteChanged();
     }
 }
+
+// Una voce di "Install for": il valore di --scope, il nome e cosa fa.
+public sealed record ScopeChoice(InstallScope Value, string Label, string ToolTip);
