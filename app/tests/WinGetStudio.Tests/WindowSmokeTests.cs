@@ -65,7 +65,9 @@ public class WindowSmokeTests
         var nameCell = FindAll<DataGridCell>(firstRow).First(c => c.Column == name.Column);
         Assert.Equal(Left(FindChild<TextBlock>(nameCell)!), Left(FindChild<TextBlock>(name)!), 1.0);
         Assert.Equal(HorizontalAlignment.Center, FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Result").HorizontalContentAlignment);
-        Assert.Equal(Middle(FindChild<CheckBox>(firstRow)!), Middle(all), 1.0);
+        // 2 px: lo spazio che l'intestazione Fluent tiene per la freccia di ordinamento dipende dal
+        // font dei glifi, e sul runner della CI (Windows Server) la spunta finiva 1,3 px piu' in la'.
+        Assert.Equal(Middle(FindChild<CheckBox>(firstRow)!), Middle(all), 2.0);
         // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
         // colonne, Result compresa, stanno dentro e le fisse non cambiano larghezza. Le altre
         // elastiche non restano schiacciate ai 20 px minimi del DataGrid: tengono almeno il titolo.
