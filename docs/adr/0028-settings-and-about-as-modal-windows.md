@@ -136,10 +136,33 @@ list on all four sides.
     - **Inactive tab text is secondary, not tertiary**: 6.07:1 in the light theme and 9.37:1 in
       the dark one, against the tertiary's 3.28:1, below WCAG AA. The active tab is still told
       apart by its semi-bold text, its 2 px border and covering the area's line.
-    - **Grid cells keep the keyboard focus frame.** The cell style had `FocusVisualStyle` null,
-      so moving with Tab and the arrows showed nowhere where the focus was. WPF draws the frame
-      only for keyboard focus, so a mouse click still shows just the selected row; the Fluent
-      cell border on focus stays transparent.
+    - **The keyboard focus frame is on the whole row.** The cell style had `FocusVisualStyle`
+      null, so moving with Tab and the arrows showed nowhere where the focus was. Removing it
+      was not enough, as the real app showed. Fluent has no implicit `DataGridCell` style, so the
+      cell style is based on the classic one, which sets no focus visual. The cell then took the
+      system one, `DefaultControlFocusVisualStyle`, drawn 3 px outside the element. It outlined a
+      single cell, and on the check box and Result columns it ran past the grid's edge.
+      Cells are back to `FocusVisualStyle` null. `RowFocusFrame`, an adorner, draws a 2 px frame
+      inside the row that has the keyboard focus, as one element. It follows the focus, which with
+      Ctrl+arrows can be on a row other than the selected one. It appears only when the focus
+      arrived from the keyboard (`InputManager.Current.MostRecentInputDevice`), and a click or
+      the focus leaving the grids removes it. The check boxes inside rows have no focus visual
+      of their own either (`RowCellCheck`): with the focus on one, the two frames showed together.
+      Select all, in the column header, keeps its own.
+      It is an adorner and not the row's `BorderThickness`, which the Fluent row template does
+      honour, because a border takes layout space. The cells presenter is held at `RowHeight`,
+      so rows would grow from 28 to 32 px. The DataGrid measures the cells' offset from its
+      scroll viewer, so the cells would also shift 2 px right of their titles, and the Result
+      column would lose 2 px. The adorner lives in the scroll content presenter's layer, which
+      clips to the grid's content.
+      Its colour is `FocusStrokeColorOuterBrush`, nearly opaque, and not the translucent
+      `KeyboardFocusBorderColorBrush` of the other controls' frames: over the selected row's blue,
+      that one drops to about 2:1.
+    - **Space checks the row with the focus.** The DataGrid does not use Space, and a check box
+      in a template cell gets no keyboard focus from the arrows, so without a mouse no row
+      could be checked. Space on a cell, with no modifiers, now toggles that row's check box,
+      the framed row and not necessarily the selected one. It goes through the check box, so a
+      disabled one (winget busy, a pinned row in Updates) stays as it is.
     - **Screen readers hear what changes.** `LiveRegion.Announce` (an attached property) sets
       `AutomationProperties.LiveSetting` to Polite and raises `LiveRegionChanged` each time the
       `TextBlock` gets a new, non-empty text: WPF raises nothing by itself. It is on the status

@@ -2,6 +2,7 @@ using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Media;
 using System.Windows.Threading;
 using WinGetStudio.Core;
@@ -23,7 +24,7 @@ public class WindowSmokeTests
         "CardBackgroundFillColorDefaultBrush", "CardStrokeColorDefaultBrush", "OverlayCornerRadius",
         "ControlStrongStrokeColorDefault", "TextFillColorPrimaryBrush", "SolidBackgroundFillColorTertiaryBrush",
         "AccentFillColorDefaultBrush", "TextOnAccentFillColorPrimaryBrush", "ControlStrongStrokeColorDisabledBrush",
-        "SystemFillColorCautionBackgroundBrush", "ControlCornerRadius",
+        "SystemFillColorCautionBackgroundBrush", "ControlCornerRadius", "FocusStrokeColorOuterBrush",
     ];
 
     [Fact]
@@ -82,11 +83,43 @@ public class WindowSmokeTests
             .Select(t => ((Border)t.Template.FindName("Border", t)).BorderThickness.Top));
         Assert.False(grid.CanUserReorderColumns);
         // Accessibilita' (ADR 0028, punto 16): nome delle linguette inattive in testo secondario,
-        // cornice di fuoco sulle celle (solo da tastiera), nome del badge, testo che si annuncia.
+        // cornice di fuoco sulla riga (solo da tastiera), nome del badge, testo che si annuncia.
         var secondary = ((SolidColorBrush)w.FindResource("TextFillColorSecondaryBrush")).Color;
         foreach (var t in tabs.Items.Cast<TabItem>().Where(t => !t.IsSelected))
             Assert.Equal(secondary, ((SolidColorBrush)FindAll<TextBlock>(t).First(b => b.Text == (string)t.Header).Foreground).Color);
-        Assert.NotNull(FindChild<DataGridCell>(grid)?.FocusVisualStyle);
+        // Le celle non hanno cornice; quella della riga c'e' solo da tastiera, una per tutta la riga
+        // sia dalla spunta sia da Result, disegnata dentro la riga e quindi dentro la griglia.
+        // La prima riga visibile: la griglia e' scorsa qui sopra, la riga 0 non c'e' piu'.
+        var row = FindChild<DataGridRow>(grid)!;
+        var cells = FindAll<DataGridCell>(row).ToList();
+        Assert.All(cells, c => Assert.Null(c.FocusVisualStyle));
+        // Ne' la spunta della riga: con la sua, le cornici erano due. Seleziona tutto la tiene.
+        Assert.Null(FindChild<CheckBox>(row)!.FocusVisualStyle);
+        Assert.NotNull(all.FocusVisualStyle);
+        var layer = AdornerLayer.GetAdornerLayer(row)!;
+        w.ShowRowFocus(cells[0], keyboard: false);
+        Assert.Null(layer.GetAdorners(row));
+        var inside = new Rect(1, 1, grid.ActualWidth - 2, grid.ActualHeight - 2);
+        foreach (var cell in new[] { cells[0], cells[^1] })
+        {
+            w.ShowRowFocus(cell, keyboard: true);
+            Pump(() => true);
+            var frame = Assert.IsType<RowFocusFrame>(Assert.Single(layer.GetAdorners(row)!));
+            var drawn = VisualTreeHelper.GetContentBounds(frame);
+            Assert.Equal(new Rect(row.RenderSize), drawn);
+            var box = frame.TransformToAncestor(grid).TransformBounds(drawn);
+            Assert.True(inside.Contains(box), $"{box} fuori da {inside}");
+        }
+        w.ShowRowFocus(cells[^1], keyboard: false);
+        Assert.Null(layer.GetAdorners(row));
+        // Spazio su una cella qualsiasi cambia la spunta della riga, avanti e indietro.
+        var item = (PackageItem)row.Item;
+        var before = item.Selected;
+        Assert.True(MainWindow.ToggleRowCheck(cells[2]));
+        Assert.Equal(!before, item.Selected);
+        Assert.True(MainWindow.ToggleRowCheck(cells[^1]));
+        Assert.Equal(before, item.Selected);
+        Assert.False(MainWindow.ToggleRowCheck(grid));
         var updatesTab = tabs.Items.Cast<TabItem>().ElementAt(MainViewModel.UpdatesTab);
         Assert.Contains(FindAll<Border>(updatesTab), b => System.Windows.Automation.AutomationProperties.GetName(b) == "30 updates available");
         var hint = FindAll<TextBlock>(w).First(t => t.Style == w.FindResource("Hint"));

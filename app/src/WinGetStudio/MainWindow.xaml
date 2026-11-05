@@ -25,8 +25,13 @@
                 <Setter Property="AutomationProperties.Name" Value="Select"/>
                 <Setter Property="IsEnabled" Value="{Binding DataContext.State.IsIdle, RelativeSource={RelativeSource AncestorType=DataGrid}}"/>
             </Style>
+            <!-- Spunta dentro una riga: senza cornice di fuoco propria, la riga ha gia' la sua
+                 (RowFocusFrame, ADR 0028 punto 16); con le due insieme se ne vedevano due. -->
+            <Style x:Key="RowCellCheck" TargetType="CheckBox" BasedOn="{StaticResource RowCheck}">
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            </Style>
             <DataTemplate x:Key="SelectCell" DataType="{x:Type vm:PackageItem}">
-                <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RowCheck}"/>
+                <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RowCellCheck}"/>
             </DataTemplate>
             <!-- Seleziona tutto, nell'intestazione della colonna delle spunte di ogni griglia: spenta,
                  tutte, alcune (indeterminata); quali righe tocca lo decide la scheda (Selectable).
@@ -49,7 +54,7 @@
             <DataTemplate x:Key="SelectUnpinnedCell" DataType="{x:Type vm:PackageItem}">
                 <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}">
                     <CheckBox.Style>
-                        <Style TargetType="CheckBox" BasedOn="{StaticResource RowCheck}">
+                        <Style TargetType="CheckBox" BasedOn="{StaticResource RowCellCheck}">
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Pinned}" Value="True">
                                     <Setter Property="IsEnabled" Value="False"/>
@@ -246,10 +251,13 @@
                     <Setter.Value>
                         <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
                             <Setter Property="VerticalContentAlignment" Value="Center"/>
-                            <!-- Si seleziona la riga, non la cella: il bordo Fluent della cella col
-                                 fuoco resta trasparente (trigger qui sotto). La cornice di fuoco
-                                 invece resta: WPF la mostra solo con la tastiera, e senza non si
-                                 vede dove si e' (ADR 0028, punto 16). -->
+                            <!-- Si seleziona la riga, non la cella: il bordo della cella col fuoco
+                                 resta trasparente (trigger qui sotto) e la cella non ha cornice di
+                                 fuoco. Questo stile si basa su quello classico (Fluent non ne ha uno
+                                 implicito per la cella), senza la sua la cella prendeva quella di
+                                 sistema, 3 px fuori. La cornice da tastiera sta sulla riga intera:
+                                 RowFocusFrame (ADR 0028, punto 16). -->
+                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
                             <Style.Triggers>
                                 <Trigger Property="IsKeyboardFocusWithin" Value="True">
                                     <Setter Property="BorderBrush" Value="Transparent"/>
