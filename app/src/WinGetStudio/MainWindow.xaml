@@ -124,13 +124,13 @@
                         <DataTemplate>
                             <!-- Il padding Fluent della linguetta e' fisso a 6 px nel template: il
                                  resto dello spazio attorno al nome sta qui. Non attive spente
-                                 (testo terziario, bordo tenue), l'attiva in SemiBold (piu' grande scendeva sotto l'icona): qui e non sulla TabItem,
+                                 (testo secondario, non terziario: 3,28:1 non bastava; bordo tenue), l'attiva in SemiBold (piu' grande scendeva sotto l'icona): qui e non sulla TabItem,
                                  da cui passerebbero al contenuto della scheda. -->
                             <Grid>
                             <StackPanel Orientation="Horizontal" Margin="6,0">
                                 <StackPanel.Style>
                                     <Style TargetType="StackPanel">
-                                        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorTertiaryBrush}"/>
+                                        <Setter Property="TextElement.Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
                                         <Style.Triggers>
                                             <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TabItem}}" Value="True">
                                                 <Setter Property="TextElement.FontWeight" Value="SemiBold"/>
@@ -163,8 +163,7 @@
                                      accento; sulle altre grigio, come disattivato, ma sempre presente. -->
                                 <Border CornerRadius="8" MinWidth="16" Height="16" Padding="4,0"
                                         HorizontalAlignment="Right" VerticalAlignment="Top"
-                                        AutomationProperties.Name="{Binding DataContext.Badge, RelativeSource={RelativeSource AncestorType=TabItem}}"
-                                        AutomationProperties.HelpText="updates available">
+                                        AutomationProperties.Name="{Binding DataContext.Badge, RelativeSource={RelativeSource AncestorType=TabItem}, StringFormat={}{0} updates available}">
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Setter Property="Background" Value="{DynamicResource AccentFillColorDefaultBrush}"/>
@@ -230,6 +229,7 @@
                 <Setter Property="TextWrapping" Value="Wrap"/>
                 <Setter Property="TextAlignment" Value="Center"/>
                 <Setter Property="Visibility" Value="{Binding IsEmpty, Converter={StaticResource Visible}}"/>
+                <Setter Property="local:LiveRegion.Announce" Value="True"/>
             </Style>
             <Style x:Key="Grid" TargetType="DataGrid" BasedOn="{StaticResource {x:Type DataGrid}}">
                 <Setter Property="AutoGenerateColumns" Value="False"/>
@@ -246,9 +246,10 @@
                     <Setter.Value>
                         <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
                             <Setter Property="VerticalContentAlignment" Value="Center"/>
-                            <!-- Si seleziona la riga, non la cella: niente cornice di fuoco sulla
-                                 cella cliccata (il trigger Fluent la colora). -->
-                            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                            <!-- Si seleziona la riga, non la cella: il bordo Fluent della cella col
+                                 fuoco resta trasparente (trigger qui sotto). La cornice di fuoco
+                                 invece resta: WPF la mostra solo con la tastiera, e senza non si
+                                 vede dove si e' (ADR 0028, punto 16). -->
                             <Style.Triggers>
                                 <Trigger Property="IsKeyboardFocusWithin" Value="True">
                                     <Setter Property="BorderBrush" Value="Transparent"/>
@@ -564,7 +565,7 @@
                 </Style>
             </DockPanel.Style>
             <TextBlock DockPanel.Dock="Left" Text="{Binding State.ProgressText}" Margin="0,0,12,0" VerticalAlignment="Center"
-                       TextTrimming="CharacterEllipsis" MaxWidth="480"/>
+                       TextTrimming="CharacterEllipsis" MaxWidth="480" local:LiveRegion.Announce="True"/>
             <!-- 10 px, angoli arrotondati (Clip nel codice), accento del tema sul binario del tratto
                  forte: si nota in tutti e due i temi. -->
             <ProgressBar x:Name="Progress" Height="10" VerticalAlignment="Center" Value="{Binding State.ProgressValue, Mode=OneWay}"
@@ -572,6 +573,11 @@
                          Background="{DynamicResource ControlStrongStrokeColorDisabledBrush}"
                          AutomationProperties.Name="{Binding State.ProgressText}"/>
         </DockPanel>
+        <!-- Il riepilogo a fine coda per i lettori di schermo: trasparente ma presente per
+             l'automazione. Fuori dalla riga qui sopra, che a coda finita e' Hidden e uscirebbe
+             dall'albero di automazione proprio quando c'e' da annunciare. -->
+        <TextBlock x:Name="Announcement" Grid.Row="2" Text="{Binding State.Announcement}" Opacity="0" IsHitTestVisible="False"
+                   HorizontalAlignment="Left" VerticalAlignment="Center" MaxWidth="480" local:LiveRegion.Announce="True"/>
 
         <TextBlock Grid.Row="3" Text="Log" Margin="0,4,0,4" FontWeight="SemiBold"/>
         <!-- Il menu proprio sostituisce quello del TextBox: Copy e Select all vanno rimessi. -->

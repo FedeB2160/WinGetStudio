@@ -112,7 +112,8 @@ list on all four sides.
     their `*` weights, none below its title's width (the Fluent DataGrid had squeezed them, fixed
     columns included, to 20 px, and the refit saved that). Tabs stand 2 px apart (attached, the
     rounded corners met in a V; `TabPanel` ignores margins, so only the drawing is shifted);
-    inactive tabs have a fainter border (25%) and tertiary text. Dialogs separate the buttons in a
+    inactive tabs have a fainter border (25%) and tertiary text (secondary since point 16: the
+    tertiary measured 3.28:1 in the light theme). Dialogs separate the buttons in a
     band with its own background and a line above, as 1.x did. The theme hint ("following the
     system: dark") is gone: it was clipped and the theme in use is on screen anyway.
 14. **Settings with a menu on the left (2026-11-03)**, replacing the two columns of point 11: four
@@ -131,6 +132,23 @@ list on all four sides.
     overlapped (tab edges on the area's top line) their light added up into bright dots: the main
     window now uses the same colours already blended on the window background, opaque, recomputed
     when the theme changes. Inactive tabs end above the area's line; only the active one covers it.
+16. **Accessibility (2026-11-05), the high-severity findings of the UI/UX review.**
+    - **Inactive tab text is secondary, not tertiary**: 6.07:1 in the light theme and 9.37:1 in
+      the dark one, against the tertiary's 3.28:1, below WCAG AA. The active tab is still told
+      apart by its semi-bold text, its 2 px border and covering the area's line.
+    - **Grid cells keep the keyboard focus frame.** The cell style had `FocusVisualStyle` null,
+      so moving with Tab and the arrows showed nowhere where the focus was. WPF draws the frame
+      only for keyboard focus, so a mouse click still shows just the selected row; the Fluent
+      cell border on focus stays transparent.
+    - **Screen readers hear what changes.** `LiveRegion.Announce` (an attached property) sets
+      `AutomationProperties.LiveSetting` to Polite and raises `LiveRegionChanged` each time the
+      `TextBlock` gets a new, non-empty text: WPF raises nothing by itself. It is on the status
+      line beside the bar ("Updating 2 of 3: ..."), on the `Hint` style (the counts next to the
+      buttons) and on the empty-list message. The queue's summary ("Update complete: 2 ok, 1
+      failed.") goes to `AppState.Announcement`, read by a transparent `TextBlock` in the status
+      row: the bar's row is hidden when the queue ends, and a hidden element leaves the
+      automation tree just when there is something to say. The Updates badge is named
+      "N updates available" instead of a bare number with a help text.
 
 ## Consequences
 

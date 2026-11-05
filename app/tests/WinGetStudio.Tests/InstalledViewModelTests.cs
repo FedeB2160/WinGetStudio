@@ -94,6 +94,7 @@ public class InstalledViewModelTests
         var ask = Assert.Single(h.Dialogs.Calls);
         Assert.Equal(("Confirm uninstall", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No),
             (ask.Title, ask.Button, ask.Image, ask.Default));
+        Assert.Equal(("Uninstall", "Cancel"), ask.Verbs);
         Assert.Equal("Uninstall 2 packages?\n\n  - Alpha\n  - Beta\n\n1 of them are currently hidden by the filter.\n\nThis cannot be undone.", ask.Text);
         Assert.Equal(0, h.WinGet.Count("uninstall"));
         Assert.Contains("Uninstall cancelled.", h.Log);
@@ -167,6 +168,7 @@ public class InstalledViewModelTests
 
             var ask = Assert.Single(h.Dialogs.Calls);
             Assert.Equal(("Confirm import", MessageBoxResult.No), (ask.Title, ask.Default));
+            Assert.Equal(("Import", "Cancel"), ask.Verbs);
             Assert.Contains("1 package carries installer arguments saved in the file.", ask.Text);
             Assert.Equal("Keep the installer arguments saved for 1 package (--custom, --override)", preview!.KeepStoredText);
             var package = Assert.Single(JsonNode.Parse(imported!)!["Sources"]![0]!["Packages"]!.AsArray())!;

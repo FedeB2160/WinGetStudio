@@ -14,10 +14,11 @@ public sealed class DialogService : IDialogService
     public MainWindow? Owner { get; set; }
 
     public MessageBoxResult Show(string text, string title = "WinGet Studio", MessageBoxButton button = MessageBoxButton.OK,
-        MessageBoxImage image = MessageBoxImage.None, MessageBoxResult defaultResult = MessageBoxResult.None, object? content = null, bool links = false)
+        MessageBoxImage image = MessageBoxImage.None, MessageBoxResult defaultResult = MessageBoxResult.None, object? content = null, bool links = false,
+        (string Yes, string No)? verbs = null)
     {
         AppDialog dialog;
-        try { dialog = new AppDialog(text, title, button, image, defaultResult, content, links); }
+        try { dialog = new AppDialog(text, title, button, image, defaultResult, content, links, verbs); }
         catch (Exception e) when (e is System.Windows.Markup.XamlParseException or InvalidOperationException or ResourceReferenceKeyNotFoundException)
         {
             // Ripiego sulla MessageBox: un messaggio non deve perdersi proprio quando qualcosa

@@ -41,6 +41,11 @@ The MessageBox also gave a few things for free, and some of them are safety rule
   - the last one answers Esc, and so does the close button: No, or OK;
   - the default button has the focus when the dialog opens;
   - the click handler reads the window from the sender, not from a captured variable (ADR 0008).
+  - **Note (2.0, 2026-11-05):** confirmations name their buttons with verbs ("Uninstall" /
+    "Cancel", "Restart now" / "Not now", "Install winget" / "Close WinGet Studio"), passed as
+    `verbs` to `IDialogService.Show`: a bare Yes / No made the reader go back to the question.
+    The results are still Yes and No, and the second button is still the default, the accent
+    and the Esc answer. The MessageBox fallback shows plain Yes / No.
 - **Placement**: centred on the app (`Owner` plus `CenterOwner`), never in the taskbar, not
   resizable.
 - **The sound**: the one the MessageBox plays for the same image.

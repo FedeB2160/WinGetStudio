@@ -24,7 +24,8 @@ public partial class AppDialog : Window
     private readonly MessageBoxButton _button;
     private MessageBoxResult? _answer;
 
-    public AppDialog(string text, string title, MessageBoxButton button, MessageBoxImage image, MessageBoxResult defaultResult, object? content, bool links)
+    public AppDialog(string text, string title, MessageBoxButton button, MessageBoxImage image, MessageBoxResult defaultResult, object? content, bool links,
+        (string Yes, string No)? verbs = null)
     {
         InitializeComponent();
         TitleBar.Follow(this);
@@ -50,7 +51,9 @@ public partial class AppDialog : Window
         var preferred = answers.Length == 1 ? MessageBoxResult.OK : defaultResult == MessageBoxResult.No ? MessageBoxResult.No : MessageBoxResult.Yes;
         foreach (var a in answers)
         {
-            var b = new Button { Content = a.ToString(), MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), IsDefault = a == preferred, IsCancel = a == answers[^1] };
+            // Il verbo dice cosa succede: "Uninstall" / "Cancel" invece di Yes / No.
+            var label = verbs is { } v && answers.Length == 2 ? (a == MessageBoxResult.Yes ? v.Yes : v.No) : a.ToString();
+            var b = new Button { Content = label, MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), IsDefault = a == preferred, IsCancel = a == answers[^1] };
             if (b.IsDefault) b.SetResourceReference(StyleProperty, "AccentButtonStyle");
             b.Click += (_, _) => { _answer = a; Close(); };
             DlgButtons.Children.Add(b);
