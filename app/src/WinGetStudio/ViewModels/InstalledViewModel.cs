@@ -123,6 +123,7 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         if (file is null || !State.TryBegin()) return;
         Loading = true;
         State.Log.Write($"Exporting the package list to {file} ...");
+        string? failure = null;
         try
         {
             var r = await RunAsync(WinGetCommands.Export(file), "export");
@@ -138,6 +139,8 @@ public sealed partial class InstalledViewModel : PackageListViewModel
             {
                 State.Log.Write($"Export FAILED (exit {r.ExitCode}).");
                 foreach (var l in WinGetTable.OutputTail(r.Output)) State.Log.Write($"   {l}");
+                failure = $"The package list could not be exported (exit {r.ExitCode}).\n\n" + Reason(r) +
+                    "Try again, or save it to another folder. The log has winget's full output.";
             }
         }
         finally
@@ -145,6 +148,15 @@ public sealed partial class InstalledViewModel : PackageListViewModel
             Loading = false;
             State.End();
         }
+        // Dopo lo stato occupato: sotto il dialogo la scheda non resta "al lavoro".
+        if (failure is not null) State.Dialogs.Show(failure, "Export failed", MessageBoxButton.OK, MessageBoxImage.Error);
+    }
+
+    // Perche' winget ha fallito, per un dialogo: il motivo noto del codice, o le sue ultime righe.
+    private static string Reason(ProcessResult r)
+    {
+        var why = ExitCodes.Hint(r.ExitCode) is { } hint ? $"{hint}." : string.Join("\n", WinGetTable.OutputTail(r.Output));
+        return why.Length > 0 ? $"{why}\n\n" : "";
     }
 
     // L'import installa software senza altre domande: anteprima con tutto spuntato, No
@@ -159,7 +171,8 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         // 0 come null: un export senza pacchetti winget lo rifiuterebbe dopo la conferma.
         if (list is null || list.Packages.Count == 0)
         {
-            State.Dialogs.Show($"This file is not a winget package list, or it lists no packages.\n\n{file}", "Cannot import",
+            State.Dialogs.Show($"This file is not a winget package list, or it lists no packages.\n\n{file}\n\n" +
+                "To make one, use Export... in the Installed tab.", "Cannot import",
                 MessageBoxButton.OK, MessageBoxImage.Error);
             return;
         }
@@ -206,6 +219,7 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         Loading = true;
         State.ProgressIndeterminate = true;
         State.Log.Write($"Importing {count} packages from {file} ...");
+        string? failure = null;
         try
         {
             var r = await RunAsync(WinGetCommands.Import(file), "import");
@@ -216,6 +230,8 @@ public sealed partial class InstalledViewModel : PackageListViewModel
                 default:
                     State.Log.Write($"Import FAILED (exit {r.ExitCode}).");
                     foreach (var l in WinGetTable.OutputTail(r.Output, 3)) State.Log.Write($"   {l}");
+                    failure = $"Not every package was imported (exit {r.ExitCode}).\n\n" + Reason(r) +
+                        "The log says what winget did with each package. Install the missing ones from the Install tab.";
                     break;
             }
             // Software installato: Updates si rilegge all'apertura, questo elenco subito.
@@ -227,6 +243,7 @@ public sealed partial class InstalledViewModel : PackageListViewModel
             Loading = false;
             State.End();
         }
+        if (failure is not null) State.Dialogs.Show(failure, "Import failed", MessageBoxButton.OK, MessageBoxImage.Error);
     }
 
     // Il tick ogni 30 s dice che winget sta ancora lavorando.

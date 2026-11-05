@@ -189,6 +189,16 @@ list on all four sides.
       once, ticked or not, with no confirmation. It now opens the details (the same as the context
       menu item), whose button band offers **Install** and **Close**; Close is the default, so
       Enter and Esc close and only a click on Install installs that row, from its source.
+    - **Errors say what to do next.** `ExitCodes.Hint` explains the winget codes it knows (names
+      checked with `winget error`): needs administrator, application running, disk full, no
+      network, restart Windows, sources that cannot be opened, and a few more. The Result tooltip
+      shows it ("Needs administrator rights: use Retry as administrator (exit ...)", the Retry
+      part only where that button exists, never elevated), and the log adds it under the
+      failure. A failed export or import is no longer only in the log: a dialog gives the reason
+      and the next step. A file that is not a package list says how to make one (Export...). A
+      failed self-update or winget update says why and where to get it, in the note under the
+      version, since the log is under the page's veil. Upper-case FAILED and WARNING stay in the
+      log, where they help to scan it, and leave dialogs.
 
 ## Consequences
 

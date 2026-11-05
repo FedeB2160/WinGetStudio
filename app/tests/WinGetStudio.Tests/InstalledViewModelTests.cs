@@ -212,8 +212,29 @@ public class InstalledViewModelTests
             await h.Vm.Installed.ImportAsync();
             var d = Assert.Single(h.Dialogs.Calls);
             Assert.Equal(("Cannot import", MessageBoxImage.Error), (d.Title, d.Image));
+            // Il passo successivo: come farsene uno.
+            Assert.EndsWith("\n\nTo make one, use Export... in the Installed tab.", d.Text);
             Assert.Empty(h.WinGet.Calls);
         }
         finally { File.Delete(file); }
+    }
+
+    // Export fallito: non solo nel log. Un dialogo col motivo noto del codice e cosa fare, dopo
+    // lo stato occupato; FAILED maiuscolo resta solo nel log.
+    [Fact]
+    public async Task FailedExportSaysWhyAndWhatToDo()
+    {
+        const int sourcesFailed = unchecked((int)0x8A15004B);
+        using var h = Create([], a => a[0] == "export" ? FakeWinGet.Result(sourcesFailed, "Failed to open one or more sources\r\n") : null);
+        h.Dialogs.SaveFile = Path.Combine(Path.GetTempPath(), $"wgt-test-{Guid.NewGuid():N}.json");
+
+        await h.Vm.Installed.ExportAsync();
+
+        Assert.Contains($"Export FAILED (exit {sourcesFailed}).", h.Log);
+        var d = Assert.Single(h.Dialogs.Calls);
+        Assert.Equal(("Export failed", MessageBoxImage.Error), (d.Title, d.Image));
+        Assert.Equal($"The package list could not be exported (exit {sourcesFailed}).\n\nSome sources could not be opened: check the internet connection.\n\n" +
+            "Try again, or save it to another folder. The log has winget's full output.", d.Text);
+        Assert.False(h.State.IsBusy);
     }
 }

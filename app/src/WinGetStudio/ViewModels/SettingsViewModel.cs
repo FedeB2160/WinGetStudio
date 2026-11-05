@@ -335,7 +335,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             (installed ? $"Download the {rel.Tag} installer and update WinGet Studio? It closes, updates and reopens.\n\n" : $"Download {rel.Tag} and restart WinGet Studio?\n\n") +
             $"{rel.Name} - {rel.Size / 1024} KB\nFrom: {rel.Url}\n\n" +
             (rel.Sha256 is not null ? "The download is checked against the SHA-256 published with the release, and must carry the WinGet Studio signature."
-                : "WARNING: this release publishes no checksum, so the download is checked against the WinGet Studio signature only."),
+                : "This release publishes no checksum, so the download is checked against the WinGet Studio signature only."),
             "Update WinGet Studio", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No, verbs: ("Update", "Cancel"));
         if (answer != MessageBoxResult.Yes || !State.TryBegin()) return;
         try
@@ -347,8 +347,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             {
                 State.Log.Write($"Update FAILED: {d.Error}.");
                 // Chi resta qui (una release con un certificato nuovo) deve sapere che puo'
-                // aggiornare a mano, e da dove: il log non lo legge nessuno.
-                if (d.SignatureRejected)
+                // aggiornare a mano, e da dove: il log non lo legge nessuno. Gli altri motivi nella
+                // nota sotto la versione, che la pagina mostra.
+                if (!d.SignatureRejected) UpdateFailed(d.Error);
+                else
                     State.Dialogs.Show("WinGet Studio could not confirm that this update was signed by its author, so it was not installed. " +
                         "This happens when a release is signed with a new certificate, or when the file was altered.\n\n" +
                         $"You can get the latest version by hand from https://github.com/{SelfUpdate.Repo}/releases/latest",
@@ -361,6 +363,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             if (_host.Apply(file, installed) is { } error)
             {
                 State.Log.Write(installed ? $"Update FAILED: the installer did not start: {error}" : $"Update FAILED while replacing the executable: {error}");
+                UpdateFailed(error);
                 return;
             }
             if (!installed) State.Log.Write($"Updated to {rel.Tag}. Restarting...");
@@ -368,6 +371,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
         finally { State.End(); }
     }
+
+    // Il motivo e il passo successivo, sotto la versione: il log sta sotto il velo della pagina.
+    private void UpdateFailed(string? why) =>
+        UpdateStatus = $"The update failed: {why?.TrimEnd('.')}. Try again, or download it from github.com/{SelfUpdate.Repo}/releases.";
 
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private Task UpdateWinGet() => InstallWinGetAsync(missing: false);
@@ -422,6 +429,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (!missing)
         {
             State.Log.Write($"winget update FAILED: {why}");
+            WinGetStatus = $"The update failed: {why.TrimEnd('.')}. Try again, or update App Installer from the Microsoft Store.";
             State.End();
             return;
         }

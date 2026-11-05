@@ -195,6 +195,23 @@ public class PackageQueueTests
         Assert.Contains("Cancelled at the administrator prompt: nothing was run.", log);
     }
 
+    // L'esito dice il motivo dei codici noti e cosa fare (revisione UI/UX, R9): Retry as
+    // administrator solo dove c'e', cioe' mai da elevata.
+    [Fact]
+    public async Task KnownCodesExplainTheOutcome()
+    {
+        const int requiresAdmin = unchecked((int)0x8A150019);
+        var (queue, _, _) = CreateElevated(false, _ => FakeRunner.Result(requiresAdmin, ""));
+        var log = new List<string>();
+        var r = await queue.RunAsync(new QueueRequest(QueueVerb.Install, [A], r => WinGetCommands.Install(r, InstallScope.Auto)), log.Add);
+        Assert.Equal($"Needs administrator rights: use Retry as administrator (exit {requiresAdmin})", r.Outcomes["A.A"].Detail);
+        Assert.Contains("      Needs administrator rights: use Retry as administrator.", log);
+
+        var (elevated, _, _) = CreateElevated(true, _ => FakeRunner.Result(requiresAdmin, ""));
+        r = await elevated.RunAsync(new QueueRequest(QueueVerb.Install, [A], r => WinGetCommands.Install(r, InstallScope.Auto)));
+        Assert.Equal($"Needs administrator rights (exit {requiresAdmin})", r.Outcomes["A.A"].Detail);
+    }
+
     [Fact]
     public void ElevatableIdsAreTheFailuresElevationCanFix()
     {

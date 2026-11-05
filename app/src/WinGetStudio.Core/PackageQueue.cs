@@ -77,7 +77,7 @@ public sealed class PackageQueue(WinGetCli cli)
                         r = await cli.RunUnelevatedAsync(args, tick);
                     }
                 }
-                outcome = Report(row, r, log);
+                outcome = Report(row, r, log, cli.Elevation.IsElevated);
             }
             catch (Exception e) when (e is ArgumentException or System.ComponentModel.Win32Exception or IOException or UnauthorizedAccessException
                 or InvalidOperationException or System.Runtime.InteropServices.COMException)
@@ -112,7 +112,7 @@ public sealed class PackageQueue(WinGetCli cli)
                     rowChanged?.Invoke(rows[i], null);
                     return;
                 }
-                var outcome = Report(rows[i], r, log);
+                var outcome = Report(rows[i], r, log, elevated: true);
                 outcomes[rows[i].Id] = outcome;
                 rowChanged?.Invoke(rows[i], outcome);
             }, cancel);
@@ -142,9 +142,11 @@ public sealed class PackageQueue(WinGetCli cli)
         return Finish(request, outcomes, outcomes.Count, log);
     }
 
-    private static PackageOutcome Report(PackageRow row, ProcessResult r, Action<string>? log)
+    // Il tooltip dell'esito: il motivo per i codici noti (ExitCodes.Hint), "exit N" sempre.
+    private static PackageOutcome Report(PackageRow row, ProcessResult r, Action<string>? log, bool elevated)
     {
-        var outcome = new PackageOutcome(ExitCodes.Classify(r.ExitCode), $"exit {r.ExitCode}", r.ExitCode);
+        var advice = Advice(r.ExitCode, elevated);
+        var outcome = new PackageOutcome(ExitCodes.Classify(r.ExitCode), advice is null ? $"exit {r.ExitCode}" : $"{advice} (exit {r.ExitCode})", r.ExitCode);
         switch (outcome.Status)
         {
             case OperationStatus.Ok: log?.Invoke($"   OK: {row.Name} ({(int)r.Elapsed.TotalSeconds}s)"); break;
@@ -156,7 +158,15 @@ public sealed class PackageQueue(WinGetCli cli)
                 foreach (var l in WinGetTable.OutputTail(r.Output)) log?.Invoke($"      {l}");
                 break;
         }
+        if (advice is not null && outcome.Status != OperationStatus.Ok) log?.Invoke($"      {advice}.");
         return outcome;
+    }
+
+    // Il motivo noto e cosa fare. Retry as administrator solo dove c'e': mai da elevata (ADR 0024).
+    internal static string? Advice(int code, bool elevated)
+    {
+        var hint = ExitCodes.Hint(code);
+        return hint is not null && !elevated && ExitCodes.ElevationCanFix(code) ? $"{hint}: use Retry as administrator" : hint;
     }
 
     private static QueueResult Finish(QueueRequest request, Dictionary<string, PackageOutcome> outcomes, int done, Action<string>? log)
