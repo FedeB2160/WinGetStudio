@@ -21,4 +21,14 @@ public class ExitCodesTests
     [InlineData(-1, OperationStatus.Error)]
     public void Classify(int code, OperationStatus expected) =>
         Assert.Equal(expected, ExitCodes.Classify(code));
+
+    // Il motivo dei codici noti (revisione UI/UX, R9); gli altri nessuno.
+    [Theory]
+    [InlineData(unchecked((int)0x8A150019), "Needs administrator rights")]
+    [InlineData(unchecked((int)0x8A150101), "The application is running: close it and try again")]
+    [InlineData(3010, "Restart Windows to finish")]
+    [InlineData(1, null)]
+    [InlineData(-1, null)]
+    public void Hint(int code, string? expected) =>
+        Assert.Equal(expected, ExitCodes.Hint(code));
 }

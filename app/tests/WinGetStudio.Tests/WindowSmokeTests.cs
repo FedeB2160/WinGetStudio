@@ -53,9 +53,22 @@ public class WindowSmokeTests
         Assert.True(all.IsEnabled);
         all.IsChecked = true;
         Assert.True(h.Vm.Updates.Items[0].Selected);
-        // Titoli delle colonne al centro (ADR 0028).
+        // Titoli delle colonne a sinistra, dove comincia il testo delle celle; al centro solo le
+        // colonne fisse (ADR 0028, punto 17). La spunta di Seleziona tutto resta sopra quelle delle
+        // righe (i 7 px di SelectAllHeader).
+        var updatesGrid = (DataGrid)w.FindName("GridUpdates");
+        var firstRow = FindChild<DataGridRow>(updatesGrid)!;
+        double Left(FrameworkElement e) => e.TranslatePoint(new Point(), updatesGrid).X;
+        double Middle(FrameworkElement e) => Left(e) + e.ActualWidth / 2;
         var name = FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Package Name");
-        Assert.Equal(HorizontalAlignment.Center, name.HorizontalContentAlignment);        // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
+        Assert.Equal(HorizontalAlignment.Left, name.HorizontalContentAlignment);
+        var nameCell = FindAll<DataGridCell>(firstRow).First(c => c.Column == name.Column);
+        Assert.Equal(Left(FindChild<TextBlock>(nameCell)!), Left(FindChild<TextBlock>(name)!), 1.0);
+        Assert.Equal(HorizontalAlignment.Center, FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Result").HorizontalContentAlignment);
+        // 2 px: lo spazio che l'intestazione Fluent tiene per la freccia di ordinamento dipende dal
+        // font dei glifi, e sul runner della CI (Windows Server) la spunta finiva 1,3 px piu' in la'.
+        Assert.Equal(Middle(FindChild<CheckBox>(firstRow)!), Middle(all), 2.0);
+        // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
         // colonne, Result compresa, stanno dentro e le fisse non cambiano larghezza. Le altre
         // elastiche non restano schiacciate ai 20 px minimi del DataGrid: tengono almeno il titolo.
         var grid = (DataGrid)w.FindName("GridUpdates");
@@ -127,6 +140,27 @@ public class WindowSmokeTests
         Assert.Equal(System.Windows.Automation.AutomationLiveSetting.Polite,
             System.Windows.Automation.AutomationProperties.GetLiveSetting((TextBlock)w.FindName("Announcement")));
         all.IsChecked = false;
+        // Etichette che dicono l'azione (ADR 0028, punto 17), nella scheda aperta (Updates): il
+        // contenuto sta nel TabControl, non nella TabItem.
+        Assert.Contains(FindAll<Button>(tabs), b => b.Content as string == "Check for updates");
+        Assert.Contains(FindAll<CheckBox>(tabs), c => c.Content as string == "Include unknown versions");
+        var scope = (ComboBox)w.FindName("CmbScope");
+        Assert.Equal(["Auto", "Current user", "All users"], scope.Items.Cast<ScopeChoice>().Select(s => s.Label));
+        Assert.Equal("Auto", ((ScopeChoice)scope.SelectedItem).Label);
+        // Suggerimento nel campo vuoto (ADR 0028, punto 17): dove comincia il testo scritto, e solo
+        // finche' il campo e' vuoto.
+        tabs.SelectedIndex = MainViewModel.InstallTab;
+        var search = (TextBox)w.FindName("TxtSearch");
+        var placeholder = (TextBlock)w.FindName("HintSearch");
+        Pump(() => placeholder.IsVisible);
+        Assert.True(placeholder.IsVisible);
+        Assert.Equal(search.GetRectFromCharacterIndex(0).X, placeholder.TranslatePoint(new Point(), search).X, 1.0);
+        h.Vm.Install.SearchText = "ab";
+        Pump(() => true);
+        Assert.False(placeholder.IsVisible);
+        h.Vm.Install.SearchText = "";
+        tabs.SelectedIndex = MainViewModel.UpdatesTab;
+        Pump(() => true);
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
         var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };
         about.Show();
@@ -140,7 +174,7 @@ public class WindowSmokeTests
         Assert.Equal(h.Vm.Settings.Themes.Count, FindChild<ComboBox>(settings)!.Items.Count);
         // Menu a sinistra (ADR 0028): tre sezioni, si apre sulla prima e mostra solo la sua pagina.
         var nav = (ListBox)settings.FindName("Nav");
-        Assert.Equal(["Appearance", "General", "Updates"], nav.Items.Cast<ListBoxItem>().Select(i => (string)i.Content));
+        Assert.Equal(["Appearance", "General", "App updates"], nav.Items.Cast<ListBoxItem>().Select(i => (string)i.Content));
         Assert.Equal(0, nav.SelectedIndex);
         Assert.True(FindAll<CheckBox>(settings).All(c => !c.IsVisible));
         nav.SelectedIndex = 1;

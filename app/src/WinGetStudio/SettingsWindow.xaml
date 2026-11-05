@@ -146,7 +146,8 @@
             </ListBox.ItemContainerStyle>
             <ListBoxItem Content="Appearance" Tag="&#xE790;"/>
             <ListBoxItem Content="General" Tag="&#xE713;"/>
-            <ListBoxItem Content="Updates" Tag="&#xE895;"/>
+            <!-- "App updates" e non "Updates": quello e' il nome della scheda dei pacchetti. -->
+            <ListBoxItem Content="App updates" Tag="&#xE895;"/>
         </ListBox>
         </DockPanel>
         <!-- Linea fra il menu e la pagina: lo stesso tratto delle aree. -->
@@ -207,7 +208,7 @@
                     <Border Style="{StaticResource CompactCard}" Margin="0,12,0,0">
                         <StackPanel>
                             <CheckBox Content="Close to tray" IsChecked="{Binding CloseToTray}"
-                                      ToolTip="The close button hides the window and WinGet Studio keeps running in the notification area. Close in the icon's menu closes it"/>
+                                      ToolTip="The close button hides the window and WinGet Studio keeps running in the notification area. Exit in the icon's menu closes it"/>
                             <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
                                 <TextBlock Text="Check for package updates" Style="{StaticResource Label}"/>
                                 <ComboBox Width="150" ItemsSource="{Binding CheckIntervals}" SelectedItem="{Binding SelectedCheckInterval}"
@@ -218,10 +219,10 @@
                     </Border>
                 </StackPanel>
 
-                <!-- Updates: WinGet Studio e winget stesso. -->
+                <!-- App updates: WinGet Studio e winget stesso. -->
                 <StackPanel Style="{StaticResource Page}">
                     <StackPanel.Tag><sys:Int32>2</sys:Int32></StackPanel.Tag>
-                    <TextBlock Text="Updates" Style="{StaticResource PageTitle}"/>
+                    <TextBlock Text="App updates" Style="{StaticResource PageTitle}"/>
                     <Border Style="{StaticResource CompactCard}">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -259,12 +260,13 @@
                                 </StackPanel>
                                 <TextBlock Style="{StaticResource Note}" Text="{Binding WinGetStatus}"/>
                             </StackPanel>
-                            <!-- Valgono per tutte e due le voci sopra. -->
+                            <!-- Valgono per tutte e due le voci sopra. "Check for new versions": "Check for
+                                 updates" e' il controllo dei pacchetti (scheda Updates, menu del tray). -->
                             <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal">
-                                <Button Content="Check for updates" MinWidth="140" Command="{Binding CheckForUpdatesCommand}"/>
+                                <Button Content="Check for new versions" MinWidth="140" Command="{Binding CheckForUpdatesCommand}"/>
                                 <CheckBox Content="Check at startup" Margin="16,0,0,0" VerticalAlignment="Center"
                                           IsChecked="{Binding CheckAtStartup}"
-                                          ToolTip="Anonymous calls to the GitHub API when the app starts: one for WinGet Studio, and one for winget where the Microsoft Store does not update it. Turn it off to go online only when you press Check for updates"/>
+                                          ToolTip="Anonymous calls to the GitHub API when the app starts: one for WinGet Studio, and one for winget where the Microsoft Store does not update it. Turn it off to go online only when you press Check for new versions"/>
                                 <local:Spinner Margin="12,0,0,0" Visibility="{Binding Checking, Converter={StaticResource Visible}}"/>
                             </StackPanel>
                         </Grid>

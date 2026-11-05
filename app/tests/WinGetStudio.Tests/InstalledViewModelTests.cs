@@ -79,6 +79,22 @@ public class InstalledViewModelTests
         Assert.Equal("2 selected (1 hidden by the filter)", vm.InfoText);
     }
 
+    // Un filtro che non trova nulla lo dice al posto della griglia vuota, e come uscirne.
+    [Fact]
+    public async Task FilterWithNoMatchSaysSoInsteadOfAnEmptyGrid()
+    {
+        using var h = Create([A, B]);
+        var vm = h.Vm.Installed;
+        await vm.LoadAsync();
+
+        vm.FilterText = " zzz ";
+        Assert.Equal((false, true), (vm.HasItems, vm.IsEmpty));
+        Assert.Equal("No installed package matches 'zzz'.\nClear the filter to see all 2.", vm.EmptyText);
+
+        vm.FilterText = "";
+        Assert.Equal((true, false), (vm.HasItems, vm.IsEmpty));
+    }
+
     [Fact]
     public async Task UninstallAsksFirstWithNoAsDefault()
     {
@@ -196,8 +212,29 @@ public class InstalledViewModelTests
             await h.Vm.Installed.ImportAsync();
             var d = Assert.Single(h.Dialogs.Calls);
             Assert.Equal(("Cannot import", MessageBoxImage.Error), (d.Title, d.Image));
+            // Il passo successivo: come farsene uno.
+            Assert.EndsWith("\n\nTo make one, use Export... in the Installed tab.", d.Text);
             Assert.Empty(h.WinGet.Calls);
         }
         finally { File.Delete(file); }
+    }
+
+    // Export fallito: non solo nel log. Un dialogo col motivo noto del codice e cosa fare, dopo
+    // lo stato occupato; FAILED maiuscolo resta solo nel log.
+    [Fact]
+    public async Task FailedExportSaysWhyAndWhatToDo()
+    {
+        const int sourcesFailed = unchecked((int)0x8A15004B);
+        using var h = Create([], a => a[0] == "export" ? FakeWinGet.Result(sourcesFailed, "Failed to open one or more sources\r\n") : null);
+        h.Dialogs.SaveFile = Path.Combine(Path.GetTempPath(), $"wgt-test-{Guid.NewGuid():N}.json");
+
+        await h.Vm.Installed.ExportAsync();
+
+        Assert.Contains($"Export FAILED (exit {sourcesFailed}).", h.Log);
+        var d = Assert.Single(h.Dialogs.Calls);
+        Assert.Equal(("Export failed", MessageBoxImage.Error), (d.Title, d.Image));
+        Assert.Equal($"The package list could not be exported (exit {sourcesFailed}).\n\nSome sources could not be opened: check the internet connection.\n\n" +
+            "Try again, or save it to another folder. The log has winget's full output.", d.Text);
+        Assert.False(h.State.IsBusy);
     }
 }

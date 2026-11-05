@@ -159,7 +159,24 @@ public class SettingsViewModelTests
         Assert.Equal((MessageBoxButton.YesNo, MessageBoxResult.No), (c.Button, c.Default));
         // Senza digest il canale portable si affida alla sola firma, e lo dice.
         Assert.Contains("checked against the WinGet Studio signature only", c.Text);
+        // Il maiuscolo resta nel log, non nei dialoghi.
+        Assert.DoesNotContain("WARNING", c.Text);
         Assert.DoesNotContain("Downloading", h.Log);
+    }
+
+    // Un download fallito dice perche' e cosa fare sotto la versione: il log e' sotto il velo.
+    [Fact]
+    public async Task FailedDownloadSaysWhyUnderTheVersion()
+    {
+        using var h = new Harness();
+        h.Host.Releases[SelfUpdate.Repo] = FakeUpdateHost.Release("v9.0.0");
+        await h.Vm.Settings.CheckAsync(manual: false);
+        h.Dialogs.Answer = _ => MessageBoxResult.Yes;
+        h.Host.Download = new DownloadResult(null, "no network");
+        await h.Vm.Settings.UpdateAppAsync();
+        Assert.Contains("Update FAILED: no network.", h.Log);
+        Assert.Equal("The update failed: no network. Try again, or download it from github.com/FedeB2160/WinGetStudio/releases.", h.Vm.Settings.UpdateStatus);
+        Assert.Single(h.Dialogs.Calls);
     }
 
     // Il setup chiede l'amministratore: senza digest non si scarica nemmeno.
@@ -325,7 +342,7 @@ public class SettingsViewModelTests
             : ""));
         await h.Vm.Updates.LoadAsync();
         Assert.Equal(["A.A"], h.Vm.Updates.Items.Select(i => i.Id));
-        Assert.Contains("An update for WinGet Studio itself is available: update it from the Settings tab.", h.Log);
+        Assert.Contains("An update for WinGet Studio itself is available: update it from Settings > App updates.", h.Log);
         Assert.Contains("Found 1 updates.", h.Log);
     }
 }

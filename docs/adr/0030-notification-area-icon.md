@@ -33,7 +33,9 @@ Windows desktop runtime the app already uses, a library (H.NotifyIcon, Hardcodet
    version) covered the badge and blurred at 16 px.
 3. **The menu is a WPF `ContextMenu`**, not the WinForms one, so it follows the Fluent theme (ADR 0027)
    like the rest of the app: Install, Installed, Updates (open the window on that tab), Check for
-   updates, Settings, About, Close. A double click opens the window. An invisible window of its own is
+   updates, Settings, About, Exit. A double click opens the window. (The last item was "Close"
+   until the UI/UX review of 2026-11-05: with Close to tray the window's X does not close the
+   app, so one word had two effects. "Exit", as in the Windows apps that live in the tray.) An invisible window of its own is
    brought to the foreground before the menu opens, or the menu would not close on a click elsewhere;
    the main window would come up over the others and make the app count as active. With Settings or
    a dialog already open, the items bring that to the front instead of opening a second modal page.
@@ -46,7 +48,7 @@ Windows desktop runtime the app already uses, a library (H.NotifyIcon, Hardcodet
 5. **Settings gains a "Notification area" card**, at the top of the right column, above Updates
    (ADR 0028, point 11: settings widen, not lengthen):
    - **Close to tray**, preference `CloseToTray`, off by default: off, the X closes the app as before;
-     on, it hides the window. Close in the menu, an update that restarts the app, the end of the
+     on, it hides the window. Exit in the menu, an update that restarts the app, the end of the
      Windows session and every other path that closes the app on purpose still close it.
    - **Check for package updates**: Never, Every hour, Every 6 hours, Every 24 hours, preference
      `CheckInterval`, **Never by default**, so winget does not start on its own unless asked. The

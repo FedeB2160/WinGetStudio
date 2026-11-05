@@ -225,6 +225,22 @@
                 </Style.Triggers>
             </Style>
     
+            <!-- Suggerimento nel campo vuoto (Search, Filter): un testo sopra il TextBox, senza
+                 rifarne il template. Tag = il TextBox; si vede solo finche' e' vuoto e lascia passare
+                 i clic. Il margine porta il testo dove comincia quello scritto (smoke test). -->
+            <Style x:Key="Placeholder" TargetType="TextBlock">
+                <Setter Property="IsHitTestVisible" Value="False"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Margin" Value="13,0,0,0"/>
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Tag.Text, RelativeSource={RelativeSource Self}}" Value="">
+                        <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
             <!-- Messaggio al posto della griglia vuota: guida, "nessun risultato", errore di winget. -->
             <Style x:Key="EmptyMessage" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="16"/>
@@ -288,16 +304,26 @@
                 <Setter Property="ItemsSource" Value="{Binding Items}"/>
                 <Setter Property="Visibility" Value="{Binding HasItems, Converter={StaticResource Visible}}"/>
             </Style>
-            <!-- Titoli delle colonne al centro. Stile implicito e non ColumnHeaderStyle della griglia:
-                 col tema Fluent le intestazioni prendono lo stile per tipo e ignorano quello. -->
+            <!-- Titoli delle colonne a sinistra, dove comincia il testo delle celle (smoke test); al
+                 centro solo spunta, Pin e Result, le colonne a modello, che non si ordinano. Il
+                 trigger e' su CanUserSort perche' e' una proprieta' dell'intestazione: Column non
+                 notifica, e un binding su Column.CanUserResize resta a null. Stile implicito e non
+                 ColumnHeaderStyle della griglia: col tema Fluent le intestazioni prendono lo stile
+                 per tipo e ignorano quello. -->
             <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
-                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
                 <!-- Niente separatori verticali: come le righe, solo linee orizzontali. -->
                 <Setter Property="SeparatorVisibility" Value="Collapsed"/>
                 <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
-                <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
-                     rispetto a quelle delle righe. Centrati, i titoli non ne hanno bisogno. -->
-                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Padding" Value="3,0,0,0"/>
+                <Style.Triggers>
+                    <Trigger Property="CanUserSort" Value="False">
+                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
+                             rispetto a quelle delle righe. -->
+                        <Setter Property="Padding" Value="0"/>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
             <!-- Testo delle colonne: VerticalContentAlignment della cella non arriva al TextBlock,
                  che si stende e lascia il testo in alto. Lo si centra qui. Testo lungo: i puntini. -->
@@ -391,13 +417,16 @@
                     <Grid Margin="0,0,0,8">
                         <StackPanel Orientation="Horizontal">
                             <!-- Invio: ricerca subito, con lo Store se spuntato. -->
-                            <TextBox x:Name="TxtSearch" Width="380" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                     IsEnabled="{Binding State.IsIdle}"
-                                     AutomationProperties.Name="Package name or ID, at least 3 characters">
-                                <TextBox.InputBindings>
-                                    <KeyBinding Key="Return" Command="{Binding SearchNowCommand}"/>
-                                </TextBox.InputBindings>
-                            </TextBox>
+                            <Grid Width="380">
+                                <TextBox x:Name="TxtSearch" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding State.IsIdle}"
+                                         AutomationProperties.Name="Package name or ID, at least 3 characters">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding SearchNowCommand}"/>
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                                <TextBlock x:Name="HintSearch" Style="{StaticResource Placeholder}" Tag="{Binding ElementName=TxtSearch}" Text="Search by name or ID"/>
+                            </Grid>
                             <Button Content="Search" MinWidth="96" Margin="8,0,0,0" Command="{Binding SearchNowCommand}"/>
                             <CheckBox Content="MS Store" Margin="12,0,0,0" VerticalAlignment="Center"
                                       IsChecked="{Binding IncludeStore}" IsEnabled="{Binding State.IsIdle}"
@@ -418,9 +447,9 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <DataGrid x:Name="GridSearch" Style="{StaticResource Grid}">
-                            <!-- Doppio clic: installa quel pacchetto, senza passare dalle spunte. -->
+                            <!-- Doppio clic: i dettagli del pacchetto, con Install fra i pulsanti. -->
                             <DataGrid.InputBindings>
-                                <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding InstallOneCommand}"
+                                <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DetailsCommand}"
                                               CommandParameter="{Binding SelectedItem, ElementName=GridSearch}"/>
                             </DataGrid.InputBindings>
                             <DataGrid.ContextMenu>
@@ -444,8 +473,18 @@
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding Message}"/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">
-                        <Button DockPanel.Dock="Left" MinWidth="124" Content="{Binding ScopeText}" ToolTip="{Binding ScopeToolTip}"
-                                Command="{Binding CycleScopeCommand}"/>
+                        <!-- Per chi installare (scope di winget): tre voci, ognuna col tooltip che dice cosa fa; sulla
+                             ComboBox quello della voce scelta. -->
+                        <TextBlock DockPanel.Dock="Left" Text="Install for" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <ComboBox x:Name="CmbScope" DockPanel.Dock="Left" MinWidth="124" ItemsSource="{Binding Scopes}" SelectedItem="{Binding SelectedScope}"
+                                  DisplayMemberPath="Label" ToolTip="{Binding SelectedScope.ToolTip}" IsEnabled="{Binding State.IsIdle}"
+                                  AutomationProperties.Name="Install for">
+                            <ComboBox.ItemContainerStyle>
+                                <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                                    <Setter Property="ToolTip" Value="{Binding ToolTip}"/>
+                                </Style>
+                            </ComboBox.ItemContainerStyle>
+                        </ComboBox>
                         <Button DockPanel.Dock="Left" MinWidth="96" Margin="8,0,0,0" Content="Install"
                                 Style="{StaticResource AccentButtonStyle}" Command="{Binding InstallCommand}"/>
                         <TextBlock Style="{StaticResource Hint}" Text="{Binding InfoText}"/>
@@ -465,8 +504,11 @@
                         <StackPanel Orientation="Horizontal">
                             <Button Content="Refresh" MinWidth="96" Command="{Binding ReloadCommand}"/>
                             <!-- Filtro locale sull'elenco gia' caricato: non richiama winget. -->
-                            <TextBox Width="300" Margin="8,0,0,0" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
-                                     IsEnabled="{Binding State.IsIdle}" AutomationProperties.Name="Filter by name or ID"/>
+                            <Grid Width="300" Margin="8,0,0,0">
+                                <TextBox x:Name="TxtFilter" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding State.IsIdle}" AutomationProperties.Name="Filter by name or ID"/>
+                                <TextBlock Style="{StaticResource Placeholder}" Tag="{Binding ElementName=TxtFilter}" Text="Filter by name or ID"/>
+                            </Grid>
                             <local:Spinner Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
                             <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding CountText}"/>
                         </StackPanel>
@@ -519,8 +561,8 @@
                     </Grid.RowDefinitions>
                     <!-- LastChildFill spento: Retry e' l'ultimo e senza riempirebbe lo spazio da sinistra. -->
                     <DockPanel Margin="0,0,0,8" LastChildFill="False">
-                        <Button DockPanel.Dock="Left" MinWidth="96" Content="Check" Command="{Binding CheckCommand}"/>
-                        <CheckBox DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" Content="Unknown"
+                        <Button DockPanel.Dock="Left" MinWidth="96" Content="Check for updates" Command="{Binding CheckCommand}"/>
+                        <CheckBox DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" Content="Include unknown versions"
                                   IsChecked="{Binding IncludeUnknown}" IsEnabled="{Binding State.IsIdle}"
                                   ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"/>
                         <local:Spinner DockPanel.Dock="Left" Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>

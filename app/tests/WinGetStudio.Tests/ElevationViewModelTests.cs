@@ -47,7 +47,7 @@ public class ElevationViewModelTests
 
         Assert.True(vm.RetryAdminVisible);
         Assert.Equal("Retry as administrator (1)", vm.RetryAdminText);
-        Assert.Equal("Retry failed (2)", vm.RetryText);
+        Assert.Equal("Retry failed packages (2)", vm.RetryText);
     }
 
     // Conferma con No predefinito; poi le stesse righe di comando in un solo runas, e la lista si
@@ -153,8 +153,9 @@ public class ElevationViewModelTests
         vm.SearchText = "alpha";
         await vm.SearchNowAsync();
 
-        await vm.InstallOneAsync(vm.Items[0]);
-        await vm.InstallOneAsync(vm.Items[0]);
+        h.Dialogs.Answer = _ => MessageBoxResult.Yes;
+        await vm.DetailsAsync(vm.Items[0]);
+        await vm.DetailsAsync(vm.Items[0]);
 
         Assert.Equal(1, h.Log.Split('\n').Count(l => l.Contains(@"WARNING: running elevated as PC\admin, not as the signed-in user.")));
     }

@@ -71,7 +71,8 @@ list on all four sides.
     all in Install, the non-pinned ones in Updates, the visible ones in Installed (never rows the
     filter hides). The check box, pin and result columns cannot be resized. Column titles are
     centred through an implicit `DataGridColumnHeader` style: with the Fluent theme the headers take
-    the style by type and ignore the grid's `ColumnHeaderStyle`. Truncated cell text shows in full
+    the style by type and ignore the grid's `ColumnHeaderStyle`. (Since point 17, left-aligned
+    except those three columns.) Truncated cell text shows in full
     in a tooltip.
 11. **Third review (2026-10-30).** Borders of areas, tabs, grids and buttons use the theme's strong
     stroke (`ControlStrongStrokeColorDefault`, white on dark and black on light) at 55%: the Fluent
@@ -172,6 +173,48 @@ list on all four sides.
       row: the bar's row is hidden when the queue ends, and a hidden element leaves the
       automation tree just when there is something to say. The Updates badge is named
       "N updates available" instead of a bare number with a help text.
+17. **Clarity (2026-11-05), the medium-severity findings of the UI/UX review.**
+    - **One name per action.** "Check for updates" always means the packages: the Updates tab
+      button (it was "Check") and the notification-area menu. The Settings page of point 14 is
+      **App updates**, and its button, which asks GitHub about WinGet Studio and winget, is
+      **Check for new versions**. "Updates" is only the tab. An out-of-date list says "List out of
+      date: press Check for updates."
+    - **A filter that hides everything says so.** In Installed the grid gives way to "No
+      installed package matches 'x'." and, on its own line, "Clear the filter to see all N.", as an Install search with
+      no result does.
+    - **Install for is a choice in sight.** The "Scope: Auto" button cycled through three values
+      it did not show. It is now a Fluent `ComboBox` labelled "Install for", with Auto, Current
+      user and All users; each item's tooltip says what it passes to winget. The saved values
+      (`InstallScope`: Auto, User, Machine) do not change.
+    - **A double click opens, it does not run.** In Install a double click on a row installed it at
+      once, ticked or not, with no confirmation. It now opens the details (the same as the context
+      menu item), whose button band offers **Install** and **Close**; Close is the default, so
+      Enter and Esc close and only a click on Install installs that row, from its source.
+    - **Errors say what to do next.** `ExitCodes.Hint` explains the winget codes it knows (names
+      checked with `winget error`): needs administrator, application running, disk full, no
+      network, restart Windows, sources that cannot be opened, and a few more. The Result tooltip
+      shows it ("Needs administrator rights: use Retry as administrator (exit ...)", the Retry
+      part only where that button exists, never elevated), and the log adds it under the
+      failure. A failed export or import is no longer only in the log: a dialog gives the reason
+      and the next step. A file that is not a package list says how to make one (Export...). A
+      failed self-update or winget update says why and where to get it, in the note under the
+      version, since the log is under the page's veil. Upper-case FAILED and WARNING stay in the
+      log, where they help to scan it, and leave dialogs.
+    - **Fields say what goes in them.** Search and Filter show "Search by name or ID" and
+      "Filter by name or ID" while empty, in secondary text: a `TextBlock` laid over the
+      `TextBox` (style `Placeholder`), which lets clicks through and starts where typed text
+      does, with no template of our own. Narrator may read it as text of its own: to hear in
+      the Narrator check.
+    - **Column titles sit over their text** (amends point 10): left-aligned, with a 3 px padding
+      that starts them where the cell text starts, as in the import preview. Only the check box,
+      Pin and Result columns stay centred. The implicit header style tells them apart by the
+      header's own `CanUserSort` (template columns have no sort path): a binding on
+      `Column.CanUserResize` is evaluated before the header gets its column, and `Column` does
+      not notify. The Select all check box keeps its 7 px shift and sits over the rows' ones.
+    - **Labels are actions.** "Retry failed (2)" read as a state (the retry failed); it is
+      "Retry failed packages (2)", and its confirmation is titled the same, with Retry and
+      Cancel. The Updates check box "Unknown" said what it changes only in its tooltip; it is
+      "Include unknown versions".
 
 ## Consequences
 

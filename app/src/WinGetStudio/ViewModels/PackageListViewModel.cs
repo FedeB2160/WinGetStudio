@@ -30,7 +30,8 @@ public abstract partial class PackageListViewModel : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(RetryText), nameof(RetryVisible))]
     public partial int RetryCount { get; private set; }
 
-    public string RetryText => $"Retry failed ({RetryCount})";
+    // "packages": "Retry failed (2)" si leggeva come uno stato, il nuovo tentativo fallito.
+    public string RetryText => $"Retry failed packages ({RetryCount})";
     public bool RetryVisible => RetryCount > 0;
 
     // Retry as administrator (ADR 0024): mentre il suo batch gira il pulsante diventa Cancel, che
@@ -61,8 +62,9 @@ public abstract partial class PackageListViewModel : ObservableObject
     }
 
     private bool CanRetryAdmin() => _elevating ? !State.Cancelling : State.IsIdle;
-    public bool HasItems => Items.Count > 0;
-    public bool IsEmpty => Items.Count == 0;
+    // Righe da mostrare: la griglia, o al suo posto il messaggio.
+    public virtual bool HasItems => Items.Count > 0;
+    public bool IsEmpty => !HasItems;
 
     // Dettagli: list --details per cio' che e' installato, solo il catalogo per una ricerca.
     protected abstract bool DetailsInstalled { get; }
@@ -76,8 +78,9 @@ public abstract partial class PackageListViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private Task Unpin(IList? highlighted) => UnpinAsync([.. highlighted?.OfType<PackageItem>() ?? []]);
 
+    // Virtuale: Install offre Install fra i pulsanti dei dettagli.
     [RelayCommand(CanExecute = nameof(IsIdle))]
-    public Task DetailsAsync(PackageItem? item) => State.ShowDetailsAsync(item, DetailsInstalled);
+    public virtual Task DetailsAsync(PackageItem? item) => State.ShowDetailsAsync(item, DetailsInstalled);
 
     public Task PinAsync(IReadOnlyList<PackageItem> highlighted) => State.SetPinAsync(highlighted, Items, true);
     public Task UnpinAsync(IReadOnlyList<PackageItem> highlighted) => State.SetPinAsync(highlighted, Items, false);
