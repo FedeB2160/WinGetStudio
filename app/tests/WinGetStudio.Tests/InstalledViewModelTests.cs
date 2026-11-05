@@ -79,6 +79,22 @@ public class InstalledViewModelTests
         Assert.Equal("2 selected (1 hidden by the filter)", vm.InfoText);
     }
 
+    // Un filtro che non trova nulla lo dice al posto della griglia vuota, e come uscirne.
+    [Fact]
+    public async Task FilterWithNoMatchSaysSoInsteadOfAnEmptyGrid()
+    {
+        using var h = Create([A, B]);
+        var vm = h.Vm.Installed;
+        await vm.LoadAsync();
+
+        vm.FilterText = " zzz ";
+        Assert.Equal((false, true), (vm.HasItems, vm.IsEmpty));
+        Assert.Equal("No installed package matches 'zzz'.\nClear the filter to see all 2.", vm.EmptyText);
+
+        vm.FilterText = "";
+        Assert.Equal((true, false), (vm.HasItems, vm.IsEmpty));
+    }
+
     [Fact]
     public async Task UninstallAsksFirstWithNoAsDefault()
     {

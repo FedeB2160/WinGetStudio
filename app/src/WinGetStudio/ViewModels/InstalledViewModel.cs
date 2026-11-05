@@ -44,6 +44,9 @@ public sealed partial class InstalledViewModel : PackageListViewModel
     // disinstallarle e' proprio cio' che la conferma deve segnalare, non provocare.
     protected override IEnumerable<PackageItem> Selectable => Items.Where(Matches);
 
+    // Un filtro che nasconde tutto: al posto della griglia vuota, il messaggio che lo dice.
+    public override bool HasItems => Items.Any(Matches);
+
     public bool Matches(PackageItem item)
     {
         var f = FilterText.Trim();
@@ -244,6 +247,8 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         var selected = Items.Count(i => i.Selected);
         var hidden = Items.Count(i => i.Selected && !Matches(i));
         CountText = total == 0 ? "" : shown != total ? $"{shown} of {total} installed" : $"{total} installed";
+        // Senza righe il messaggio e' quello della lettura (LoadCoreAsync); con righe, solo il filtro.
+        if (total > 0) EmptyText = shown == 0 ? $"No installed package matches '{FilterText.Trim()}'.\nClear the filter to see all {total}." : "";
         // Un selezionato nascosto dal filtro verrebbe disinstallato senza essere a schermo.
         InfoText = selected == 0 ? "" : hidden > 0 ? $"{selected} selected ({hidden} hidden by the filter)" : $"{selected} selected";
         ReloadCommand?.NotifyCanExecuteChanged();

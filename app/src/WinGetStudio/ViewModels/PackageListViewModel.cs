@@ -61,8 +61,9 @@ public abstract partial class PackageListViewModel : ObservableObject
     }
 
     private bool CanRetryAdmin() => _elevating ? !State.Cancelling : State.IsIdle;
-    public bool HasItems => Items.Count > 0;
-    public bool IsEmpty => Items.Count == 0;
+    // Righe da mostrare: la griglia, o al suo posto il messaggio.
+    public virtual bool HasItems => Items.Count > 0;
+    public bool IsEmpty => !HasItems;
 
     // Dettagli: list --details per cio' che e' installato, solo il catalogo per una ricerca.
     protected abstract bool DetailsInstalled { get; }

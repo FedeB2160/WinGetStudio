@@ -178,6 +178,9 @@ list on all four sides.
       **App updates**, and its button, which asks GitHub about WinGet Studio and winget, is
       **Check for new versions**. "Updates" is only the tab. An out-of-date list says "List out of
       date: press Check for updates."
+    - **A filter that hides everything says so.** In Installed the grid gives way to "No
+      installed package matches 'x'." and, on its own line, "Clear the filter to see all N.", as an Install search with
+      no result does.
 
 ## Consequences
 
