@@ -72,6 +72,10 @@ public sealed partial class AppState : ObservableObject
     // Accanto alla barra durante una coda: "Updating 2 of 3: LibreOffice".
     [ObservableProperty] public partial string ProgressText { get; private set; } = "";
 
+    // Il riepilogo dell'ultima coda ("Update complete: 2 ok, 1 failed."), per i lettori di
+    // schermo (ADR 0028, punto 16). Vuotato a ogni coda: due riepiloghi uguali si annunciano due volte.
+    [ObservableProperty] public partial string Announcement { get; private set; } = "";
+
     // Le liste sono una fotografia della macchina: un'azione da un'altra scheda le rende vecchie.
     public event Action? PinsChanged, UpdatesStale, InstalledStale;
     public void MarkUpdatesStale() => UpdatesStale?.Invoke();
@@ -169,9 +173,18 @@ public sealed partial class AppState : ObservableObject
                 if (outcome is not null) ProgressValue++;
                 else ProgressText = $"{verbing} {ProgressValue + 1} of {ProgressMaximum}: {row.Name}";
             }
+            // L'ultima riga che la coda scrive nel log e' il suo riepilogo.
+            var lastLine = "";
+            void Write(string line)
+            {
+                lastLine = line;
+                Log.Write(line);
+            }
+            Announcement = "";
             var result = elevated
-                ? await Queue.RunElevatedAsync(request, Log.Write, Changed, _cancel.Token)
-                : await Queue.RunAsync(request, Log.Write, Changed, _cancel.Token);
+                ? await Queue.RunElevatedAsync(request, Write, Changed, _cancel.Token)
+                : await Queue.RunAsync(request, Write, Changed, _cancel.Token);
+            Announcement = lastLine;
             _waitingApproval = false;
             // Annullato a meta' del batch elevato: le righe non partite tengono l'esito di prima,
             // e con lui la possibilita' di ripeterle.
@@ -227,7 +240,7 @@ public sealed partial class AppState : ObservableObject
         if (retry.Count == 0 || Last is not { } last) return;
         var verb = last.Result.Request.Verb.ToString().ToLowerInvariant();
         var answer = Dialogs.Show($"Retry the {verb} of {retry.Count} package{(retry.Count == 1 ? "" : "s")} that failed?\n\n" + NameList(retry.Select(r => r.Name)),
-            "Retry failed", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            "Retry failed", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No, verbs: ("Retry", "Cancel"));
         if (answer != MessageBoxResult.Yes) return;
         await RunQueueAsync(last.Result.Request with { Rows = [.. retry.Select(r => r.Row)] }, items, last.Then);
     }
@@ -248,7 +261,8 @@ public sealed partial class AppState : ObservableObject
         var verb = last.Result.Request.Verb.ToString().ToLowerInvariant();
         var answer = Dialogs.Show($"Retry the {verb} of {retry.Count} package{(retry.Count == 1 ? "" : "s")} as administrator?\n\n" +
             "Windows asks once for administrator approval, for all of them.\n\n" + NameList(retry.Select(r => r.Name)),
-            "Retry as administrator", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            "Retry as administrator", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No,
+            verbs: ("Retry as administrator", "Cancel"));
         if (answer != MessageBoxResult.Yes) return;
         await RunQueueAsync(last.Result.Request with { Rows = [.. retry.Select(r => r.Row)] }, items, last.Then, elevated: true);
     }

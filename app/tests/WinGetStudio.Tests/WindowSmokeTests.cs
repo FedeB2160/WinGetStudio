@@ -81,6 +81,18 @@ public class WindowSmokeTests
         Assert.Equal([2d, 1d, 1d], tabs.Items.Cast<TabItem>().OrderByDescending(t => t.IsSelected)
             .Select(t => ((Border)t.Template.FindName("Border", t)).BorderThickness.Top));
         Assert.False(grid.CanUserReorderColumns);
+        // Accessibilita' (ADR 0028, punto 16): nome delle linguette inattive in testo secondario,
+        // cornice di fuoco sulle celle (solo da tastiera), nome del badge, testo che si annuncia.
+        var secondary = ((SolidColorBrush)w.FindResource("TextFillColorSecondaryBrush")).Color;
+        foreach (var t in tabs.Items.Cast<TabItem>().Where(t => !t.IsSelected))
+            Assert.Equal(secondary, ((SolidColorBrush)FindAll<TextBlock>(t).First(b => b.Text == (string)t.Header).Foreground).Color);
+        Assert.NotNull(FindChild<DataGridCell>(grid)?.FocusVisualStyle);
+        var updatesTab = tabs.Items.Cast<TabItem>().ElementAt(MainViewModel.UpdatesTab);
+        Assert.Contains(FindAll<Border>(updatesTab), b => System.Windows.Automation.AutomationProperties.GetName(b) == "30 updates available");
+        var hint = FindAll<TextBlock>(w).First(t => t.Style == w.FindResource("Hint"));
+        Assert.Equal(System.Windows.Automation.AutomationLiveSetting.Polite, System.Windows.Automation.AutomationProperties.GetLiveSetting(hint));
+        Assert.Equal(System.Windows.Automation.AutomationLiveSetting.Polite,
+            System.Windows.Automation.AutomationProperties.GetLiveSetting((TextBlock)w.FindName("Announcement")));
         all.IsChecked = false;
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
         var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };
@@ -127,6 +139,14 @@ public class WindowSmokeTests
         Assert.True(buttons[1].IsDefault && buttons[1].IsCancel && !buttons[0].IsDefault);
         Assert.Same(w.FindResource("AccentButtonStyle"), buttons[1].Style);
         dialog.Close();
+        // Coi verbi (ADR 0020): i pulsanti dicono cosa fanno, default e accento restano sul secondo.
+        var verbs = new AppDialog("Uninstall 1 package?", "Confirm uninstall", MessageBoxButton.YesNo,
+            MessageBoxImage.Warning, MessageBoxResult.No, null, links: false, verbs: ("Uninstall", "Cancel"));
+        buttons = ((StackPanel)verbs.FindName("DlgButtons")).Children.Cast<Button>().ToList();
+        Assert.Equal(["Uninstall", "Cancel"], buttons.Select(b => (string)b.Content));
+        Assert.True(buttons[1].IsDefault && buttons[1].IsCancel && !buttons[0].IsDefault);
+        Assert.Equal(MessageBoxResult.No, verbs.Answer);
+        verbs.Close();
 
         // I dettagli (testo coi link): il font della finestra e non il serif del FlowDocument,
         // piu' piccolo e piu' largo del resto.
@@ -185,6 +205,19 @@ public class WindowSmokeTests
         }
         while (!until() && DateTime.UtcNow < deadline);
     }
+
+    // Announce accende e spegne LiveSetting; un testo che cambia senza lettori di schermo non
+    // lancia nulla. Nessuna Application: basta un thread STA.
+    [Fact]
+    public void LiveRegionSetsPolite() => RunSta(() =>
+    {
+        var text = new TextBlock();
+        LiveRegion.SetAnnounce(text, true);
+        Assert.Equal(System.Windows.Automation.AutomationLiveSetting.Polite, System.Windows.Automation.AutomationProperties.GetLiveSetting(text));
+        text.Text = "Update complete: 1 ok.";
+        LiveRegion.SetAnnounce(text, false);
+        Assert.Equal(System.Windows.Automation.AutomationLiveSetting.Off, System.Windows.Automation.AutomationProperties.GetLiveSetting(text));
+    });
 
     private static void RunSta(Action body)
     {

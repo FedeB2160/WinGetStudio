@@ -186,7 +186,8 @@ public sealed partial class SettingsViewModel : ObservableObject
                 return;
             }
             var answer = State.Dialogs.Show($"Restart WinGet Studio {mode} now?\n\nOtherwise it starts {mode} next time.",
-                "Start as administrator", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+                "Start as administrator", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No,
+                verbs: ("Restart now", "Not now"));
             if (answer != MessageBoxResult.Yes) return;
             if (value) RestartElevated();
             else State.Fire(RestartUnelevatedAsync);
@@ -335,7 +336,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             $"{rel.Name} - {rel.Size / 1024} KB\nFrom: {rel.Url}\n\n" +
             (rel.Sha256 is not null ? "The download is checked against the SHA-256 published with the release, and must carry the WinGet Studio signature."
                 : "WARNING: this release publishes no checksum, so the download is checked against the WinGet Studio signature only."),
-            "Update WinGet Studio", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+            "Update WinGet Studio", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No, verbs: ("Update", "Cancel"));
         if (answer != MessageBoxResult.Yes || !State.TryBegin()) return;
         try
         {
@@ -381,11 +382,12 @@ public sealed partial class SettingsViewModel : ObservableObject
             ? "WinGet Studio needs winget, which is not installed for this account.\n\n" +
               "Install it now? WinGet Studio first registers the App Installer that comes with Windows. " +
               "If there is none, it downloads App Installer and its dependencies from github.com/microsoft/winget-cli " +
-              "(a few hundred MB) and checks them against the SHA-256 published with the release.\n\nNo closes WinGet Studio."
+              "(a few hundred MB) and checks them against the SHA-256 published with the release.\n\nWithout winget, WinGet Studio closes."
             : $"Download winget {rel!.Tag} from github.com/microsoft/winget-cli and install it?\n\n" +
               $"App Installer: {rel.Size / (1024 * 1024)} MB, plus its dependencies. The download is checked against the SHA-256 published with the release.\n\n" +
               "If winget is running somewhere else, the new version starts when it closes.";
-        var answer = State.Dialogs.Show(text, missing ? "winget not found" : "Update winget", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No);
+        var answer = State.Dialogs.Show(text, missing ? "winget not found" : "Update winget", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No,
+            verbs: missing ? ("Install winget", "Close WinGet Studio") : ("Update", "Cancel"));
         if (answer != MessageBoxResult.Yes)
         {
             if (missing) CloseRequested?.Invoke();

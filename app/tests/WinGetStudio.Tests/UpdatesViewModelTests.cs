@@ -119,6 +119,8 @@ public class UpdatesViewModelTests
         Assert.Equal([RowStatus.Ok, RowStatus.Ok, RowStatus.Error], vm.Items.Select(i => i.Status));
         Assert.Equal("exit 1", vm.Items[2].StatusDetail);
         Assert.Contains("Update complete: 2 ok, 1 failed.", h.Log);
+        // Il riepilogo va anche ai lettori di schermo (ADR 0028, punto 16).
+        Assert.Equal("Update complete: 2 ok, 1 failed.", h.State.Announcement);
         Assert.True(vm.Stale);
         Assert.Equal("list out of date - press Check", vm.SelectedText);
         Assert.False(vm.UpdateCommand.CanExecute(null));

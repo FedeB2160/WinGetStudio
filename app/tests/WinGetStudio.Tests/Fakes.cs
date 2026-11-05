@@ -60,16 +60,18 @@ internal sealed class FakeWinGet : IProcessRunner
 // predefinito), salvo Answer diverso.
 internal sealed class FakeDialogs : IDialogService
 {
-    public sealed record Call(string Text, string Title, MessageBoxButton Button, MessageBoxImage Image, MessageBoxResult Default, object? Content, bool Links);
+    public sealed record Call(string Text, string Title, MessageBoxButton Button, MessageBoxImage Image, MessageBoxResult Default, object? Content, bool Links,
+        (string Yes, string No)? Verbs = null);
 
     public readonly List<Call> Calls = [];
     public Func<Call, MessageBoxResult> Answer = c => c.Default == MessageBoxResult.None ? MessageBoxResult.OK : c.Default;
     public string? SaveFile, OpenFile;
 
     public MessageBoxResult Show(string text, string title = "WinGet Studio", MessageBoxButton button = MessageBoxButton.OK,
-        MessageBoxImage image = MessageBoxImage.None, MessageBoxResult defaultResult = MessageBoxResult.None, object? content = null, bool links = false)
+        MessageBoxImage image = MessageBoxImage.None, MessageBoxResult defaultResult = MessageBoxResult.None, object? content = null, bool links = false,
+        (string Yes, string No)? verbs = null)
     {
-        var call = new Call(text, title, button, image, defaultResult, content, links);
+        var call = new Call(text, title, button, image, defaultResult, content, links, verbs);
         Calls.Add(call);
         return Answer(call);
     }

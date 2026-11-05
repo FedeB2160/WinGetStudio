@@ -93,7 +93,7 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         var answer = State.Dialogs.Show(
             $"Uninstall {selected.Count} package{(selected.Count == 1 ? "" : "s")}?\n\n" + AppState.NameList(selected.Select(i => i.Name)) +
             (hidden > 0 ? $"\n\n{hidden} of them are currently hidden by the filter." : "") + "\n\nThis cannot be undone.",
-            "Confirm uninstall", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+            "Confirm uninstall", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No, verbs: ("Uninstall", "Cancel"));
         if (answer != MessageBoxResult.Yes)
         {
             State.Log.Write("Uninstall cancelled.");
@@ -167,7 +167,7 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         var answer = State.Dialogs.Show($"Install the ticked packages from this list?\n{file}\n\n" +
             "Untick what you do not want. Packages already installed are skipped or upgraded; packages " +
             "no longer available in any source are ignored rather than failing the whole import." + storedNote,
-            "Confirm import", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No, preview);
+            "Confirm import", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No, preview, verbs: ("Import", "Cancel"));
         if (answer != MessageBoxResult.Yes)
         {
             State.Log.Write("Import cancelled.");
