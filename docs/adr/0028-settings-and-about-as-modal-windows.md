@@ -213,7 +213,8 @@ list on all four sides.
       not notify. The Select all check box keeps its 7 px shift and sits over the rows' ones.
     - **Labels are actions.** "Retry failed (2)" read as a state (the retry failed); it is
       "Retry failed packages (2)", and its confirmation is titled the same, with Retry and
-      Cancel.
+      Cancel. The Updates check box "Unknown" said what it changes only in its tooltip; it is
+      "Include unknown versions".
 
 ## Consequences
 

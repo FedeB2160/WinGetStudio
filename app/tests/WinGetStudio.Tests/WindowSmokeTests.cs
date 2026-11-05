@@ -138,6 +138,13 @@ public class WindowSmokeTests
         Assert.Equal(System.Windows.Automation.AutomationLiveSetting.Polite,
             System.Windows.Automation.AutomationProperties.GetLiveSetting((TextBlock)w.FindName("Announcement")));
         all.IsChecked = false;
+        // Etichette che dicono l'azione (ADR 0028, punto 17), nella scheda aperta (Updates): il
+        // contenuto sta nel TabControl, non nella TabItem.
+        Assert.Contains(FindAll<Button>(tabs), b => b.Content as string == "Check for updates");
+        Assert.Contains(FindAll<CheckBox>(tabs), c => c.Content as string == "Include unknown versions");
+        var scope = (ComboBox)w.FindName("CmbScope");
+        Assert.Equal(["Auto", "Current user", "All users"], scope.Items.Cast<ScopeChoice>().Select(s => s.Label));
+        Assert.Equal("Auto", ((ScopeChoice)scope.SelectedItem).Label);
         // Suggerimento nel campo vuoto (ADR 0028, punto 17): dove comincia il testo scritto, e solo
         // finche' il campo e' vuoto.
         tabs.SelectedIndex = MainViewModel.InstallTab;
