@@ -127,6 +127,20 @@ public class WindowSmokeTests
         Assert.Equal(System.Windows.Automation.AutomationLiveSetting.Polite,
             System.Windows.Automation.AutomationProperties.GetLiveSetting((TextBlock)w.FindName("Announcement")));
         all.IsChecked = false;
+        // Suggerimento nel campo vuoto (ADR 0028, punto 17): dove comincia il testo scritto, e solo
+        // finche' il campo e' vuoto.
+        tabs.SelectedIndex = MainViewModel.InstallTab;
+        var search = (TextBox)w.FindName("TxtSearch");
+        var placeholder = (TextBlock)w.FindName("HintSearch");
+        Pump(() => placeholder.IsVisible);
+        Assert.True(placeholder.IsVisible);
+        Assert.Equal(search.GetRectFromCharacterIndex(0).X, placeholder.TranslatePoint(new Point(), search).X, 1.0);
+        h.Vm.Install.SearchText = "ab";
+        Pump(() => true);
+        Assert.False(placeholder.IsVisible);
+        h.Vm.Install.SearchText = "";
+        tabs.SelectedIndex = MainViewModel.UpdatesTab;
+        Pump(() => true);
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
         var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };
         about.Show();

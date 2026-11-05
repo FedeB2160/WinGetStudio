@@ -199,6 +199,11 @@ list on all four sides.
       failed self-update or winget update says why and where to get it, in the note under the
       version, since the log is under the page's veil. Upper-case FAILED and WARNING stay in the
       log, where they help to scan it, and leave dialogs.
+    - **Fields say what goes in them.** Search and Filter show "Search by name or ID" and
+      "Filter by name or ID" while empty, in secondary text: a `TextBlock` laid over the
+      `TextBox` (style `Placeholder`), which lets clicks through and starts where typed text
+      does, with no template of our own. Narrator may read it as text of its own: to hear in
+      the Narrator check.
 
 ## Consequences
 

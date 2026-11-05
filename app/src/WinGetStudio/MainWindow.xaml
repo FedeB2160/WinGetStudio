@@ -225,6 +225,22 @@
                 </Style.Triggers>
             </Style>
     
+            <!-- Suggerimento nel campo vuoto (Search, Filter): un testo sopra il TextBox, senza
+                 rifarne il template. Tag = il TextBox; si vede solo finche' e' vuoto e lascia passare
+                 i clic. Il margine porta il testo dove comincia quello scritto (smoke test). -->
+            <Style x:Key="Placeholder" TargetType="TextBlock">
+                <Setter Property="IsHitTestVisible" Value="False"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Margin" Value="13,0,0,0"/>
+                <Setter Property="Visibility" Value="Collapsed"/>
+                <Style.Triggers>
+                    <DataTrigger Binding="{Binding Tag.Text, RelativeSource={RelativeSource Self}}" Value="">
+                        <Setter Property="Visibility" Value="Visible"/>
+                    </DataTrigger>
+                </Style.Triggers>
+            </Style>
+
             <!-- Messaggio al posto della griglia vuota: guida, "nessun risultato", errore di winget. -->
             <Style x:Key="EmptyMessage" TargetType="TextBlock">
                 <Setter Property="FontSize" Value="16"/>
@@ -391,13 +407,16 @@
                     <Grid Margin="0,0,0,8">
                         <StackPanel Orientation="Horizontal">
                             <!-- Invio: ricerca subito, con lo Store se spuntato. -->
-                            <TextBox x:Name="TxtSearch" Width="380" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
-                                     IsEnabled="{Binding State.IsIdle}"
-                                     AutomationProperties.Name="Package name or ID, at least 3 characters">
-                                <TextBox.InputBindings>
-                                    <KeyBinding Key="Return" Command="{Binding SearchNowCommand}"/>
-                                </TextBox.InputBindings>
-                            </TextBox>
+                            <Grid Width="380">
+                                <TextBox x:Name="TxtSearch" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding State.IsIdle}"
+                                         AutomationProperties.Name="Package name or ID, at least 3 characters">
+                                    <TextBox.InputBindings>
+                                        <KeyBinding Key="Return" Command="{Binding SearchNowCommand}"/>
+                                    </TextBox.InputBindings>
+                                </TextBox>
+                                <TextBlock x:Name="HintSearch" Style="{StaticResource Placeholder}" Tag="{Binding ElementName=TxtSearch}" Text="Search by name or ID"/>
+                            </Grid>
                             <Button Content="Search" MinWidth="96" Margin="8,0,0,0" Command="{Binding SearchNowCommand}"/>
                             <CheckBox Content="MS Store" Margin="12,0,0,0" VerticalAlignment="Center"
                                       IsChecked="{Binding IncludeStore}" IsEnabled="{Binding State.IsIdle}"
@@ -475,8 +494,11 @@
                         <StackPanel Orientation="Horizontal">
                             <Button Content="Refresh" MinWidth="96" Command="{Binding ReloadCommand}"/>
                             <!-- Filtro locale sull'elenco gia' caricato: non richiama winget. -->
-                            <TextBox Width="300" Margin="8,0,0,0" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
-                                     IsEnabled="{Binding State.IsIdle}" AutomationProperties.Name="Filter by name or ID"/>
+                            <Grid Width="300" Margin="8,0,0,0">
+                                <TextBox x:Name="TxtFilter" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
+                                         IsEnabled="{Binding State.IsIdle}" AutomationProperties.Name="Filter by name or ID"/>
+                                <TextBlock Style="{StaticResource Placeholder}" Tag="{Binding ElementName=TxtFilter}" Text="Filter by name or ID"/>
+                            </Grid>
                             <local:Spinner Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
                             <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding CountText}"/>
                         </StackPanel>
