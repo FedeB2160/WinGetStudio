@@ -77,8 +77,9 @@ public abstract partial class PackageListViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(IsIdle))]
     private Task Unpin(IList? highlighted) => UnpinAsync([.. highlighted?.OfType<PackageItem>() ?? []]);
 
+    // Virtuale: Install offre Install fra i pulsanti dei dettagli.
     [RelayCommand(CanExecute = nameof(IsIdle))]
-    public Task DetailsAsync(PackageItem? item) => State.ShowDetailsAsync(item, DetailsInstalled);
+    public virtual Task DetailsAsync(PackageItem? item) => State.ShowDetailsAsync(item, DetailsInstalled);
 
     public Task PinAsync(IReadOnlyList<PackageItem> highlighted) => State.SetPinAsync(highlighted, Items, true);
     public Task UnpinAsync(IReadOnlyList<PackageItem> highlighted) => State.SetPinAsync(highlighted, Items, false);

@@ -185,6 +185,10 @@ list on all four sides.
       it did not show. It is now a Fluent `ComboBox` labelled "Install for", with Auto, Current
       user and All users; each item's tooltip says what it passes to winget. The saved values
       (`InstallScope`: Auto, User, Machine) do not change.
+    - **A double click opens, it does not run.** In Install a double click on a row installed it at
+      once, ticked or not, with no confirmation. It now opens the details (the same as the context
+      menu item), whose button band offers **Install** and **Close**; Close is the default, so
+      Enter and Esc close and only a click on Install installs that row, from its source.
 
 ## Consequences
 

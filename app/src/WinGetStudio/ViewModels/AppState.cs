@@ -292,12 +292,13 @@ public sealed partial class AppState : ObservableObject
     }
 
     // Dettagli come testo di winget (ADR 0021), letti dietro lo stato occupato: e' un winget
-    // come gli altri.
-    public async Task ShowDetailsAsync(PackageItem? item, bool installed)
+    // come gli altri. verbs: un'azione sul pacchetto fra i pulsanti ("Install" / "Close"), col
+    // secondo predefinito; true se l'utente sceglie l'azione.
+    public async Task<bool> ShowDetailsAsync(PackageItem? item, bool installed, (string Yes, string No)? verbs = null)
     {
         // Senza la barra condivisa: lo spinner nella colonna Result della riga, poi torna l'esito
         // che c'era (un errore di prima non si perde aprendo i dettagli).
-        if (item is null || !TryBegin()) return;
+        if (item is null || !TryBegin()) return false;
         Log.Write($"Reading the details of {item.Name} [{item.Id}]...");
         var (status, detail) = (item.Status, item.StatusDetail);
         item.Status = RowStatus.Running;
@@ -309,6 +310,8 @@ public sealed partial class AppState : ObservableObject
             (item.Status, item.StatusDetail) = (status, detail);
             End();
         }
-        Dialogs.Show(text.Length > 0 ? text : "winget returned no details for this package.", $"{item.Name} - details", links: true);
+        return Dialogs.Show(text.Length > 0 ? text : "winget returned no details for this package.", $"{item.Name} - details",
+            verbs is null ? MessageBoxButton.OK : MessageBoxButton.YesNo, defaultResult: verbs is null ? MessageBoxResult.None : MessageBoxResult.No,
+            links: true, verbs: verbs) == MessageBoxResult.Yes;
     }
 }

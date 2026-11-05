@@ -418,9 +418,9 @@
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <DataGrid x:Name="GridSearch" Style="{StaticResource Grid}">
-                            <!-- Doppio clic: installa quel pacchetto, senza passare dalle spunte. -->
+                            <!-- Doppio clic: i dettagli del pacchetto, con Install fra i pulsanti. -->
                             <DataGrid.InputBindings>
-                                <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding InstallOneCommand}"
+                                <MouseBinding MouseAction="LeftDoubleClick" Command="{Binding DetailsCommand}"
                                               CommandParameter="{Binding SelectedItem, ElementName=GridSearch}"/>
                             </DataGrid.InputBindings>
                             <DataGrid.ContextMenu>

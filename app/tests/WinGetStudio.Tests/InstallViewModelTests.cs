@@ -1,10 +1,11 @@
+using System.Windows;
 using WinGetStudio.Core;
 using WinGetStudio.ViewModels;
 
 namespace WinGetStudio.Tests;
 
 // Scheda Install (Tab.Install.ps1 della 1.x): ricerca mentre si scrive (>= 3 caratteri, mai lo
-// Store), Invio con lo Store se spuntato, Scope, sorgente della riga, doppio clic.
+// Store), Invio con lo Store se spuntato, Install for, sorgente della riga, dettagli con Install.
 public class InstallViewModelTests
 {
     private static readonly PackageRow Zip = new("7-Zip", "7zip.7zip", "24.09");
@@ -36,7 +37,7 @@ public class InstallViewModelTests
         Assert.Equal(["search", "7zip", "--count", "25", "--source", "winget"], call.Take(6));
         Assert.Equal(["7zip.7zip"], vm.Items.Select(i => i.Id));
         Assert.Equal("winget", vm.Items[0].Source);
-        Assert.Equal("1 result - tick the ones to install, or double click a row", vm.InfoText);
+        Assert.Equal("1 result - tick the ones to install, or double click a row for details", vm.InfoText);
     }
 
     [Fact]
@@ -112,8 +113,10 @@ public class InstallViewModelTests
         Assert.False(h.Vm.Installed.Loaded);
     }
 
+    // Doppio clic (e menu): i dettagli, con Install fra i pulsanti e Close predefinito. Invio
+    // chiude; Install installa quella riga, con la sua sorgente, senza passare dalle spunte.
     [Fact]
-    public async Task DoubleClickInstallsThatRowOnly()
+    public async Task DetailsOfferInstallForThatRowOnly()
     {
         using var h = Create();
         var vm = h.Vm.Install;
@@ -121,10 +124,18 @@ public class InstallViewModelTests
         vm.IncludeStore = true;
         await vm.SearchNowAsync();
 
-        await vm.InstallOneAsync(vm.Items[1]);
+        await vm.DetailsAsync(vm.Items[1]);
+        var details = Assert.Single(h.Dialogs.Calls);
+        Assert.Equal(("7-Zip Store - details", MessageBoxButton.YesNo, MessageBoxResult.No, ("Install", "Close")),
+            (details.Title, details.Button, details.Default, details.Verbs));
+        Assert.Equal(0, h.WinGet.Count("install"));
+
+        h.Dialogs.Answer = _ => MessageBoxResult.Yes;
+        await vm.DetailsAsync(vm.Items[1]);
 
         var install = Assert.Single(h.WinGet.Calls, c => c[0] == "install");
         Assert.Equal(["install", "--id", "9NBLGGH4S6S1", "-e", "--source", "msstore"], install.Take(6));
+        Assert.False(vm.Items[1].Selected);
     }
 
     [Fact]

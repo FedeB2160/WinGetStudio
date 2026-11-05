@@ -97,9 +97,12 @@ public sealed partial class InstallViewModel : PackageListViewModel
         return Task.CompletedTask;
     }
 
-    // Doppio clic: quel pacchetto, senza passare dalle spunte.
-    [RelayCommand(CanExecute = nameof(IsIdle))]
-    public Task InstallOneAsync(PackageItem? item) => item is null || State.IsBusy ? Task.CompletedTask : InstallRowsAsync([item]);
+    // Doppio clic e menu contestuale: i dettagli, con Install fra i pulsanti. In Windows il doppio
+    // clic apre, non esegue; Close e' il predefinito, quindi Invio non installa.
+    public override async Task DetailsAsync(PackageItem? item)
+    {
+        if (await State.ShowDetailsAsync(item, installed: false, ("Install", "Close"))) await InstallRowsAsync([item!]);
+    }
 
     private bool CanInstall() => State.IsIdle && Items.Any(i => i.Selected);
 
@@ -182,11 +185,10 @@ public sealed partial class InstallViewModel : PackageListViewModel
         var total = Items.Count;
         var selected = Items.Count(i => i.Selected);
         InfoText = selected > 0 ? $"{selected} selected"
-            : total > 0 ? $"{total} result{(total == 1 ? "" : "s")} - tick the ones to install, or double click a row"
+            : total > 0 ? $"{total} result{(total == 1 ? "" : "s")} - tick the ones to install, or double click a row for details"
             : "";
         OnPropertyChanged(nameof(Searching));
         InstallCommand?.NotifyCanExecuteChanged();
-        InstallOneCommand?.NotifyCanExecuteChanged();
         SearchNowCommand?.NotifyCanExecuteChanged();
     }
 }
