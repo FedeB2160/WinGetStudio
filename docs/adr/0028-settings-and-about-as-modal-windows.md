@@ -172,6 +172,12 @@ list on all four sides.
       row: the bar's row is hidden when the queue ends, and a hidden element leaves the
       automation tree just when there is something to say. The Updates badge is named
       "N updates available" instead of a bare number with a help text.
+17. **Clarity (2026-11-05), the medium-severity findings of the UI/UX review.**
+    - **One name per action.** "Check for updates" always means the packages: the Updates tab
+      button (it was "Check") and the notification-area menu. The Settings page of point 14 is
+      **App updates**, and its button, which asks GitHub about WinGet Studio and winget, is
+      **Check for new versions**. "Updates" is only the tab. An out-of-date list says "List out of
+      date: press Check for updates."
 
 ## Consequences
 

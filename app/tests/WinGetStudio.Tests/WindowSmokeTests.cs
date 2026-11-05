@@ -140,7 +140,7 @@ public class WindowSmokeTests
         Assert.Equal(h.Vm.Settings.Themes.Count, FindChild<ComboBox>(settings)!.Items.Count);
         // Menu a sinistra (ADR 0028): tre sezioni, si apre sulla prima e mostra solo la sua pagina.
         var nav = (ListBox)settings.FindName("Nav");
-        Assert.Equal(["Appearance", "General", "Updates"], nav.Items.Cast<ListBoxItem>().Select(i => (string)i.Content));
+        Assert.Equal(["Appearance", "General", "App updates"], nav.Items.Cast<ListBoxItem>().Select(i => (string)i.Content));
         Assert.Equal(0, nav.SelectedIndex);
         Assert.True(FindAll<CheckBox>(settings).All(c => !c.IsVisible));
         nav.SelectedIndex = 1;

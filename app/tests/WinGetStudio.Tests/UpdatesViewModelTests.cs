@@ -122,7 +122,7 @@ public class UpdatesViewModelTests
         // Il riepilogo va anche ai lettori di schermo (ADR 0028, punto 16).
         Assert.Equal("Update complete: 2 ok, 1 failed.", h.State.Announcement);
         Assert.True(vm.Stale);
-        Assert.Equal("list out of date - press Check", vm.SelectedText);
+        Assert.Equal("List out of date: press Check for updates.", vm.SelectedText);
         Assert.False(vm.UpdateCommand.CanExecute(null));
         Assert.Equal(1, vm.RetryCount);
         Assert.Equal("Retry failed (1)", vm.RetryText);
@@ -277,7 +277,7 @@ public class UpdatesViewModelTests
         h.State.MarkUpdatesStale();
 
         Assert.False(vm.UpdateCommand.CanExecute(null));
-        Assert.Equal("list out of date - press Check", vm.SelectedText);
+        Assert.Equal("List out of date: press Check for updates.", vm.SelectedText);
         // Riaprire la scheda la rilegge.
         h.Vm.SelectedTab = MainViewModel.InstallTab;
         h.Vm.SelectedTab = MainViewModel.UpdatesTab;

@@ -238,7 +238,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         RestartElevatedCommand.NotifyCanExecuteChanged();
     }
 
-    // "Check for updates": l'app e winget, e riferisce SEMPRE l'esito.
+    // "Check for new versions": l'app e winget, e riferisce SEMPRE l'esito.
     [RelayCommand(CanExecute = nameof(CanCheck))]
     private Task CheckForUpdates() => CheckAsync(manual: true);
 

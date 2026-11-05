@@ -519,7 +519,7 @@
                     </Grid.RowDefinitions>
                     <!-- LastChildFill spento: Retry e' l'ultimo e senza riempirebbe lo spazio da sinistra. -->
                     <DockPanel Margin="0,0,0,8" LastChildFill="False">
-                        <Button DockPanel.Dock="Left" MinWidth="96" Content="Check" Command="{Binding CheckCommand}"/>
+                        <Button DockPanel.Dock="Left" MinWidth="96" Content="Check for updates" Command="{Binding CheckCommand}"/>
                         <CheckBox DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" Content="Unknown"
                                   IsChecked="{Binding IncludeUnknown}" IsEnabled="{Binding State.IsIdle}"
                                   ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"/>

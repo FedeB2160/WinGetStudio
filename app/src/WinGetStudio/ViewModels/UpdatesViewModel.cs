@@ -90,7 +90,7 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         // fallirebbe sempre. Ci si aggiorna da Settings (ADR 0013).
         if (read.Success) Fill(read.Rows.Where(r => !SelfUpdate.IsSelfPackage(r.Id)), outcomes);
         if (read.Rows.Any(r => SelfUpdate.IsSelfPackage(r.Id)))
-            State.Log.Write("An update for WinGet Studio itself is available: update it from the Settings tab.");
+            State.Log.Write("An update for WinGet Studio itself is available: update it from Settings > App updates.");
         if (Items.Count == 0)
         {
             // Mai "nessun aggiornamento" quando winget non ha risposto.
@@ -156,7 +156,7 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         var selected = Items.Count(i => i.Selected);
         AvailableText = total switch { 0 => "", 1 => "1 update available", _ => $"{total} updates available" };
         // A lista vecchia il contatore cede il posto al motivo per cui Update e' spento.
-        SelectedText = Stale ? "list out of date - press Check" : selected > 0 ? $"{selected} selected" : "";
+        SelectedText = Stale ? "List out of date: press Check for updates." : selected > 0 ? $"{selected} selected" : "";
         UpdateButtonText = OurQueue ? State.Cancelling ? "Cancelling..." : "Cancel" : "Update";
         UpdateButtonToolTip = OurQueue ? "Finish the package in progress, then stop without starting the others" : null;
         UpdateCommand?.NotifyCanExecuteChanged();

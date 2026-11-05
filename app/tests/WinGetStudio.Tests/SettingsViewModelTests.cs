@@ -325,7 +325,7 @@ public class SettingsViewModelTests
             : ""));
         await h.Vm.Updates.LoadAsync();
         Assert.Equal(["A.A"], h.Vm.Updates.Items.Select(i => i.Id));
-        Assert.Contains("An update for WinGet Studio itself is available: update it from the Settings tab.", h.Log);
+        Assert.Contains("An update for WinGet Studio itself is available: update it from Settings > App updates.", h.Log);
         Assert.Contains("Found 1 updates.", h.Log);
     }
 }
