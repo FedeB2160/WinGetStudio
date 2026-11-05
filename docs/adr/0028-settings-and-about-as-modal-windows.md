@@ -71,7 +71,8 @@ list on all four sides.
     all in Install, the non-pinned ones in Updates, the visible ones in Installed (never rows the
     filter hides). The check box, pin and result columns cannot be resized. Column titles are
     centred through an implicit `DataGridColumnHeader` style: with the Fluent theme the headers take
-    the style by type and ignore the grid's `ColumnHeaderStyle`. Truncated cell text shows in full
+    the style by type and ignore the grid's `ColumnHeaderStyle`. (Since point 17, left-aligned
+    except those three columns.) Truncated cell text shows in full
     in a tooltip.
 11. **Third review (2026-10-30).** Borders of areas, tabs, grids and buttons use the theme's strong
     stroke (`ControlStrongStrokeColorDefault`, white on dark and black on light) at 55%: the Fluent
@@ -204,6 +205,12 @@ list on all four sides.
       `TextBox` (style `Placeholder`), which lets clicks through and starts where typed text
       does, with no template of our own. Narrator may read it as text of its own: to hear in
       the Narrator check.
+    - **Column titles sit over their text** (amends point 10): left-aligned, with a 3 px padding
+      that starts them where the cell text starts, as in the import preview. Only the check box,
+      Pin and Result columns stay centred. The implicit header style tells them apart by the
+      header's own `CanUserSort` (template columns have no sort path): a binding on
+      `Column.CanUserResize` is evaluated before the header gets its column, and `Column` does
+      not notify. The Select all check box keeps its 7 px shift and sits over the rows' ones.
 
 ## Consequences
 

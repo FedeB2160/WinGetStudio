@@ -53,9 +53,20 @@ public class WindowSmokeTests
         Assert.True(all.IsEnabled);
         all.IsChecked = true;
         Assert.True(h.Vm.Updates.Items[0].Selected);
-        // Titoli delle colonne al centro (ADR 0028).
+        // Titoli delle colonne a sinistra, dove comincia il testo delle celle; al centro solo le
+        // colonne fisse (ADR 0028, punto 17). La spunta di Seleziona tutto resta sopra quelle delle
+        // righe (i 7 px di SelectAllHeader).
+        var updatesGrid = (DataGrid)w.FindName("GridUpdates");
+        var firstRow = FindChild<DataGridRow>(updatesGrid)!;
+        double Left(FrameworkElement e) => e.TranslatePoint(new Point(), updatesGrid).X;
+        double Middle(FrameworkElement e) => Left(e) + e.ActualWidth / 2;
         var name = FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Package Name");
-        Assert.Equal(HorizontalAlignment.Center, name.HorizontalContentAlignment);        // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
+        Assert.Equal(HorizontalAlignment.Left, name.HorizontalContentAlignment);
+        var nameCell = FindAll<DataGridCell>(firstRow).First(c => c.Column == name.Column);
+        Assert.Equal(Left(FindChild<TextBlock>(nameCell)!), Left(FindChild<TextBlock>(name)!), 1.0);
+        Assert.Equal(HorizontalAlignment.Center, FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Result").HorizontalContentAlignment);
+        Assert.Equal(Middle(FindChild<CheckBox>(firstRow)!), Middle(all), 1.0);
+        // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
         // colonne, Result compresa, stanno dentro e le fisse non cambiano larghezza. Le altre
         // elastiche non restano schiacciate ai 20 px minimi del DataGrid: tengono almeno il titolo.
         var grid = (DataGrid)w.FindName("GridUpdates");

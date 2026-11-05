@@ -304,16 +304,26 @@
                 <Setter Property="ItemsSource" Value="{Binding Items}"/>
                 <Setter Property="Visibility" Value="{Binding HasItems, Converter={StaticResource Visible}}"/>
             </Style>
-            <!-- Titoli delle colonne al centro. Stile implicito e non ColumnHeaderStyle della griglia:
-                 col tema Fluent le intestazioni prendono lo stile per tipo e ignorano quello. -->
+            <!-- Titoli delle colonne a sinistra, dove comincia il testo delle celle (smoke test); al
+                 centro solo spunta, Pin e Result, le colonne a modello, che non si ordinano. Il
+                 trigger e' su CanUserSort perche' e' una proprieta' dell'intestazione: Column non
+                 notifica, e un binding su Column.CanUserResize resta a null. Stile implicito e non
+                 ColumnHeaderStyle della griglia: col tema Fluent le intestazioni prendono lo stile
+                 per tipo e ignorano quello. -->
             <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
-                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="HorizontalContentAlignment" Value="Left"/>
                 <!-- Niente separatori verticali: come le righe, solo linee orizzontali. -->
                 <Setter Property="SeparatorVisibility" Value="Collapsed"/>
                 <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
-                <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
-                     rispetto a quelle delle righe. Centrati, i titoli non ne hanno bisogno. -->
-                <Setter Property="Padding" Value="0"/>
+                <Setter Property="Padding" Value="3,0,0,0"/>
+                <Style.Triggers>
+                    <Trigger Property="CanUserSort" Value="False">
+                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                        <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
+                             rispetto a quelle delle righe. -->
+                        <Setter Property="Padding" Value="0"/>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
             <!-- Testo delle colonne: VerticalContentAlignment della cella non arriva al TextBlock,
                  che si stende e lascia il testo in alto. Lo si centra qui. Testo lungo: i puntini. -->
