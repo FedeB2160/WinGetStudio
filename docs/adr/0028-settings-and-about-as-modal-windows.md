@@ -215,6 +215,29 @@ list on all four sides.
       "Retry failed packages (2)", and its confirmation is titled the same, with Retry and
       Cancel. The Updates check box "Unknown" said what it changes only in its tooltip; it is
       "Include unknown versions".
+18. **Polish (2026-11-06), the low-severity findings of the UI/UX review.**
+    - **Stop, not Cancel.** The queue button finishes the package in progress and stops; in dialogs
+      Cancel means leaving without doing anything. It says **Stop** / **Stopping...**, on Update and
+      on Retry as administrator (whose tooltip follows it), and the log and the queue summary say
+      "stopped" (ADR 0024).
+    - **Details are a titled table**: the package name, then a label/value table read by position,
+      never by label (ADR 0021, amended).
+    - **One word for each thing.** American spelling in the UI (catalog, license, canceled),
+      "Microsoft Store" also on the Install check box, and versions always as "v2.0.0", like the
+      GitHub tags on the update buttons.
+    - **A disabled Update says why**: "Tick the packages to update" when nothing is ticked and
+      something can be; Install's hint already said so.
+    - **App updates aligns label and value**: each shares a grid row with its version line, centered;
+      the check outcome moves to the row below. The value stays SemiBold.
+    - **Shortcuts are named**: Refresh and Check for updates say "(F5)", the search field "(Ctrl+F)",
+      also as `AutomationProperties.AcceleratorKey`.
+    - **The import preview has Select all** in its header, shared with the main grids through
+      `Styles.xaml`, and a missing version reads "latest" in secondary text.
+    - **Notifications have an icon and a target** (ADR 0030, amended).
+    - **Retry stays at the top right (R24, declined).** The review suggested moving the two Retry
+      buttons next to Update, only if the bottom band did not crowd. At the 760 px minimum, after a
+      failure that band would hold Update, both Retry buttons and "List out of date: press Check for
+      updates.", and the text would be cut; Install and Installed keep Retry at the top anyway.
 
 ## Consequences
 
