@@ -277,9 +277,29 @@ public sealed partial class InstalledViewModel : PackageListViewModel
 
 // Anteprima dell'import nel dialogo di conferma: una riga spuntata per pacchetto, nell'ordine
 // del file (il sottoinsieme si sceglie per posizione).
-public sealed class ImportPreviewViewModel(PackageList list)
+public sealed partial class ImportPreviewViewModel : ObservableObject
 {
-    public IReadOnlyList<ImportRow> Rows { get; } = [.. list.Packages.Select(p => new ImportRow(p))];
+    private readonly PackageList list;
+
+    public ImportPreviewViewModel(PackageList list)
+    {
+        this.list = list;
+        Rows = [.. list.Packages.Select(p => new ImportRow(p))];
+        // Seleziona tutto segue le spunte delle righe.
+        foreach (var r in Rows) r.PropertyChanged += (_, _) => OnPropertyChanged(nameof(AllChecked));
+    }
+
+    public IReadOnlyList<ImportRow> Rows { get; }
+
+    // Seleziona tutto nell'intestazione, come PackageListViewModel.AllChecked: true tutte, false
+    // nessuna, null alcune; un clic su "alcune" le spunta tutte.
+    public bool? AllChecked
+    {
+        get => Rows.All(r => r.Selected) ? true : Rows.Any(r => r.Selected) ? null : false;
+        set { foreach (var r in Rows) r.Selected = value == true; }
+    }
+
+    public bool CanCheckAll => Rows.Count > 0;
     public bool HasStoredArguments => list.StoredArguments > 0;
     public string KeepStoredText => $"Keep the installer arguments saved for {list.StoredArguments} package{(list.StoredArguments == 1 ? "" : "s")} (--custom, --override)";
 
@@ -289,9 +309,9 @@ public sealed class ImportPreviewViewModel(PackageList list)
     public IReadOnlyList<int> KeptIndices => [.. Rows.Select((r, i) => (r, i)).Where(x => x.r.Selected).Select(x => x.i)];
 }
 
-public sealed class ImportRow(ImportPackage package)
+public sealed partial class ImportRow(ImportPackage package) : ObservableObject
 {
-    public bool Selected { get; set; } = true;
+    [ObservableProperty] public partial bool Selected { get; set; } = true;
     public string Id => package.Id;
     public string Source => package.Source;
     public string Version => package.Version;

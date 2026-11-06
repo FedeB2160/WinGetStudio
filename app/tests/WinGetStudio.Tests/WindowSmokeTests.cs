@@ -264,6 +264,23 @@ public class WindowSmokeTests
         Pump(() => true);
         Assert.True(table.ActualWidth <= 760, $"{table.ActualWidth}");
         table.Close();
+        // Anteprima dell'import (2.0 UI/UX review R22): Seleziona tutto sopra le spunte delle righe,
+        // "latest" in secondario dove il file non ha la versione.
+        var import = new AppDialog("Install?", "Confirm import", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No,
+            new ImportPreviewViewModel(InstalledViewModelTests.TwoPackages()), links: false) { Owner = w, ShowActivated = false };
+        import.Show();
+        Pump(() => true);
+        var importGrid = FindChild<DataGrid>(import)!;
+        var importAll = FindChild<CheckBox>(FindChild<DataGridColumnHeadersPresenter>(importGrid)!)!;
+        Assert.True(importAll.IsChecked);
+        var importRow = FindChild<DataGridRow>(importGrid)!;
+        double ImportMiddle(FrameworkElement e) => e.TranslatePoint(new Point(), importGrid).X + e.ActualWidth / 2;
+        Assert.Equal(ImportMiddle(FindChild<CheckBox>(importRow)!), ImportMiddle(importAll), 2.0);
+        var texts = FindAll<TextBlock>(importGrid).ToList();
+        Assert.Contains(texts, t => t.Text == "1.0");
+        var latest = texts.Single(t => t.Text == "latest");
+        Assert.Equal(((SolidColorBrush)w.FindResource("TextFillColorSecondaryBrush")).Color, ((SolidColorBrush)latest.Foreground).Color);
+        import.Close();
 
         settings.Close();
         w.Close();

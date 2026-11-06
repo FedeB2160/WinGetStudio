@@ -155,6 +155,38 @@ public class InstalledViewModelTests
         finally { File.Delete(file); }
     }
 
+    // Seleziona tutto nell'anteprima, come nelle griglie (2.0 UI/UX review R22).
+    [Fact]
+    public void ImportPreviewSelectAll()
+    {
+        var preview = new ImportPreviewViewModel(TwoPackages());
+        Assert.Equal((true, true), (preview.AllChecked, preview.CanCheckAll));
+
+        preview.AllChecked = false;
+        Assert.Empty(preview.KeptIndices);
+        Assert.False(preview.AllChecked);
+
+        var raised = new List<string?>();
+        preview.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        preview.Rows[1].Selected = true;
+        Assert.Null(preview.AllChecked);
+        Assert.Contains(nameof(ImportPreviewViewModel.AllChecked), raised);
+        Assert.Equal([1], preview.KeptIndices);
+    }
+
+    // Due pacchetti, uno con la versione e uno senza.
+    internal static PackageList TwoPackages()
+    {
+        var file = Path.Combine(Path.GetTempPath(), $"wgt-test-{Guid.NewGuid():N}.json");
+        File.WriteAllText(file, """
+            {"Sources":[{"SourceDetails":{"Name":"winget"},"Packages":[
+              {"PackageIdentifier":"A.A","Version":"1.0"},
+              {"PackageIdentifier":"B.B"}]}]}
+            """);
+        try { return PackageList.Load(file)!; }
+        finally { File.Delete(file); }
+    }
+
     [Fact]
     public async Task ImportPreviewDropsStoredArgumentsByDefault()
     {

@@ -33,23 +33,6 @@
             <DataTemplate x:Key="SelectCell" DataType="{x:Type vm:PackageItem}">
                 <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RowCellCheck}"/>
             </DataTemplate>
-            <!-- Seleziona tutto, nell'intestazione della colonna delle spunte di ogni griglia: spenta,
-                 tutte, alcune (indeterminata); quali righe tocca lo decide la scheda (Selectable).
-                 In un template e non come Header diretto: un controllo messo li' viene legato
-                 prima di entrare nell'albero e non trova la griglia. -->
-            <DataTemplate x:Key="SelectAllHeader">
-                <!-- 7 px a destra: l'intestazione Fluent tiene a destra lo spazio della freccia di
-                     ordinamento anche nascosta, e la spunta finiva a sinistra di quelle sotto. Un
-                     margine non ci sta nella colonna stretta: si sposta solo il disegno. -->
-                <CheckBox Style="{StaticResource RowCheck}" AutomationProperties.Name="Select all"
-                          ToolTip="Select or clear every package in the list"
-                          IsChecked="{Binding DataContext.AllChecked, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                          IsEnabled="{Binding DataContext.CanCheckAll, RelativeSource={RelativeSource AncestorType=DataGrid}}">
-                    <CheckBox.RenderTransform>
-                        <TranslateTransform X="7"/>
-                    </CheckBox.RenderTransform>
-                </CheckBox>
-            </DataTemplate>
             <!-- In Updates una riga con un pin non si spunta: non e' aggiornabile. -->
             <DataTemplate x:Key="SelectUnpinnedCell" DataType="{x:Type vm:PackageItem}">
                 <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}">
@@ -303,27 +286,6 @@
                 <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Hidden"/>
                 <Setter Property="ItemsSource" Value="{Binding Items}"/>
                 <Setter Property="Visibility" Value="{Binding HasItems, Converter={StaticResource Visible}}"/>
-            </Style>
-            <!-- Titoli delle colonne a sinistra, dove comincia il testo delle celle (smoke test); al
-                 centro solo spunta, Pin e Result, le colonne a modello, che non si ordinano. Il
-                 trigger e' su CanUserSort perche' e' una proprieta' dell'intestazione: Column non
-                 notifica, e un binding su Column.CanUserResize resta a null. Stile implicito e non
-                 ColumnHeaderStyle della griglia: col tema Fluent le intestazioni prendono lo stile
-                 per tipo e ignorano quello. -->
-            <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
-                <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                <!-- Niente separatori verticali: come le righe, solo linee orizzontali. -->
-                <Setter Property="SeparatorVisibility" Value="Collapsed"/>
-                <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
-                <Setter Property="Padding" Value="3,0,0,0"/>
-                <Style.Triggers>
-                    <Trigger Property="CanUserSort" Value="False">
-                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                        <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
-                             rispetto a quelle delle righe. -->
-                        <Setter Property="Padding" Value="0"/>
-                    </Trigger>
-                </Style.Triggers>
             </Style>
             <!-- Testo delle colonne: VerticalContentAlignment della cella non arriva al TextBlock,
                  che si stende e lascia il testo in alto. Lo si centra qui. Testo lungo: i puntini. -->
