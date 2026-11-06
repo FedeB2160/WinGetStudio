@@ -50,7 +50,7 @@ public sealed partial class AppState : ObservableObject
 
     public bool IsIdle => !IsBusy;
 
-    // Quale coda gira, o null: solo chi l'ha avviata offre Cancel.
+    // Quale coda gira, o null: solo chi l'ha avviata offre Stop.
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ShowProgress))] public partial QueueVerb? QueueVerb { get; private set; }
     [ObservableProperty] public partial bool Cancelling { get; private set; }
 
@@ -218,8 +218,8 @@ public sealed partial class AppState : ObservableObject
         if (QueueVerb is null || Cancelling) return;
         Cancelling = true;
         Log.Write(_waitingApproval
-            ? "Cancelling: no longer waiting for administrator approval. If the Windows prompt is still open, approving it now does nothing."
-            : "Cancelling: the package in progress will finish, then the queue stops.");
+            ? "Stopping: no longer waiting for administrator approval. If the Windows prompt is still open, approving it now does nothing."
+            : "Stopping: the package in progress will finish, then the queue stops.");
         _cancel?.Cancel();
     }
 

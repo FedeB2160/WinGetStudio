@@ -174,7 +174,7 @@ public sealed class PackageQueue(WinGetCli cli)
         var verb = request.Verb.ToString();
         var result = new QueueResult(request, outcomes, done < request.Rows.Count);
         log?.Invoke(result.Cancelled
-            ? $"{verb} cancelled after {done} of {request.Rows.Count} packages; the rest were left untouched: {result.Summary}."
+            ? $"{verb} stopped after {done} of {request.Rows.Count} packages; the rest were left untouched: {result.Summary}."
             : $"{verb} complete: {result.Summary}.");
         return result;
     }

@@ -154,7 +154,7 @@ public class UpdatesViewModelTests
     }
 
     [Fact]
-    public async Task UpdateBecomesCancelAndFinishesThePackageInProgress()
+    public async Task UpdateBecomesStopAndFinishesThePackageInProgress()
     {
         using var h = Create([A, B, C]);
         var vm = h.Vm.Updates;
@@ -164,18 +164,18 @@ public class UpdatesViewModelTests
         h.WinGet.Before = a => a[1] == "--id" && a[2] == "A.A" ? release.Task : Task.CompletedTask;
 
         var queue = vm.UpdateAsync();
-        Assert.Equal("Cancel", vm.UpdateButtonText);
+        Assert.Equal("Stop", vm.UpdateButtonText);
         Assert.True(vm.UpdateCommand.CanExecute(null));
 
-        var cancel = vm.UpdateAsync();   // secondo clic: Cancel
-        Assert.Equal("Cancelling...", vm.UpdateButtonText);
+        var cancel = vm.UpdateAsync();   // secondo clic: Stop
+        Assert.Equal("Stopping...", vm.UpdateButtonText);
         Assert.False(vm.UpdateCommand.CanExecute(null));
         release.SetResult();
         await Task.WhenAll(queue, cancel);
 
         Assert.Equal(["A.A"], h.WinGet.Calls.Where(c => c[1] == "--id").Select(c => c[2]));
-        Assert.Contains("Cancelling: the package in progress will finish, then the queue stops.", h.Log);
-        Assert.Contains("Update cancelled after 1 of 3 packages; the rest were left untouched: 1 ok, 2 not run.", h.Log);
+        Assert.Contains("Stopping: the package in progress will finish, then the queue stops.", h.Log);
+        Assert.Contains("Update stopped after 1 of 3 packages; the rest were left untouched: 1 ok, 2 not run.", h.Log);
         Assert.Equal("Update", vm.UpdateButtonText);
     }
 

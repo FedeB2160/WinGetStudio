@@ -36,7 +36,7 @@ Measured on 2026-10-29 with winget 1.29.380 from an unelevated process (standard
    It runs the same command lines through **one** `runas` for all of them, output to files, exit code
    from the process handle, under the one-winget-at-a-time lock (ADR 0003). A declined UAC (1223) is an
    outcome of its own, *Cancelled at the administrator prompt*, and stays retryable.
-4. **A row waiting for a UAC says so** (*Waiting for administrator approval*), and Cancel can stop the
+4. **A row waiting for a UAC says so** (*Waiting for administrator approval*), and **Stop** (the button itself, "Cancel" until 2026-11) can stop the
    wait: winget has no timeout and the queue deliberately has none either (ADR 0004).
 5. **"Restart as administrator"** (Settings and the window menu) relaunches the whole app with `runas`
    for those who prefer one UAC per session, today's behaviour. In that mode a banner says so, only the
@@ -75,12 +75,12 @@ Measured on 2026-10-29 with winget 1.29.380 from an unelevated process (standard
   share write access.
 - `cmd` is back in an elevated path, so arguments with `%`, a quote or a control character are refused,
   as in 1.x (v1.13): `cmd` expands `%VAR%` even between quotes.
-- Retryable as administrator: `0x8A150030`, `0x8A150019`, and `1223`. A declined UAC, or Cancel while
+- Retryable as administrator: `0x8A150030`, `0x8A150019`, and `1223`. A declined UAC, or Stop while
   the UAC waits, gives every row *Cancelled at the administrator prompt* with exit 1223, so it stays
-  retryable. Cancel stops the wait but cannot close the prompt: `ShellExecuteEx` stays blocked on its
+  retryable. Stop ends the wait but cannot close the prompt: `ShellExecuteEx` stays blocked on its
   thread, and an approval given later finds the marker and runs nothing; the files stay held until
   that process exits. With the secure desktop the window cannot be clicked while the prompt is up;
-  the case is a prompt left waiting in the taskbar. Cancel during the batch stops the steps not yet
+  the case is a prompt left waiting in the taskbar. Stop during the batch stops the steps not yet
   started, and their rows keep their earlier outcome.
 - **Point 4 covers only this app's own `runas`.** A UAC raised by an installer through winget is not
   detected, and its wait cannot be cancelled: the only way to stop it is to kill winget, which

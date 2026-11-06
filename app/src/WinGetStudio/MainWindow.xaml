@@ -340,7 +340,7 @@
                 <Setter Property="ToolTip" Value="Run the last operation again on the packages in this list where it failed"/>
             </Style>
             <!-- Retry as administrator (ADR 0024): solo per i fallimenti che l'elevazione puo' risolvere,
-                 col glifo dello scudo; mentre il suo batch gira e' il Cancel che smette di aspettare l'UAC. -->
+                 col glifo dello scudo; mentre il suo batch gira e' lo Stop che smette di aspettare l'UAC. -->
             <Style x:Key="RetryAdmin" TargetType="Button" BasedOn="{StaticResource PageButton}">
                 <Setter Property="Padding" Value="11,5,11,6"/>
                 <Setter Property="Margin" Value="0,0,8,0"/>
@@ -348,7 +348,7 @@
                 <Setter Property="Content" Value="{Binding RetryAdminText}"/>
                 <Setter Property="Command" Value="{Binding RetryAdminCommand}"/>
                 <Setter Property="Visibility" Value="{Binding RetryAdminVisible, Converter={StaticResource Visible}}"/>
-                <Setter Property="ToolTip" Value="Run the failed operation again as administrator: one Windows prompt for all of these packages"/>
+                <Setter Property="ToolTip" Value="{Binding RetryAdminToolTip}"/>
             </Style>
             <!-- Pin e Unpin sulle righe EVIDENZIATE, non sulle spuntate: la spunta di una riga con
                  un pin e' spenta, e con le spunte il pin non si toglierebbe piu'. Ognuna compare
