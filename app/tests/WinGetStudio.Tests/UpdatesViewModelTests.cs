@@ -261,6 +261,8 @@ public class UpdatesViewModelTests
         var d = Assert.Single(h.Dialogs.Calls);
         Assert.Equal(("App A - details", true), (d.Title, d.Links));
         Assert.Contains("https://a.example/", d.Text);
+        var p = Assert.IsType<PackageDetails>(d.Content);
+        Assert.Equal(("App A", new DetailsRow("Homepage", "https://a.example/")), (p.Name, p.Parts[0].Rows[0]));
         Assert.All(busy, Assert.True);
         Assert.Contains("Reading the details of App A [A.A]...", h.Log);
         Assert.False(h.State.IsBusy);

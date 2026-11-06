@@ -312,6 +312,6 @@ public sealed partial class AppState : ObservableObject
         }
         return Dialogs.Show(text.Length > 0 ? text : "winget returned no details for this package.", $"{item.Name} - details",
             verbs is null ? MessageBoxButton.OK : MessageBoxButton.YesNo, defaultResult: verbs is null ? MessageBoxResult.None : MessageBoxResult.No,
-            links: true, verbs: verbs) == MessageBoxResult.Yes;
+            content: PackageDetails.Parse(item.Name, text), links: true, verbs: verbs) == MessageBoxResult.Yes;
     }
 }
