@@ -81,6 +81,28 @@ public class UpdatesViewModelTests
         Assert.Contains(h.WinGet.Calls, c => c is ["upgrade", "--accept-source-agreements", "--include-unknown"]);
     }
 
+    // Update spento senza spunte: il perche' accanto al pulsante (2.0 UI/UX review R19).
+    [Fact]
+    public async Task UpdateIsExplainedWhenNothingIsTicked()
+    {
+        using var h = Create([A, B]);
+        var vm = h.Vm.Updates;
+        await vm.LoadAsync();
+        Assert.Equal("Tick the packages to update", vm.SelectedText);
+        vm.Items[0].Selected = true;
+        Assert.Equal("1 selected", vm.SelectedText);
+    }
+
+    // Tutte con pin: nessuna si spunta, quindi niente invito a spuntare.
+    [Fact]
+    public async Task NoHintWhenEveryRowIsPinned()
+    {
+        using var h = Create([A], ["A.A"]);
+        var vm = h.Vm.Updates;
+        await vm.LoadAsync();
+        Assert.Equal("", vm.SelectedText);
+    }
+
     [Fact]
     public async Task SelectAllSkipsPinnedRows()
     {

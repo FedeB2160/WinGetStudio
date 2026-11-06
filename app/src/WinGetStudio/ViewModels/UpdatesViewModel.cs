@@ -155,8 +155,11 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         var total = Items.Count;
         var selected = Items.Count(i => i.Selected);
         AvailableText = total switch { 0 => "", 1 => "1 update available", _ => $"{total} updates available" };
-        // A lista vecchia il contatore cede il posto al motivo per cui Update e' spento.
-        SelectedText = Stale ? "List out of date: press Check for updates." : selected > 0 ? $"{selected} selected" : "";
+        // A lista vecchia il contatore cede il posto al motivo per cui Update e' spento; senza
+        // spunte, l'invito a spuntare (solo se c'e' qualcosa da spuntare: i pinnati no).
+        SelectedText = Stale ? "List out of date: press Check for updates."
+            : selected > 0 ? $"{selected} selected"
+            : Selectable.Any() ? "Tick the packages to update" : "";
         UpdateButtonText = OurQueue ? State.Cancelling ? "Stopping..." : "Stop" : "Update";
         UpdateButtonToolTip = OurQueue ? "Finish the package in progress, then stop without starting the others" : null;
         UpdateCommand?.NotifyCanExecuteChanged();

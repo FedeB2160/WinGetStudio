@@ -37,7 +37,7 @@ public class InstallViewModelTests
         Assert.Equal(["search", "7zip", "--count", "25", "--source", "winget"], call.Take(6));
         Assert.Equal(["7zip.7zip"], vm.Items.Select(i => i.Id));
         Assert.Equal("winget", vm.Items[0].Source);
-        Assert.Equal("1 result - tick the ones to install, or double click a row for details", vm.InfoText);
+        Assert.Equal("1 result: tick the packages to install, or double click a row for details", vm.InfoText);
     }
 
     [Fact]
