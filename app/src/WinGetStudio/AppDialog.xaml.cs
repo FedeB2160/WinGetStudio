@@ -86,7 +86,7 @@ public partial class AppDialog : Window
     // In un RichTextBox e non in una griglia: il testo resta selezionabile e si copia (ADR 0020).
     private RichTextBox DetailsTable(PackageDetails details)
     {
-        Block Text(string value, bool secondary)
+        Block Text(string value)
         {
             var p = new Paragraph { Margin = new Thickness(0, 0, 0, 4) };
             var lines = value.Split('\n');
@@ -96,12 +96,11 @@ public partial class AppDialog : Window
                     p.Inlines.Add(part.IsLink ? new Hyperlink(new Run(part.Text)) { NavigateUri = new Uri(part.Text) } : new Run(part.Text));
                 if (i < lines.Length - 1) p.Inlines.Add(new LineBreak());
             }
-            if (secondary) p.SetResourceReference(TextElement.ForegroundProperty, "TextFillColorSecondaryBrush");
             return p;
         }
         TableCell Cell(string value, bool secondary, int span = 1)
         {
-            var c = new TableCell(Text(value, secondary)) { ColumnSpan = span, Padding = new Thickness(0, 0, 12, 0) };
+            var c = new TableCell(Text(value)) { ColumnSpan = span, Padding = new Thickness(0, 0, 12, 0) };
             if (secondary) c.SetResourceReference(TextElement.ForegroundProperty, "TextFillColorSecondaryBrush");
             return c;
         }
