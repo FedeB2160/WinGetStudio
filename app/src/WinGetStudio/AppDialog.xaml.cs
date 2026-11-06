@@ -32,12 +32,21 @@ public partial class AppDialog : Window
         _button = button;
         Title = title;
         DlgText.Text = text;
-        if (links)
+        // I dettagli di un pacchetto come tabella (ADR 0021); il testo resta per il ripiego.
+        if (content is PackageDetails details)
         {
-            DlgBody.Children.Insert(0, LinkedText(text));
+            DlgBody.Children.Insert(0, DetailsTable(details));
             DlgText.Visibility = Visibility.Collapsed;
         }
-        DlgContent.Content = content;
+        else
+        {
+            if (links)
+            {
+                DlgBody.Children.Insert(0, LinkedText(text));
+                DlgText.Visibility = Visibility.Collapsed;
+            }
+            DlgContent.Content = content;
+        }
 
         if (Icons.TryGetValue(image, out var icon))
         {
@@ -71,6 +80,61 @@ public partial class AppDialog : Window
 
     // Esc o la X: la risposta prudente.
     public MessageBoxResult Answer => _answer ?? (_button == MessageBoxButton.YesNo ? MessageBoxResult.No : MessageBoxResult.OK);
+
+    // Dettagli come tabella (ADR 0021): il nome come titolo, poi per ogni lettura di winget la sua
+    // prima riga e le coppie etichetta/valore. Etichette e titoletti in secondario, valori coi link.
+    // In un RichTextBox e non in una griglia: il testo resta selezionabile e si copia (ADR 0020).
+    private RichTextBox DetailsTable(PackageDetails details)
+    {
+        Block Text(string value, bool secondary)
+        {
+            var p = new Paragraph { Margin = new Thickness(0, 0, 0, 4) };
+            var lines = value.Split('\n');
+            for (var i = 0; i < lines.Length; i++)
+            {
+                foreach (var part in LinkText.Split(lines[i]))
+                    p.Inlines.Add(part.IsLink ? new Hyperlink(new Run(part.Text)) { NavigateUri = new Uri(part.Text) } : new Run(part.Text));
+                if (i < lines.Length - 1) p.Inlines.Add(new LineBreak());
+            }
+            if (secondary) p.SetResourceReference(TextElement.ForegroundProperty, "TextFillColorSecondaryBrush");
+            return p;
+        }
+        TableCell Cell(string value, bool secondary, int span = 1)
+        {
+            var c = new TableCell(Text(value, secondary)) { ColumnSpan = span, Padding = new Thickness(0, 0, 12, 0) };
+            if (secondary) c.SetResourceReference(TextElement.ForegroundProperty, "TextFillColorSecondaryBrush");
+            return c;
+        }
+        var title = new Paragraph(new Run(details.Name)) { FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
+        title.SetResourceReference(TextElement.FontSizeProperty, "SectionFontSize");
+        var table = new Table { CellSpacing = 0, Margin = new Thickness(0) };
+        table.Columns.Add(new TableColumn { Width = new GridLength(180) });
+        table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+        var group = new TableRowGroup();
+        foreach (var part in details.Parts)
+        {
+            group.Rows.Add(new TableRow { Cells = { Cell(part.Heading, secondary: true, span: 2) } });
+            foreach (var row in part.Rows)
+                group.Rows.Add(row.Label.Length == 0
+                    ? new TableRow { Cells = { Cell(row.Value, secondary: false, span: 2) } }
+                    : new TableRow { Cells = { Cell(row.Label, secondary: true), Cell(row.Value, secondary: false) } });
+        }
+        table.RowGroups.Add(group);
+        var doc = new FlowDocument(title) { PagePadding = new Thickness(0), FontSize = 12 };
+        doc.Blocks.Add(table);
+        doc.SetBinding(FlowDocument.FontFamilyProperty, new System.Windows.Data.Binding(nameof(FontFamily)) { Source = this });
+        MaxWidth = 760;
+        return new RichTextBox(doc)
+        {
+            IsReadOnly = true,
+            IsDocumentEnabled = true,
+            BorderThickness = new Thickness(0),
+            Background = Brushes.Transparent,
+            Width = 600,
+            MaxHeight = 520,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+        };
+    }
 
     // Testo coi link cliccabili (ADR 0021), in sola lettura ma selezionabile. Larghezza fissa:
     // in un dialogo che prende la misura del contenuto un RichTextBox non ne ha una sua. E' il

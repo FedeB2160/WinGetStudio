@@ -66,6 +66,22 @@ Two more facts shaped the decision:
 - **Install passes the row's source** (`--source "<Source>"`) when the row has one. Updates and
   Installed do not: winget already correlates the installed package.
 
+### Amended 2026-11-06 (version 2): a table read by position
+
+The 2.0 UI/UX review (finding R17) found the details popup hard to scan: `Name: ...` lines of plain
+text in a wide, half-empty window. The details are now a titled table, still without knowing a single
+label:
+- `PackageDetails.Parse` reads the **layout only**. A blank line separates the two reads; the first line
+  of each read is its heading (`7-Zip 26.05 (x64) [7zip.7zip]`, `Trovato 7-Zip [7zip.7zip]`), even if it
+  contains `": "`. Every other line splits at its first `": "` into label and value, a line ending in `":"`
+  opens a group, and indented lines continue the value above (tags, release notes, the installer group).
+  No label is ever matched by name, so alternative 1 below stays rejected and every language works.
+- The dialog shows the package name as a title (14 SemiBold) and a two-column table, labels and
+  headings in secondary text, values with their links. It is still a read-only `RichTextBox`, so the text
+  can be selected and copied.
+- Text with no `label: value` line at all (an error, an old winget, no details) is shown verbatim, as
+  before.
+
 ## Consequences
 
 **Positive**

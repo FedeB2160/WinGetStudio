@@ -223,6 +223,26 @@ public class WindowSmokeTests
         Assert.Equal(details.FontFamily, rich.Document.FontFamily);
         Assert.Equal((12d, 680d), (rich.Document.FontSize, rich.Width));
         details.Close();
+        // Dettagli letti per posizione (ADR 0021): titolo col nome, poi una tabella etichetta/valore
+        // con etichette secondarie e link; un valore lungo va a capo, la finestra non si allarga.
+        var parsed = PackageDetails.Parse("App A", "Found App A [A.A]\r\nHomepage: https://example.com\r\nTags:\r\n  one\r\n  two\r\nSHA256: " + new string('a', 64))!;
+        var table = new AppDialog("text", "App A - details", MessageBoxButton.OK, MessageBoxImage.None, MessageBoxResult.None, parsed, links: true)
+        {
+            Owner = w, ShowActivated = false,
+        };
+        var doc = ((StackPanel)table.FindName("DlgBody")).Children.OfType<RichTextBox>().First().Document;
+        Assert.Equal(table.FontFamily, doc.FontFamily);
+        var title = Assert.IsType<Paragraph>(doc.Blocks.FirstBlock);
+        Assert.Equal(("App A", 14d, FontWeights.SemiBold), (new TextRange(title.ContentStart, title.ContentEnd).Text, title.FontSize, title.FontWeight));
+        var tableRows = Assert.Single(doc.Blocks.OfType<Table>()).RowGroups.SelectMany(g => g.Rows).ToList();
+        Assert.Equal(4, tableRows.Count);
+        Assert.Equal(((SolidColorBrush)w.FindResource("TextFillColorSecondaryBrush")).Color, ((SolidColorBrush)tableRows[1].Cells[0].Foreground).Color);
+        var link = Assert.Single(FindLinks(doc));
+        Assert.Equal("https://example.com/", link.NavigateUri.AbsoluteUri);
+        table.Show();
+        Pump(() => true);
+        Assert.True(table.ActualWidth <= 760, $"{table.ActualWidth}");
+        table.Close();
 
         settings.Close();
         w.Close();
@@ -249,6 +269,10 @@ public class WindowSmokeTests
             foreach (var d in FindAll<T>(c)) yield return d;
         }
     }
+
+    private static IEnumerable<Hyperlink> FindLinks(FlowDocument doc) =>
+        doc.Blocks.OfType<Table>().SelectMany(t => t.RowGroups).SelectMany(g => g.Rows).SelectMany(r => r.Cells)
+            .SelectMany(c => c.Blocks.OfType<Paragraph>()).SelectMany(p => p.Inlines.OfType<Hyperlink>());
 
     private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
     {
