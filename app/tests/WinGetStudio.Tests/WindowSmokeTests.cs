@@ -192,6 +192,14 @@ public class WindowSmokeTests
         Pump(() => nav.ActualWidth < 60);
         Assert.True(nav.ActualWidth < 60 && wide > 150, $"{wide} -> {nav.ActualWidth}");
         Assert.Equal(y, last.TranslatePoint(new Point(), nav).Y);
+        settings.NavCompact = false;
+        // App updates: etichetta e valore sulla stessa riga, centrati (2.0 UI/UX review R20).
+        nav.SelectedIndex = 2;
+        Pump(() => true);
+        double Center(TextBlock t) => t.TranslatePoint(new Point(0, t.ActualHeight / 2), settings).Y;
+        var shown = FindAll<TextBlock>(settings).Where(t => t.IsVisible).ToList();
+        foreach (var (label, value) in new[] { ("WinGet Studio", h.Vm.Settings.VersionText), ("winget", h.Vm.Settings.WinGetVersionText) })
+            Assert.Equal(Center(shown.First(t => t.Text == label)), Center(shown.First(t => t.Text == value)), 1.0);
         h.Vm.Settings.ApplyTheme = name => app.ThemeMode = App.Theme(name);
         Assert.Contains("Found 30 updates.", ((TextBox)w.FindName("TxtLog")).Text);
         foreach (var key in FluentKeys) Assert.True(w.TryFindResource(key) is not null, key);

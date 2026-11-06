@@ -231,38 +231,37 @@
                             </Grid.ColumnDefinitions>
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="8"/>
+                                <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="12"/>
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
-                            <!-- Una voce per riga: versione e pulsante (solo con una versione piu' recente), sotto
-                                 l'esito del controllo. -->
-                            <TextBlock Text="WinGet Studio" Style="{StaticResource Label}" VerticalAlignment="Top" Margin="0,6,16,0"/>
-                            <StackPanel Grid.Column="1">
-                                <StackPanel Orientation="Horizontal" MinHeight="32">
-                                    <TextBlock Text="{Binding VersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0"/>
-                                    <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateAppText}" ToolTip="{Binding UpdateAppToolTip}"
-                                            Command="{Binding UpdateAppCommand}" Visibility="{Binding UpdateAppVisible, Converter={StaticResource Visible}}"/>
-                                </StackPanel>
-                                <TextBlock Style="{StaticResource Note}" Text="{Binding UpdateStatus}"/>
+                            <!-- Una voce per riga: etichetta, versione e pulsante (solo con una versione piu' recente)
+                                 sulla stessa riga della griglia, centrati; sotto, nella riga dopo, l'esito del controllo.
+                                 Con l'esito nella stessa cella l'etichetta andava in alto e restava 2 px sopra il valore. -->
+                            <TextBlock Text="WinGet Studio" Style="{StaticResource Label}"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" MinHeight="32">
+                                <TextBlock Text="{Binding VersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateAppText}" ToolTip="{Binding UpdateAppToolTip}"
+                                        Command="{Binding UpdateAppCommand}" Visibility="{Binding UpdateAppVisible, Converter={StaticResource Visible}}"/>
                             </StackPanel>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource Note}" Text="{Binding UpdateStatus}"/>
                             <!-- winget stesso (ADR 0019): chi lo aggiorna, o il pulsante. -->
-                            <TextBlock Grid.Row="2" Text="winget" Style="{StaticResource Label}" VerticalAlignment="Top" Margin="0,6,16,0"/>
-                            <StackPanel Grid.Row="2" Grid.Column="1">
-                                <StackPanel Orientation="Horizontal" MinHeight="32">
-                                    <TextBlock Text="{Binding WinGetVersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0"/>
-                                    <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateWinGetText}" ToolTip="{Binding UpdateWinGetToolTip}"
-                                            Command="{Binding UpdateWinGetCommand}" Visibility="{Binding UpdateWinGetVisible, Converter={StaticResource Visible}}"/>
-                                    <TextBlock Style="{StaticResource Subtle}" VerticalAlignment="Center"
-                                               Visibility="{Binding WinGetStore, Converter={StaticResource Visible}}">Updated by the <Hyperlink
-                                               NavigateUri="ms-windows-store://downloadsandupdates">Microsoft Store</Hyperlink></TextBlock>
-                                </StackPanel>
-                                <TextBlock Style="{StaticResource Note}" Text="{Binding WinGetStatus}"/>
+                            <TextBlock Grid.Row="3" Text="winget" Style="{StaticResource Label}"/>
+                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" MinHeight="32">
+                                <TextBlock Text="{Binding WinGetVersionText}" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                                <Button Style="{StaticResource AccentButtonStyle}" Content="{Binding UpdateWinGetText}" ToolTip="{Binding UpdateWinGetToolTip}"
+                                        Command="{Binding UpdateWinGetCommand}" Visibility="{Binding UpdateWinGetVisible, Converter={StaticResource Visible}}"/>
+                                <TextBlock Style="{StaticResource Subtle}" VerticalAlignment="Center"
+                                           Visibility="{Binding WinGetStore, Converter={StaticResource Visible}}">Updated by the <Hyperlink
+                                           NavigateUri="ms-windows-store://downloadsandupdates">Microsoft Store</Hyperlink></TextBlock>
                             </StackPanel>
+                            <TextBlock Grid.Row="4" Grid.Column="1" Style="{StaticResource Note}" Text="{Binding WinGetStatus}"/>
                             <!-- Valgono per tutte e due le voci sopra. "Check for new versions": "Check for
                                  updates" e' il controllo dei pacchetti (scheda Updates, menu del tray). -->
-                            <StackPanel Grid.Row="4" Grid.ColumnSpan="2" Orientation="Horizontal">
+                            <StackPanel Grid.Row="6" Grid.ColumnSpan="2" Orientation="Horizontal">
                                 <Button Content="Check for new versions" MinWidth="140" Command="{Binding CheckForUpdatesCommand}"/>
                                 <CheckBox Content="Check at startup" Margin="16,0,0,0" VerticalAlignment="Center"
                                           IsChecked="{Binding CheckAtStartup}"
