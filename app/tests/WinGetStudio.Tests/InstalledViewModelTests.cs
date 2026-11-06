@@ -113,7 +113,7 @@ public class InstalledViewModelTests
         Assert.Equal(("Uninstall", "Cancel"), ask.Verbs);
         Assert.Equal("Uninstall 2 packages?\n\n  - Alpha\n  - Beta\n\n1 of them are currently hidden by the filter.\n\nThis cannot be undone.", ask.Text);
         Assert.Equal(0, h.WinGet.Count("uninstall"));
-        Assert.Contains("Uninstall cancelled.", h.Log);
+        Assert.Contains("Uninstall canceled.", h.Log);
     }
 
     [Fact]

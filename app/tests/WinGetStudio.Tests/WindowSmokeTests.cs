@@ -144,6 +144,8 @@ public class WindowSmokeTests
         // contenuto sta nel TabControl, non nella TabItem.
         Assert.Contains(FindAll<Button>(tabs), b => b.Content as string == "Check for updates");
         Assert.Contains(FindAll<CheckBox>(tabs), c => c.Content as string == "Include unknown versions");
+        // Un nome solo per lo Store (2.0 UI/UX review R18).
+        Assert.Equal("Microsoft Store", ((CheckBox)w.FindName("ChkStore")).Content);
         var scope = (ComboBox)w.FindName("CmbScope");
         Assert.Equal(["Auto", "Current user", "All users"], scope.Items.Cast<ScopeChoice>().Select(s => s.Label));
         Assert.Equal("Auto", ((ScopeChoice)scope.SelectedItem).Label);
@@ -165,7 +167,7 @@ public class WindowSmokeTests
         var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };
         about.Show();
         Pump(() => true);
-        Assert.True(about.FindName("TxtVersion") is TextBlock { Text: "Version 2.0.0" });
+        Assert.True(about.FindName("TxtVersion") is TextBlock { Text: "v2.0.0" });
         Assert.NotNull(FindChild<Image>(about)?.Source);
         about.Close();
         var settings = new SettingsWindow { DataContext = h.Vm.Settings, Owner = w, ShowActivated = false };

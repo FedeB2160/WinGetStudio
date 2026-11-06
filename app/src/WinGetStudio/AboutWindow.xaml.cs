@@ -9,7 +9,7 @@ public partial class AboutWindow : Window
     {
         InitializeComponent();
         TitleBar.Follow(this);
-        TxtVersion.Text = $"Version {version}";
+        TxtVersion.Text = $"v{version}";
         DialogService.OpenLinks(this);
     }
 }

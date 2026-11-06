@@ -399,7 +399,7 @@
             <Button Style="{StaticResource PageButton}" Tag="&#xE713;" Content="Settings" Command="{Binding OpenSettingsCommand}"
                     ToolTip="Theme, tab strip, version and updates"/>
             <Button Style="{StaticResource PageButton}" Tag="&#xE946;" Content="About" Command="{Binding OpenAboutCommand}" Margin="6,0,0,0"
-                    ToolTip="What this app does, where to report a bug, and the licence"/>
+                    ToolTip="What this app does, where to report a bug, and the license"/>
         </StackPanel>
 
         <!-- Il riquadro delle schede: bordo e sfondo delle card, che il template Fluent usa gia'
@@ -407,7 +407,7 @@
         <TabControl x:Name="TabMain" Grid.Row="1" SelectedIndex="{Binding SelectedTab}" BorderThickness="2" AlternationCount="3"
                     BorderBrush="{DynamicResource AreaStrokeBrush}" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}">
             <TabItem Header="Install" Tag="&#xE896;" DataContext="{Binding Install}"
-                     AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
+                     AutomationProperties.HelpText="Search the winget catalog as you type and install what you pick">
                 <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -428,7 +428,7 @@
                                 <TextBlock x:Name="HintSearch" Style="{StaticResource Placeholder}" Tag="{Binding ElementName=TxtSearch}" Text="Search by name or ID"/>
                             </Grid>
                             <Button Content="Search" MinWidth="96" Margin="8,0,0,0" Command="{Binding SearchNowCommand}"/>
-                            <CheckBox Content="MS Store" Margin="12,0,0,0" VerticalAlignment="Center"
+                            <CheckBox x:Name="ChkStore" Content="Microsoft Store" Margin="12,0,0,0" VerticalAlignment="Center"
                                       IsChecked="{Binding IncludeStore}" IsEnabled="{Binding State.IsIdle}"
                                       ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"/>
                             <local:Spinner Margin="12,0,0,0" Visibility="{Binding Searching, Converter={StaticResource Visible}}"/>
@@ -463,7 +463,7 @@
                                 <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package Name" Width="2*" Binding="{Binding Name}"/>
                                 <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package ID" Width="2.4*" Binding="{Binding Id}"/>
                                 <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Version" Width="1.2*" Binding="{Binding Version}"/>
-                                <!-- Con MS Store i risultati vengono da due sorgenti: l'installazione usa quella della riga. -->
+                                <!-- Con Microsoft Store i risultati vengono da due sorgenti: l'installazione usa quella della riga. -->
                                 <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Source" Width="90" Binding="{Binding Source}"/>
                                 <DataGridTemplateColumn Header="Result" Width="56" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
                             </DataGrid.Columns>

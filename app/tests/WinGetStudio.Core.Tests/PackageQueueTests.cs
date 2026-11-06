@@ -190,9 +190,9 @@ public class PackageQueueTests
 
         var r = await queue.RunElevatedAsync(new QueueRequest(QueueVerb.Uninstall, [A], WinGetCommands.Uninstall), log.Add);
 
-        Assert.Equal(new PackageOutcome(OperationStatus.Error, "Cancelled at the administrator prompt", 1223), r.Outcomes["A.A"]);
+        Assert.Equal(new PackageOutcome(OperationStatus.Error, "Canceled at the administrator prompt", 1223), r.Outcomes["A.A"]);
         Assert.Equal(["A.A"], r.ElevatableIds);
-        Assert.Contains("Cancelled at the administrator prompt: nothing was run.", log);
+        Assert.Contains("Canceled at the administrator prompt: nothing was run.", log);
     }
 
     // L'esito dice il motivo dei codici noti e cosa fare (revisione UI/UX, R9): Retry as

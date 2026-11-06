@@ -37,7 +37,7 @@ public sealed record QueueResult(QueueRequest Request, IReadOnlyDictionary<strin
 public sealed class PackageQueue(WinGetCli cli)
 {
     // UAC rifiutato, o Cancel mentre l'UAC aspettava: un esito suo, ripetibile (ADR 0024).
-    public const string Declined = "Cancelled at the administrator prompt";
+    public const string Declined = "Canceled at the administrator prompt";
     private const int ErrorCancelled = 1223;
 
     // log: righe per il log della finestra. rowChanged: esito null = in corso, poi l'esito.

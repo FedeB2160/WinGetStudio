@@ -222,7 +222,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         State.Log.Write("Restarting as administrator...");
         if (!_host.RestartElevated())
         {
-            State.Log.Write("Restart cancelled at the administrator prompt.");
+            State.Log.Write("Restart canceled at the administrator prompt.");
             return;
         }
         CloseRequested?.Invoke();
@@ -285,7 +285,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         UpdateAppVisible = true;
         // Il pulsante dice gia' quale versione c'e': una scritta accanto la ripeterebbe.
         UpdateStatus = "";
-        State.Log.Write($"Version {rel.Tag} is available (you have v{_host.AppVersion}).");
+        State.Log.Write($"WinGet Studio {rel.Tag} is available (you have v{_host.AppVersion}).");
     }
 
     // La versione locale si legge sempre; GitHub solo dove lo Store non aggiorna winget, e col
@@ -313,7 +313,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         UpdateWinGetText = $"Update to {rel!.Tag}";
         UpdateWinGetToolTip = $"Download App Installer {rel.Tag} ({rel.Size / (1024 * 1024)} MB) and its dependencies from GitHub, and install them";
         UpdateWinGetVisible = true;
-        State.Log.Write($"winget {rel.Tag} is available (winget {version} is installed).");
+        State.Log.Write($"winget {rel.Tag} is available (you have v{version}).");
     }
 
     // Scarica, verifica (hash e firmatario, ADR 0022) e sostituisce. Finisce chiudendo la

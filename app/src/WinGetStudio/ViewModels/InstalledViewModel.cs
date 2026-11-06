@@ -99,7 +99,7 @@ public sealed partial class InstalledViewModel : PackageListViewModel
             "Confirm uninstall", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No, verbs: ("Uninstall", "Cancel"));
         if (answer != MessageBoxResult.Yes)
         {
-            State.Log.Write("Uninstall cancelled.");
+            State.Log.Write("Uninstall canceled.");
             return;
         }
         // Updates ora mente: un pacchetto rimosso puo' esserci ancora. Questo elenco si rilegge
@@ -186,13 +186,13 @@ public sealed partial class InstalledViewModel : PackageListViewModel
             "Confirm import", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No, preview, verbs: ("Import", "Cancel"));
         if (answer != MessageBoxResult.Yes)
         {
-            State.Log.Write("Import cancelled.");
+            State.Log.Write("Import canceled.");
             return;
         }
         var keep = preview.KeptIndices;
         if (keep.Count == 0)
         {
-            State.Log.Write("Import cancelled: no package was ticked.");
+            State.Log.Write("Import canceled: no package was ticked.");
             return;
         }
         var dropStored = n > 0 && !preview.KeepStoredArguments;

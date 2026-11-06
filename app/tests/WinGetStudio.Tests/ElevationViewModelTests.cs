@@ -90,10 +90,10 @@ public class ElevationViewModelTests
         await vm.RetryAdminAsync();
 
         var a = vm.Items.Single(i => i.Id == "A.A");
-        Assert.Equal((RowStatus.Error, "Cancelled at the administrator prompt"), (a.Status, a.StatusDetail));
+        Assert.Equal((RowStatus.Error, "Canceled at the administrator prompt"), (a.Status, a.StatusDetail));
         Assert.Equal("Retry as administrator (1)", vm.RetryAdminText);
         Assert.Equal("Run the failed operation again as administrator: one Windows prompt for all of these packages", vm.RetryAdminToolTip);
-        Assert.Contains("Cancelled at the administrator prompt: nothing was run.", h.Log);
+        Assert.Contains("Canceled at the administrator prompt: nothing was run.", h.Log);
     }
 
     // La riga dice che aspetta l'UAC, e Stop (il pulsante stesso) smette di aspettare.
@@ -117,13 +117,13 @@ public class ElevationViewModelTests
         await retry;
 
         Assert.Empty(h.Elevation.Batches);
-        Assert.Equal((RowStatus.Error, "Cancelled at the administrator prompt"), (a.Status, a.StatusDetail));
+        Assert.Equal((RowStatus.Error, "Canceled at the administrator prompt"), (a.Status, a.StatusDetail));
         Assert.Equal("Retry as administrator (1)", vm.RetryAdminText);
         Assert.Equal("Run the failed operation again as administrator: one Windows prompt for all of these packages", vm.RetryAdminToolTip);
         Assert.True(h.State.IsIdle);
         // Il log dice cosa e' successo nell'ordine giusto: prima l'annullamento, poi l'esito.
         var log = h.Log;
-        Assert.True(log.IndexOf("Stopping: no longer waiting for administrator approval.") < log.IndexOf("Cancelled at the administrator prompt: nothing was run."));
+        Assert.True(log.IndexOf("Stopping: no longer waiting for administrator approval.") < log.IndexOf("Canceled at the administrator prompt: nothing was run."));
     }
 
     // Elevata: niente Retry as administrator (sarebbe lo stesso livello), un banner che lo dice.
@@ -279,7 +279,7 @@ public class ElevationViewModelTests
         h.Vm.Settings.RestartElevatedCommand.Execute(null);
 
         Assert.False(closed);
-        Assert.Contains("Restart cancelled at the administrator prompt.", h.Log);
+        Assert.Contains("Restart canceled at the administrator prompt.", h.Log);
     }
 
     // Non si chiude l'app sopra una coda; e da elevata non c'e' nulla da riavviare.
