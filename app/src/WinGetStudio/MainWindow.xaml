@@ -610,8 +610,9 @@
             </TextBox.ContextMenu>
         </TextBox>
 
-        <!-- Velo sotto un dialogo (ADR 0020): copre tutta la finestra, margine compreso. -->
-        <Border x:Name="DialogDim" Grid.RowSpan="5" Margin="-10" Panel.ZIndex="100" Visibility="Collapsed"
+        <!-- Velo sotto un dialogo (ADR 0020): copre tutta la finestra, margine compreso (-12 come il
+             Margin della griglia: con -10 restava una cornice chiara di 2 px). -->
+        <Border x:Name="DialogDim" Grid.RowSpan="5" Margin="-12" Panel.ZIndex="100" Visibility="Collapsed"
                 Background="{DynamicResource SmokeFillColorDefaultBrush}"/>
     </Grid>
 </Window>

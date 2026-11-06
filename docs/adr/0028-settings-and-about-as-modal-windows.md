@@ -234,6 +234,17 @@ list on all four sides.
     - **The import preview has Select all** in its header, shared with the main grids through
       `Styles.xaml`, and a missing version reads "latest" in secondary text.
     - **Notifications have an icon and a target** (ADR 0030, amended).
+    - **Column titles are centered, all of them (2026-11-06, the user's choice; amends point 17).** The
+      Fluent header keeps the room of its sort arrow on the right even when the arrow is hidden, so
+      centered content sat left of the column's center by half of it, an amount that depends on the
+      glyph font. `HeaderBalance` (on the implicit header style) measures that room and gives it back
+      as left padding, never more than the title leaves free; on columns that cannot be sorted
+      (check box, Pin, Result) it collapses the arrow instead. The Select all check box lost its 7 px
+      shift: it now sits over the rows' ones by layout, with the same width, since the Fluent
+      template widens an empty check box to 30 px through a trigger that a local `MinWidth` would
+      override. The import preview shares the same header style and check boxes.
+    - **The dialog veil covers the whole window** (`Margin="-12"`, the grid's own margin; it left a
+      2 px light frame). The title bar, drawn by Windows, stays undimmed.
     - **Retry stays at the top right (R24, declined).** The review suggested moving the two Retry
       buttons next to Update, only if the bottom band did not crowd. At the 760 px minimum, after a
       failure that band would hold Update, both Retry buttons and "List out of date: press Check for

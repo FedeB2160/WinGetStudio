@@ -49,39 +49,27 @@
          i setter di RowCheck sono scritti qui. In un template e non come Header diretto: un controllo messo li' viene legato
          prima di entrare nell'albero e non trova la griglia. -->
     <DataTemplate x:Key="SelectAllHeader">
-        <!-- 7 px a destra: l'intestazione Fluent tiene a destra lo spazio della freccia di
-             ordinamento anche nascosta, e la spunta finiva a sinistra di quelle sotto. Un
-             margine non ci sta nella colonna stretta: si sposta solo il disegno. -->
-        <CheckBox MinWidth="0" MinHeight="0" Padding="0" HorizontalAlignment="Center" AutomationProperties.Name="Select all"
+        <!-- Sopra le spunte delle righe senza spostamenti: l'intestazione e' bilanciata (HeaderBalance). -->
+        <!-- MinWidth non locale: il template Fluent porta a 30 una CheckBox senza testo con un suo
+             trigger, che vince sullo stile ma non su un valore locale. Le righe ce l'hanno a 30: con 0
+             qui il quadratino, disegnato a sinistra, finiva 4 px piu' in la'. -->
+        <CheckBox MinHeight="0" Padding="0" HorizontalAlignment="Center" AutomationProperties.Name="Select all"
                   ToolTip="Select or clear every package in the list"
                   IsChecked="{Binding DataContext.AllChecked, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                   IsEnabled="{Binding DataContext.CanCheckAll, RelativeSource={RelativeSource AncestorType=DataGrid}}">
-            <CheckBox.RenderTransform>
-                <TranslateTransform X="7"/>
-            </CheckBox.RenderTransform>
         </CheckBox>
     </DataTemplate>
 
-    <!-- Titoli delle colonne a sinistra, dove comincia il testo delle celle (smoke test); al
-         centro solo spunta, Pin e Result, le colonne a modello, che non si ordinano. Il
-         trigger e' su CanUserSort perche' e' una proprieta' dell'intestazione: Column non
-         notifica, e un binding su Column.CanUserResize resta a null. Stile implicito e non
-         ColumnHeaderStyle della griglia: col tema Fluent le intestazioni prendono lo stile
-         per tipo e ignorano quello. -->
+    <!-- Titoli delle colonne al centro, tutti (scelta dell'utente, ADR 0028 punto 18): al centro
+         della colonna, non dello spazio lasciato dalla freccia di ordinamento (HeaderBalance).
+         Stile implicito e non ColumnHeaderStyle della griglia: col tema Fluent le intestazioni
+         prendono lo stile per tipo e ignorano quello. -->
     <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
-        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <!-- Niente separatori verticali: come le righe, solo linee orizzontali. -->
         <Setter Property="SeparatorVisibility" Value="Collapsed"/>
         <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
-        <Setter Property="Padding" Value="3,0,0,0"/>
-        <Style.Triggers>
-            <Trigger Property="CanUserSort" Value="False">
-                <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
-                     rispetto a quelle delle righe. -->
-                <Setter Property="Padding" Value="0"/>
-            </Trigger>
-        </Style.Triggers>
+        <Setter Property="local:HeaderBalance.Balance" Value="True"/>
     </Style>
 
     <!-- Pulsante con glifo (Tag, Segoe Fluent Icons) e nome: Settings e About in alto a destra.

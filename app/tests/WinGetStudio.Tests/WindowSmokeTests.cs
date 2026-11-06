@@ -53,21 +53,33 @@ public class WindowSmokeTests
         Assert.True(all.IsEnabled);
         all.IsChecked = true;
         Assert.True(h.Vm.Updates.Items[0].Selected);
-        // Titoli delle colonne a sinistra, dove comincia il testo delle celle; al centro solo le
-        // colonne fisse (ADR 0028, punto 17). La spunta di Seleziona tutto resta sopra quelle delle
-        // righe (i 7 px di SelectAllHeader).
+        // Tutti i titoli al centro della colonna (scelta dell'utente, ADR 0028 punto 18), e Seleziona
+        // tutto sopra le spunte delle righe. Lo spazio che l'intestazione Fluent tiene a destra per
+        // la freccia di ordinamento dipende dal font dei glifi (piu' grande qui sotto): HeaderBalance
+        // lo rende anche a sinistra, con qualunque font.
         var updatesGrid = (DataGrid)w.FindName("GridUpdates");
         var firstRow = FindChild<DataGridRow>(updatesGrid)!;
         double Left(FrameworkElement e) => e.TranslatePoint(new Point(), updatesGrid).X;
         double Middle(FrameworkElement e) => Left(e) + e.ActualWidth / 2;
-        var name = FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Package Name");
-        Assert.Equal(HorizontalAlignment.Left, name.HorizontalContentAlignment);
-        var nameCell = FindAll<DataGridCell>(firstRow).First(c => c.Column == name.Column);
-        Assert.Equal(Left(FindChild<TextBlock>(nameCell)!), Left(FindChild<TextBlock>(name)!), 1.0);
-        Assert.Equal(HorizontalAlignment.Center, FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Result").HorizontalContentAlignment);
-        // 2 px: lo spazio che l'intestazione Fluent tiene per la freccia di ordinamento dipende dal
-        // font dei glifi, e sul runner della CI (Windows Server) la spunta finiva 1,3 px piu' in la'.
-        Assert.Equal(Middle(FindChild<CheckBox>(firstRow)!), Middle(all), 2.0);
+        // Il quadratino, non il controllo: il template Fluent lo disegna a sinistra, e un controllo
+        // con piu' padding ha il centro altrove.
+        FrameworkElement Box(CheckBox c) => (FrameworkElement)c.Template.FindName("ControlBorderIconPresenter", c);
+        void SelectAllCentered() => Assert.Equal(Middle(Box(FindChild<CheckBox>(firstRow)!)), Middle(Box(all)), 0.5);
+        void HeadersCentered()
+        {
+            foreach (var header in FindAll<DataGridColumnHeader>(headers).Where(c => c.Column is not null))
+            {
+                FrameworkElement content = header.Content is string ? FindChild<TextBlock>(header)! : FindChild<CheckBox>(header)!;
+                Assert.True(Math.Abs(Middle(header) - Middle(content)) <= 0.5, $"{header.Content}: {Middle(header)} vs {Middle(content)}");
+            }
+            SelectAllCentered();
+        }
+        HeadersCentered();
+        updatesGrid.Resources["DataGridSortIndicatorIconFontSize"] = 18d;
+        Pump(() => true);
+        SelectAllCentered();
+        updatesGrid.Resources.Remove("DataGridSortIndicatorIconFontSize");
+        Pump(() => true);
         // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
         // colonne, Result compresa, stanno dentro e le fisse non cambiano larghezza. Le altre
         // elastiche non restano schiacciate ai 20 px minimi del DataGrid: tengono almeno il titolo.
@@ -174,6 +186,13 @@ public class WindowSmokeTests
         h.Vm.Install.SearchText = "";
         tabs.SelectedIndex = MainViewModel.UpdatesTab;
         Pump(() => true);
+        // Il velo sotto un dialogo copre tutta l'area della finestra, margine della griglia compreso.
+        w.SetDim(true);
+        Pump(() => true);
+        var dim = (FrameworkElement)w.FindName("DialogDim");
+        var area = (FrameworkElement)VisualTreeHelper.GetParent((Visual)w.Content);
+        Assert.Equal(new Rect(0, 0, area.ActualWidth, area.ActualHeight), dim.TransformToAncestor(area).TransformBounds(new Rect(dim.RenderSize)));
+        w.SetDim(false);
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
         var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };
         about.Show();
@@ -263,6 +282,10 @@ public class WindowSmokeTests
         table.Show();
         Pump(() => true);
         Assert.True(table.ActualWidth <= 760, $"{table.ActualWidth}");
+        // Il valore comincia dopo la colonna delle etichette (180 px), non in fondo alla riga: con
+        // una colonna '*' il RichTextBox dava quasi tutto alle etichette e il valore andava a capo
+        // a ogni lettera.
+        Assert.InRange(link.ContentStart.GetCharacterRect(LogicalDirection.Forward).X, 170, 260);
         table.Close();
         // Anteprima dell'import (2.0 UI/UX review R22): Seleziona tutto sopra le spunte delle righe,
         // "latest" in secondario dove il file non ha la versione.
@@ -275,7 +298,8 @@ public class WindowSmokeTests
         Assert.True(importAll.IsChecked);
         var importRow = FindChild<DataGridRow>(importGrid)!;
         double ImportMiddle(FrameworkElement e) => e.TranslatePoint(new Point(), importGrid).X + e.ActualWidth / 2;
-        Assert.Equal(ImportMiddle(FindChild<CheckBox>(importRow)!), ImportMiddle(importAll), 2.0);
+        FrameworkElement ImportBox(CheckBox c) => (FrameworkElement)c.Template.FindName("ControlBorderIconPresenter", c);
+        Assert.Equal(ImportMiddle(ImportBox(FindChild<CheckBox>(importRow)!)), ImportMiddle(ImportBox(importAll)), 0.5);
         var texts = FindAll<TextBlock>(importGrid).ToList();
         Assert.Contains(texts, t => t.Text == "1.0");
         var latest = texts.Single(t => t.Text == "latest");

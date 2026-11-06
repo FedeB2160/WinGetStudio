@@ -108,7 +108,9 @@ public partial class AppDialog : Window
         title.SetResourceReference(TextElement.FontSizeProperty, "SectionFontSize");
         var table = new Table { CellSpacing = 0, Margin = new Thickness(0) };
         table.Columns.Add(new TableColumn { Width = new GridLength(180) });
-        table.Columns.Add(new TableColumn { Width = new GridLength(1, GridUnitType.Star) });
+        // Larghezze assolute: in un RichTextBox una colonna '*' non prende lo spazio rimasto, e il valore
+        // andava a capo a ogni lettera. 600 del controllo, meno le etichette e il margine del documento.
+        table.Columns.Add(new TableColumn { Width = new GridLength(400) });
         var group = new TableRowGroup();
         foreach (var part in details.Parts)
         {

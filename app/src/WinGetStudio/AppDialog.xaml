@@ -23,7 +23,7 @@
                         <DataGridTemplateColumn Width="44" HeaderTemplate="{StaticResource SelectAllHeader}">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" MinWidth="0"
+                                    <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}"
                                               HorizontalAlignment="Center" AutomationProperties.Name="Import"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
