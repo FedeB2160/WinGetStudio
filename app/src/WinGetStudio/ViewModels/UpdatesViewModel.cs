@@ -30,6 +30,9 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     // aggiornati. Update si spegne finche' non si rilegge; riaprire la scheda rilegge.
     public bool Stale { get; private set; }
 
+    // L'ultima scansione non ha avuto risposta da winget: il fumetto del tray e' un errore.
+    public bool ScanFailed { get; private set; }
+
     // --include-unknown, salvata e subito applicata: una spunta che cambia COSA c'e' nell'elenco
     // senza cambiare l'elenco costringe a premere Check per capire cosa ha fatto.
     public bool IncludeUnknown
@@ -86,6 +89,7 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         var read = await State.Backend.GetUpgradesAsync(IncludeUnknown);
         var pins = await State.Backend.GetPinsAsync();
         Loading = false;
+        ScanFailed = !read.Success;
         // WinGet Studio resta fuori: winget non sovrascrive un exe in esecuzione, quindi spuntarlo
         // fallirebbe sempre. Ci si aggiorna da Settings (ADR 0013).
         if (read.Success) Fill(read.Rows.Where(r => !SelfUpdate.IsSelfPackage(r.Id)), outcomes);

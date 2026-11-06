@@ -45,6 +45,11 @@ Windows desktop runtime the app already uses, a library (H.NotifyIcon, Hardcodet
    already listed does. Clicking it opens the Updates tab. Check for updates from the menu always
    reports, "No updates available." included, even with the window active: whoever asked is looking
    at the icon. "Active" means a window of the app that is visible and active.
+   *Amended 2026-11-06 (UI/UX review R23):* a balloon carries its kind and its tab (`TrayNotice`).
+   A scan that winget could not answer shows the Windows error icon, "Another winget operation is
+   still running" the warning icon, and results no icon, as before. A click opens the tab of the
+   last balloon shown: Updates for scan results; the current tab for the busy notice, since the
+   queue's progress row shows on every tab.
 5. **Settings gains a "Notification area" card**, at the top of the right column, above Updates
    (ADR 0028, point 11: settings widen, not lengthen):
    - **Close to tray**, preference `CloseToTray`, off by default: off, the X closes the app as before;

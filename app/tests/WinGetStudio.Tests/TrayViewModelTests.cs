@@ -51,7 +51,7 @@ public class TrayViewModelTests
         using var h = Create(available);
         var tray = h.Vm.Tray;
         var shown = new List<(string Title, string Text)>();
-        tray.Notify += (title, text) => shown.Add((title, text));
+        tray.Notify += n => shown.Add((n.Title, n.Text));
 
         tray.WindowActive = true;
         await h.Vm.Updates.LoadAsync();
@@ -76,9 +76,50 @@ public class TrayViewModelTests
         using var h = Create([]);
         h.Vm.Tray.WindowActive = true;
         var shown = new List<string>();
-        h.Vm.Tray.Notify += (title, _) => shown.Add(title);
+        h.Vm.Tray.Notify += n => shown.Add(n.Title);
         await h.Vm.Tray.CheckNowAsync();
         Assert.Equal(["No updates available."], shown);
+    }
+
+    // Fumetti con icona e destinazione (2.0 UI/UX review R23): l'esito di una scansione apre Updates.
+    [Fact]
+    public async Task ScanResultsOpenUpdates()
+    {
+        using var h = Create([]);
+        var shown = new List<TrayNotice>();
+        h.Vm.Tray.Notify += shown.Add;
+        await h.Vm.Tray.CheckNowAsync();
+        Assert.Equal(new TrayNotice("No updates available.", "", NoticeKind.Info, MainViewModel.UpdatesTab), Assert.Single(shown));
+    }
+
+    [Fact]
+    public async Task FailedScanIsAnError()
+    {
+        using var h = new Harness(h => h.WinGet.Respond = a => FakeWinGet.Result(a[0] == "upgrade" ? -1978335231 : 0, ""));
+        await h.Vm.Tray.CheckNowAsync();
+        var n = h.Vm.Tray.LastNotice!;
+        Assert.Equal((NoticeKind.Error, (int?)MainViewModel.UpdatesTab), (n.Kind, n.Tab));
+        Assert.StartsWith("winget upgrade failed", n.Title);
+    }
+
+    // Due fumetti di fila: il clic segue l'ultimo. "Occupato" non porta a una scheda: la riga di
+    // avanzamento si vede da tutte.
+    [Fact]
+    public async Task ClickFollowsTheLastNotice()
+    {
+        using var h = Create([A]);
+        var release = new TaskCompletionSource();
+        h.WinGet.Before = a => a[0] == "search" ? release.Task : Task.CompletedTask;
+        h.Vm.Install.SearchText = "app";
+        var search = h.Vm.Install.SearchNowAsync();
+
+        await h.Vm.Tray.CheckNowAsync();
+        Assert.Equal(new TrayNotice("Another winget operation is still running", "Try again in a moment.", NoticeKind.Warning, null), h.Vm.Tray.LastNotice);
+
+        release.SetResult();
+        await search;
+        await h.Vm.Tray.CheckNowAsync();
+        Assert.Equal(MainViewModel.UpdatesTab, h.Vm.Tray.LastNotice!.Tab);
     }
 
     // Il controllo periodico non parte sopra un altro winget (ADR 0003), ricerche comprese:
