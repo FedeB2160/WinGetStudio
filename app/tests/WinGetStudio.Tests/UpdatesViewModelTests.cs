@@ -93,6 +93,22 @@ public class UpdatesViewModelTests
         Assert.Equal("1 selected", vm.SelectedText);
     }
 
+    // Mentre un altro winget lavora le spunte sono spente: niente invito a spuntare.
+    [Fact]
+    public async Task NoHintWhileAnotherOperationRuns()
+    {
+        using var h = Create([A]);
+        var vm = h.Vm.Updates;
+        await vm.LoadAsync();
+        var release = new TaskCompletionSource();
+        h.WinGet.Before = a => a[0] == "uninstall" ? release.Task : Task.CompletedTask;
+        var other = h.State.RunQueueAsync(new QueueRequest(QueueVerb.Uninstall, [A], WinGetCommands.Uninstall), [], null);
+        Assert.Equal("", vm.SelectedText);
+        release.SetResult();
+        await other;
+        Assert.Equal("Tick the packages to update", vm.SelectedText);
+    }
+
     // Tutte con pin: nessuna si spunta, quindi niente invito a spuntare.
     [Fact]
     public async Task NoHintWhenEveryRowIsPinned()
