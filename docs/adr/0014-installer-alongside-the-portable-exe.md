@@ -50,7 +50,7 @@ It must print `WinGetStudio.exe`.
   updated by an elevated process would land in the administrator's profile when that is not the
   signed-in user.
 - **`AppId={80A0A054-6278-4145-AD5A-2B3C4853019F}` never changes**: it is the `_is1` key by which the app
-  recognises itself as installed (`Get-InstallChannel`) and winget correlates the package.
+  recognizes itself as installed (`Get-InstallChannel`) and winget correlates the package.
 - `AppVersion` and the source exe path are passed in by `build.ps1` from `$AppVersion` (ADR 0001); the
   script refuses to compile without them.
 - **Start menu entry always; desktop shortcut as a task, unchecked by default.**

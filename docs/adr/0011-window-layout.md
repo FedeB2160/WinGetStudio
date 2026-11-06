@@ -27,7 +27,7 @@ placement.
 **The tab strip is a `DockPanel` used as `IsItemsHost`**, because `TabPanel` cannot right-align a
 single item. The functional tabs take the default `Dock="Left"` in declaration order; Settings and
 About declare `Dock="Right"`; `LastChildFill="False"` stops the last one stretching across the strip
-(the same trap that once centred the settings close button). In a `DockPanel` the *first*
+(the same trap that once centered the settings close button). In a `DockPanel` the *first*
 `Dock=Right` child takes the right edge, so `TabAbout` is declared before `TabSettings` because it is
 the one further right, and it carries the negative right margin that keeps the last tab flush with
 the frame. The `Margin="0,0,0,-1"` seam between active tab and content border sits on the panel.
@@ -43,8 +43,8 @@ and what the tab-order checks rely on. What the strip shows — icon, name or bo
 clears `MergedDictionaries`, not those. Details that hold it together:
 
 - The gap between icon and word is a **symmetric** margin on the icon (`4,0,4,0`), the only form that
-  centres in every mode. On the word it leaves the word off-centre in *Text* mode; asymmetric on the
-  icon it leaves the glyph off-centre in *Icon* mode, because a margin outlives the element it was
+  centers in every mode. On the word it leaves the word off-center in *Text* mode; asymmetric on the
+  icon it leaves the glyph off-center in *Icon* mode, because a margin outlives the element it was
   meant to separate from. A trigger cannot fix it — a `DataTrigger`'s `Binding` does not accept a
   `DynamicResource` — and neither can a `Thickness` held as a resource and rewritten from PowerShell:
   layout then fails with `InvalidCastException` on the first measure pass.
@@ -64,7 +64,7 @@ tooltip is carried by the `Border` inside the `TabItem` template, which covers t
 ancestor of nothing in the page.
 
 **An empty string is a tooltip.** `ToolTipService` shows whatever is not `null`, so
-`ToolTip="{Binding StatusDetail}"` on the always-present `Grid` of the Result cell opened an empty grey
+`ToolTip="{Binding StatusDetail}"` on the always-present `Grid` of the Result cell opened an empty gray
 box over every row with no result, because starting a queue resets `StatusDetail` to `''`. The binding
 sits on the status glyph instead, which is `Collapsed` until there is something to say, and a collapsed
 element does not take the mouse.

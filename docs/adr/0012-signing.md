@@ -81,7 +81,7 @@ for a self-signed certificate on a machine that does not trust it.
 
 1. **Sign with the first valid code-signing certificate found** — the previous rule, turned down in
    v1.10.2: a same-subject certificate generated elsewhere would sign exes the published `.cer` does
-   not recognise.
+   not recognize.
 2. **Generate a new certificate when the key is missing** — forbidden for the same reason; the build
    goes unsigned instead.
 3. **A commercial OV or EV certificate** — the way to a signature trusted everywhere without importing

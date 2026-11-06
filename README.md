@@ -26,7 +26,7 @@ Update, install, uninstall, pin, export and import — all from one table with c
 ## Features
 
 - **Update** what has a newer version: tick, press **Update**, and each row shows its own outcome.
-- **Install** something new by searching as you type, from the winget catalogue and, if you want, the Microsoft Store.
+- **Install** something new by searching as you type, from the winget catalog and, if you want, the Microsoft Store.
 - **Details** of any package from the right-click menu: what it is, who publishes it, and where and how it is installed.
 - **List and uninstall** what is already on the machine, including programs installed without winget.
 - **Lists refresh themselves** after every operation, keeping each row's outcome, and **Retry failed** runs it again on just the packages where it failed. Right-click the log to save it to a file or clear it.
@@ -50,7 +50,7 @@ From the [latest release](https://github.com/FedeB2160/WinGetStudio/releases/lat
 | **Installer** (recommended) | `WinGetStudio_Setup.exe` | Installs for all users, adds a Start menu entry (a desktop one is optional) and shows up in Windows Settings to uninstall. Uninstalling keeps your preferences. |
 | **Portable** | `WinGetStudio.exe` | Runs from anywhere and installs nothing. Nothing is written outside the registry key holding your preferences. |
 
-It is also in the winget catalogue:
+It is also in the winget catalog:
 
 ```powershell
 winget install FedeB2160.WinGetStudio
@@ -78,7 +78,7 @@ The window has three tabs, plus **Settings** and **About** pinned to the right o
 4. When the queue ends, the list **checks again by itself**. Packages that were updated drop out of it, since they have nothing left to update, and the ones that failed stay with their ❌. The log ends with a summary, such as *5 ok, 1 with warnings, 2 failed*.
 5. If anything failed, **Retry failed (N)** appears at the top right of the tab: it runs the update again on just those packages, after a confirmation. The same button appears in Install and Installed after an install or an uninstall.
 
-The list stays scrollable while updating (the ticks and the pin entries are greyed, not the list), and columns can be resized by dragging their edge in the header.
+The list stays scrollable while updating (the ticks and the pin entries are grayed, not the list), and columns can be resized by dragging their edge in the header.
 
 While a scan is running the progress bar is **indeterminate**: a scan has no progress to report, and a bar sitting at zero looks like something stuck. It shows real progress only for a queue, which knows how many packages it has.
 
@@ -100,7 +100,7 @@ While a scan is running the progress bar is **indeterminate**: a scan has no pro
 
 Type a name and results appear **as you type**. There is no autocomplete popup: the results list itself is the suggestion, so you see version and ID before choosing.
 
-1. Type **at least 3 characters**. The search runs against the local winget catalogue, which is fast.
+1. Type **at least 3 characters**. The search runs against the local winget catalog, which is fast.
 2. **MS Store** also searches the Microsoft Store. Since that goes online and is much slower, it only applies when you press <kbd>Enter</kbd> or **Search**, never while typing.
 3. **Scope** chooses who the package is installed for: `Auto` lets winget decide, `Machine` installs for all users, `User` only for you.
 4. Tick rows and press **Install**, or **double click a row** to install just that one.
@@ -131,7 +131,7 @@ A pin tells winget to leave a package alone until you remove the pin: for the on
 
 ### Details
 
-**Right click a row** in any of the three lists → *Details of highlighted package*. It shows the package as winget describes it: for one that is installed, its scope, installer type and location; from the catalogue, its description, publisher, homepage, licence and release notes. The text is winget's own, in the language of Windows.
+**Right click a row** in any of the three lists → *Details of highlighted package*. It shows the package as winget describes it: for one that is installed, its scope, installer type and location; from the catalog, its description, publisher, homepage, license and release notes. The text is winget's own, in the language of Windows.
 
 ### The log
 
@@ -163,7 +163,7 @@ The **Settings** tab, on the right of the strip next to About, is a tab like the
 
 ### About
 
-Its own tab, at the very right end of the strip: what the app does function by function, and links to the source, the release notes, the licence and where to report a bug.
+Its own tab, at the very right end of the strip: what the app does function by function, and links to the source, the release notes, the license and where to report a bug.
 
 ### Keyboard
 

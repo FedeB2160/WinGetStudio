@@ -7,13 +7,13 @@
 ## Context
 
 1.x draws its own light and dark themes: two dictionaries of 17 brushes, and CheckBox, column header,
-ContextMenu, ComboBox, ScrollBar and other controls re-templated because Aero2 hard-codes light colours
+ContextMenu, ComboBox, ScrollBar and other controls re-templated because Aero2 hard-codes light colors
 (ADR 0010), plus a P/Invoke for the dark title bar.
 
 .NET 9 added the Fluent theme, set with `Application.ThemeMode` (System, Light, Dark). In .NET 10 the API
 is still marked `Experimental("WPF0001")`, and controls with templates of their own do not pick it up.
 
-A prototype of the 1.x layout on .NET 10 (2026-10-29), with no template or colour of its own, showed:
+A prototype of the 1.x layout on .NET 10 (2026-10-29), with no template or color of its own, showed:
 
 - every standard control styled: tabs, DataGrid, check and radio boxes, buttons, combo, text boxes,
   progress bar, scroll bars, context menus, hyperlinks, dialogs;
@@ -29,9 +29,9 @@ A prototype of the 1.x layout on .NET 10 (2026-10-29), with no template or colou
 ## Decision
 
 1. **`ThemeMode` only**, System by default, the user's choice kept in the 1.x preference `Theme`. No
-   colour dictionaries, no re-templated controls, no DWM call for the title bar. `WPF0001` is suppressed
+   color dictionaries, no re-templated controls, no DWM call for the title bar. `WPF0001` is suppressed
    and the SDK pinned (ADR 0026).
-   *2026-11-04: one DWM call after all. Every window's title bar takes the app's colour, as the
+   *2026-11-04: one DWM call after all. Every window's title bar takes the app's color, as the
    Windows Settings app does: the window background (`SolidBackgroundFillColorBase`) a little lighter
    in the dark theme, a little darker in the light one, set with `DWMWA_CAPTION_COLOR` and
    `DWMWA_TEXT_COLOR` and redone when the theme changes, so the title bar is no longer the accent
@@ -62,7 +62,7 @@ A prototype of the 1.x layout on .NET 10 (2026-10-29), with no template or colou
 
 ## Alternatives considered
 
-1. **Port the 1.x templates and colours** — keeps a look Fluent replaces, and the templates would hide
+1. **Port the 1.x templates and colors** — keeps a look Fluent replaces, and the templates would hide
    the Fluent styles.
 2. **A Fluent library (WPF UI, ModernWpf)** — more controls, but a dependency where the platform now has
    the theme.

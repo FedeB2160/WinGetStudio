@@ -80,7 +80,7 @@ Remove-Item "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\FedeB2160
 
 ## Windows warns about an unknown publisher
 
-The exe *is* signed, but with a self-signed certificate, and Windows only trusts certificates issued by a recognised authority. Either accept the warning (*More info* → *Run anyway*), or import `assets/WinGetStudio-codesign.cer` from this repository into *Trusted Root Certification Authorities* to make the signature trusted.
+The exe *is* signed, but with a self-signed certificate, and Windows only trusts certificates issued by a recognized authority. Either accept the warning (*More info* → *Run anyway*), or import `assets/WinGetStudio-codesign.cer` from this repository into *Trusted Root Certification Authorities* to make the signature trusted.
 
 > [!CAUTION]
 > A trusted root vouches for **anything** signed with that certificate, not only WinGet Studio. Read [Signing in DEVELOPMENT.md](../DEVELOPMENT.md#signing) before importing it.

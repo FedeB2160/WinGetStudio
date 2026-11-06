@@ -49,7 +49,7 @@ Consequences that constrain edits:
 
 **Grid rows are `WgtRow`**, a class compiled with `Add-Type` implementing `INotifyPropertyChanged`, not `PSCustomObject` — `NoteProperty` values do not notify WPF and forced a `$Grid.Items.Refresh()` that reset the scroll position.
 
-**Themes.** Colours are always `{DynamicResource ...}`; `StaticResource` resolves once and would not follow a theme change. Both theme files must define the same keys — `Test-Ui.ps1` fails otherwise. Several controls (CheckBox, DataGridColumnHeader, ContextMenu/MenuItem, ComboBox) are fully re-templated because Aero2 hardcodes light colours; the re-templated header must keep the `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` thumbs or column resizing breaks with no error.
+**Themes.** Colors are always `{DynamicResource ...}`; `StaticResource` resolves once and would not follow a theme change. Both theme files must define the same keys — `Test-Ui.ps1` fails otherwise. Several controls (CheckBox, DataGridColumnHeader, ContextMenu/MenuItem, ComboBox) are fully re-templated because Aero2 hardcodes light colors; the re-templated header must keep the `PART_LeftHeaderGripper` / `PART_RightHeaderGripper` thumbs or column resizing breaks with no error.
 
 Glyphs must be written `[char]0xE706`, never `` "`u{E706}" `` — that escape needs PowerShell 6 and ps2exe targets 5.1.
 

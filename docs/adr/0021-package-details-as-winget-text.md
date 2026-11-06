@@ -7,9 +7,9 @@
 ## Context
 
 [Issue #24](https://github.com/FedeB2160/WinGetStudio/issues/24) asked for a Details action, showing
-a package's description, publisher, website, licence and versions, plus installed scope, installer
+a package's description, publisher, website, license and versions, plus installed scope, installer
 type and location. winget has two commands for this:
-- `show` gives the catalogue manifest;
+- `show` gives the catalog manifest;
 - `list --details`, stable since winget 1.29, gives what is installed.
 
 Both print a list of `label: value` lines, and **the labels are translated**. On an Italian Windows,
@@ -21,7 +21,7 @@ The table readers do not have this problem: they parse by column position, never
 (ADR 0006).
 
 Two more facts shaped the decision:
-- **Which catalogue answers depends on the row.** A search with **MS Store** ticked mixes two
+- **Which catalog answers depends on the row.** A search with **MS Store** ticked mixes two
   sources, and `install --id X -e` without `--source` looks the Id up in every source, including the
   Store, which goes over the network.
 - **Details are a winget process like any other.** Two at once make one of them fail (ADR 0003).
@@ -34,7 +34,7 @@ Two more facts shaped the decision:
   `Invoke-WinGetRead` (UTF-8, no shell, ADR 0004):
   - `list --id X -e --details`, for an installed package (Installed and Updates tabs);
   - `show --id X -e --source S`, when the row has a source. An ARP-only program has none, and no
-    catalogue knows it.
+    catalog knows it.
 - Of each line it keeps the last `\r` segment, drops lines that are only a spinner frame, and keeps
   the indentation `show` uses for groups.
 - `Show-PackageDetails` (`App.Ui.ps1`) runs it in a background job, behind `Test-WinGetBusy` and the
@@ -94,7 +94,7 @@ label:
 **To watch**
 - The text is in the system language and in winget's layout. It is not a formatted card.
 - `show` prints the manifest of the **latest** version. For an installed package that is out of date,
-  the catalogue part can describe a newer version than the one installed. The installed part comes
+  the catalog part can describe a newer version than the one installed. The installed part comes
   first for that reason.
 - A search with the Store is two winget processes in a row, never at the same time (ADR 0003). The
   Store part goes over the network and takes about 5 s, which is why it still runs only on Enter or

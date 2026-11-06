@@ -19,7 +19,7 @@ WinGet Studio **always runs elevated**, asking once, at startup.
   `build.ps1`, so Windows shows the UAC prompt before the process starts.
 - `src\main.ps1` checks `IsInRole(Administrator)` as its first act and, if not elevated,
   relaunches itself with `Start-Process -Verb RunAs` and exits: `powershell.exe -File <script>`
-  when run from source, the exe itself otherwise. A cancelled UAC prompt exits silently. This is
+  when run from source, the exe itself otherwise. A canceled UAC prompt exits silently. This is
   the fallback to the manifest, and the reason `main.ps1` is a separate file (ADR 0001).
 
 ## Consequences

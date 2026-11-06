@@ -52,7 +52,7 @@ app/tests/                   xUnit for Core; view-model and window smoke tests
 - Startup about ten times faster; the ps2exe antivirus false positives go away with ps2exe.
 
 **To watch**
-- A rewrite of about 3,600 lines of PowerShell: every behaviour in the 1.x README is the exit criterion.
+- A rewrite of about 3,600 lines of PowerShell: every behavior in the 1.x README is the exit criterion.
 - Two products during the transition; the 1.x must not grow new features.
 - `DEVELOPMENT.md`, `CLAUDE.md` and `AGENTS.md` describe 1.x until the switch.
 
