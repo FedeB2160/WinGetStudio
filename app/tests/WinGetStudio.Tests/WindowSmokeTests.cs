@@ -146,6 +146,17 @@ public class WindowSmokeTests
         Assert.Contains(FindAll<CheckBox>(tabs), c => c.Content as string == "Include unknown versions");
         // Un nome solo per lo Store (2.0 UI/UX review R18).
         Assert.Equal("Microsoft Store", ((CheckBox)w.FindName("ChkStore")).Content);
+        // Le scorciatoie nei tooltip e per i lettori di schermo (2.0 UI/UX review R21).
+        foreach (var (element, tip, key) in new[]
+        {
+            ("BtnRefresh", "Read the installed packages again (F5)", "F5"),
+            ("BtnCheck", "Look for newer versions of the installed packages (F5)", "F5"),
+            ("TxtSearch", "Search the winget catalog (Ctrl+F)", "Ctrl+F"),
+        })
+        {
+            var control = (FrameworkElement)w.FindName(element);
+            Assert.Equal((tip, key), (control.ToolTip as string, System.Windows.Automation.AutomationProperties.GetAcceleratorKey(control)));
+        }
         var scope = (ComboBox)w.FindName("CmbScope");
         Assert.Equal(["Auto", "Current user", "All users"], scope.Items.Cast<ScopeChoice>().Select(s => s.Label));
         Assert.Equal("Auto", ((ScopeChoice)scope.SelectedItem).Label);

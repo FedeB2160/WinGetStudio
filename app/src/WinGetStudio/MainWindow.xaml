@@ -420,7 +420,8 @@
                             <Grid Width="380">
                                 <TextBox x:Name="TxtSearch" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                          IsEnabled="{Binding State.IsIdle}"
-                                         AutomationProperties.Name="Package name or ID, at least 3 characters">
+                                         AutomationProperties.Name="Package name or ID, at least 3 characters"
+                                         ToolTip="Search the winget catalog (Ctrl+F)" AutomationProperties.AcceleratorKey="Ctrl+F">
                                     <TextBox.InputBindings>
                                         <KeyBinding Key="Return" Command="{Binding SearchNowCommand}"/>
                                     </TextBox.InputBindings>
@@ -502,7 +503,9 @@
                     </Grid.RowDefinitions>
                     <Grid Margin="0,0,0,8">
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Refresh" MinWidth="96" Command="{Binding ReloadCommand}"/>
+                            <!-- La scorciatoia nel tooltip e per i lettori di schermo (F5, MainWindow.OnPreviewKeyDown). -->
+                            <Button x:Name="BtnRefresh" Content="Refresh" MinWidth="96" Command="{Binding ReloadCommand}"
+                                    ToolTip="Read the installed packages again (F5)" AutomationProperties.AcceleratorKey="F5"/>
                             <!-- Filtro locale sull'elenco gia' caricato: non richiama winget. -->
                             <Grid Width="300" Margin="8,0,0,0">
                                 <TextBox x:Name="TxtFilter" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
@@ -561,7 +564,8 @@
                     </Grid.RowDefinitions>
                     <!-- LastChildFill spento: Retry e' l'ultimo e senza riempirebbe lo spazio da sinistra. -->
                     <DockPanel Margin="0,0,0,8" LastChildFill="False">
-                        <Button DockPanel.Dock="Left" MinWidth="96" Content="Check for updates" Command="{Binding CheckCommand}"/>
+                        <Button x:Name="BtnCheck" DockPanel.Dock="Left" MinWidth="96" Content="Check for updates" Command="{Binding CheckCommand}"
+                                ToolTip="Look for newer versions of the installed packages (F5)" AutomationProperties.AcceleratorKey="F5"/>
                         <CheckBox DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" Content="Include unknown versions"
                                   IsChecked="{Binding IncludeUnknown}" IsEnabled="{Binding State.IsIdle}"
                                   ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"/>
