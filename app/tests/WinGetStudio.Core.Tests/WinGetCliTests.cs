@@ -225,6 +225,22 @@ public class WinGetCliTests
         Assert.Equal("Trovato 7-Zip [7zip.7zip]\r\nVersione: 26.04\r\nTag:\r\n  zip", await cli.GetDetailsAsync("7zip.7zip", "winget", false));
     }
 
+    // Un winget senza list --details stampa errore e guida: se show risponde, resta solo show,
+    // che il dialogo legge come tabella. Se nessuna lettura riesce, tutto il testo, com'e'.
+    [Fact]
+    public async Task AFailedReadIsDroppedWhenAnotherSucceeds()
+    {
+        var (cli, runner) = Create();
+        runner.Respond = a => a[0] == "list"
+            ? FakeRunner.Result(-1978335222, "Argument name was not recognized: --details\r\nUsage: winget list [<options>]")
+            : FakeRunner.Result(0, "Found 7-Zip [7zip.7zip]\r\nVersion: 26.05");
+        Assert.Equal("Found 7-Zip [7zip.7zip]\r\nVersion: 26.05", await cli.GetDetailsAsync("7zip.7zip", "winget", true));
+
+        runner.Respond = _ => FakeRunner.Result(-1978335222, "Argument name was not recognized: --details");
+        Assert.Equal("Argument name was not recognized: --details\r\n\r\nArgument name was not recognized: --details",
+            await cli.GetDetailsAsync("7zip.7zip", "winget", true));
+    }
+
     // Gli Id vengono dal catalogo e dal registro ARP, cioe' da terzi: uno che sembri un'opzione
     // o porti caratteri di controllo non arriva a winget.
     [Theory]

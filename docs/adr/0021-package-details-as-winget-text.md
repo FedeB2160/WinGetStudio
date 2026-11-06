@@ -81,6 +81,9 @@ label:
   can be selected and copied.
 - Text with no `label: value` line at all (an error, an old winget, no details) is shown verbatim, as
   before.
+- A read that fails is left out when the other one succeeds: an older winget without `list --details`
+  prints an error and its usage help, which would otherwise be drawn as labels. When no read succeeds,
+  all the text is shown verbatim.
 
 ## Consequences
 

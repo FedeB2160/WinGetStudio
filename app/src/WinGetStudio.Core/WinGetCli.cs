@@ -94,13 +94,18 @@ public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null, 
         var reads = new List<string[]>();
         if (installed) reads.Add(["list", "--id", id, "-e", "--details", "--accept-source-agreements", "--disable-interactivity"]);
         if (!string.IsNullOrEmpty(source)) reads.Add(["show", "--id", id, "-e", "--source", source, "--accept-source-agreements", "--disable-interactivity"]);
-        var parts = new List<string>();
+        var parts = new List<(string Text, bool Success)>();
         foreach (var a in reads)
         {
-            var text = WinGetTable.CleanText((await ReadAsync(a)).Output);
-            if (text.Length > 0) parts.Add(text);
+            var read = await ReadAsync(a);
+            var text = WinGetTable.CleanText(read.Output);
+            if (text.Length > 0) parts.Add((text, read.Success));
         }
-        return string.Join("\r\n\r\n", parts);
+        // Una lettura fallita accanto a una riuscita si lascia fuori: un winget senza list --details
+        // stampa errore e guida, che la tabella dei dettagli leggerebbe come etichette. Se nessuna
+        // riesce, tutto il testo, com'e'.
+        var shown = parts.Any(p => p.Success) ? parts.Where(p => p.Success) : parts;
+        return string.Join("\r\n\r\n", shown.Select(p => p.Text));
     }
 
     // Gli Id vengono dal catalogo e dal registro ARP, dove il nome lo scrive l'installer: uno
