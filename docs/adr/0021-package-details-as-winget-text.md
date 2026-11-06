@@ -79,6 +79,15 @@ label:
 - The dialog shows the package name as a title (14 SemiBold) and a two-column table, labels and
   headings in secondary text, values with their links. It is still a read-only `RichTextBox`, so the text
   can be selected and copied.
+- **Redrawn the same day, after a look at a real package.** `GetDetailsAsync` returns the two reads apart
+  (`DetailsReads`: `Installed`, `Catalog`), so the dialog names its sections itself, "Catalog (winget)"
+  and "Installed", and no longer shows winget's opening lines: the package name is the title and its Id
+  the line under it. **The catalog comes first** (what the package is, then where and how it is
+  installed; this amends "The installed part comes first" below: the section names now say which is
+  which). Labels are left-aligned in a column as wide as the longest (100 to 220 px), a group of
+  `label: value` lines (the installer, the documentation) becomes indented rows under its title, and
+  one-word lines (the tags) are joined with commas. The document sits in a `FlowDocumentScrollViewer`,
+  still selectable, without the look of a text field, and the single button says **Close**.
 - Text with no `label: value` line at all (an error, an old winget, no details) is shown verbatim, as
   before.
 - A read that fails is left out when the other one succeeds: an older winget without `list --details`

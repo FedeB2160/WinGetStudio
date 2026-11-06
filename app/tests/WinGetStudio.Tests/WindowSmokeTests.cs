@@ -263,29 +263,38 @@ public class WindowSmokeTests
         Assert.Equal(details.FontFamily, rich.Document.FontFamily);
         Assert.Equal((12d, 680d), (rich.Document.FontSize, rich.Width));
         details.Close();
-        // Dettagli letti per posizione (ADR 0021): titolo col nome, poi una tabella etichetta/valore
-        // con etichette secondarie e link; un valore lungo va a capo, la finestra non si allarga.
-        var parsed = PackageDetails.Parse("App A", "Found App A [A.A]\r\nHomepage: https://example.com\r\nTags:\r\n  one\r\n  two\r\nSHA256: " + new string('a', 64))!;
+        // Dettagli letti per posizione (ADR 0021): il nome come titolo e l'Id sotto, poi una sezione
+        // per lettura col nome dato dall'app e una tabella etichetta/valore, etichette secondarie e
+        // allineate a sinistra, link cliccabili; un valore lungo va a capo, la finestra non si allarga.
+        var parsed = PackageDetails.Parse("App A", "A.A", new DetailsReads("",
+            "Found App A [A.A]\r\nHomepage: https://example.com\r\nTags:\r\n  one\r\n  two\r\nSHA256: " + new string('a', 64)), "winget")!;
         var table = new AppDialog("text", "App A - details", MessageBoxButton.OK, MessageBoxImage.None, MessageBoxResult.None, parsed, links: true)
         {
             Owner = w, ShowActivated = false,
         };
-        var doc = ((StackPanel)table.FindName("DlgBody")).Children.OfType<RichTextBox>().First().Document;
+        var detailsViewer = ((StackPanel)table.FindName("DlgBody")).Children.OfType<FlowDocumentScrollViewer>().First();
+        var doc = detailsViewer.Document;
         Assert.Equal(table.FontFamily, doc.FontFamily);
-        var title = Assert.IsType<Paragraph>(doc.Blocks.FirstBlock);
-        Assert.Equal(("App A", 14d, FontWeights.SemiBold), (new TextRange(title.ContentStart, title.ContentEnd).Text, title.FontSize, title.FontWeight));
-        var tableRows = Assert.Single(doc.Blocks.OfType<Table>()).RowGroups.SelectMany(g => g.Rows).ToList();
-        Assert.Equal(4, tableRows.Count);
-        Assert.Equal(((SolidColorBrush)w.FindResource("TextFillColorSecondaryBrush")).Color, ((SolidColorBrush)tableRows[1].Cells[0].Foreground).Color);
+        Assert.Equal(TextAlignment.Left, doc.TextAlignment);
+        var blocks = doc.Blocks.ToList();
+        string Text(TextElement e) => new TextRange(e.ContentStart, e.ContentEnd).Text;
+        var title = Assert.IsType<Paragraph>(blocks[0]);
+        Assert.Equal(("App A", 14d, FontWeights.SemiBold), (Text(title), title.FontSize, title.FontWeight));
+        Assert.Equal("A.A", Text(blocks[1]));
+        Assert.Equal("Catalog (winget)", Text(blocks[2]));
+        var tableRows = Assert.Single(blocks.OfType<Table>()).RowGroups.SelectMany(g => g.Rows).ToList();
+        Assert.Equal(["Homepage", "Tags", "SHA256"], tableRows.Select(r => Text(r.Cells[0]).Trim()));
+        Assert.Equal("one, two", Text(tableRows[1].Cells[1]).Trim());
+        Assert.Equal(((SolidColorBrush)w.FindResource("TextFillColorSecondaryBrush")).Color, ((SolidColorBrush)tableRows[0].Cells[0].Foreground).Color);
         var link = Assert.Single(FindLinks(doc));
         Assert.Equal("https://example.com/", link.NavigateUri.AbsoluteUri);
+        // Un pulsante solo: Close, come la scheda Install.
+        Assert.Equal("Close", ((StackPanel)table.FindName("DlgButtons")).Children.Cast<Button>().Single().Content);
         table.Show();
         Pump(() => true);
         Assert.True(table.ActualWidth <= 760, $"{table.ActualWidth}");
-        // Il valore comincia dopo la colonna delle etichette (180 px), non in fondo alla riga: con
-        // una colonna '*' il RichTextBox dava quasi tutto alle etichette e il valore andava a capo
-        // a ogni lettera.
-        Assert.InRange(link.ContentStart.GetCharacterRect(LogicalDirection.Forward).X, 170, 260);
+        // Il valore comincia dopo la colonna delle etichette, larga quanto la piu' lunga.
+        Assert.InRange(link.ContentStart.GetCharacterRect(LogicalDirection.Forward).X, 90, 240);
         table.Close();
         // Anteprima dell'import (2.0 UI/UX review R22): Seleziona tutto sopra le spunte delle righe,
         // "latest" in secondario dove il file non ha la versione.

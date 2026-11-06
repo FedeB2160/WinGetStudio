@@ -303,7 +303,13 @@ public sealed partial class AppState : ObservableObject
         var (status, detail) = (item.Status, item.StatusDetail);
         item.Status = RowStatus.Running;
         string text;
-        try { text = await Backend.GetDetailsAsync(item.Id, item.Source, installed); }
+        PackageDetails? details = null;
+        try
+        {
+            var reads = await Backend.GetDetailsAsync(item.Id, item.Source, installed);
+            text = reads.Text;
+            details = PackageDetails.Parse(item.Name, item.Id, reads, item.Source);
+        }
         catch (ArgumentException e) { text = e.Message; }
         finally
         {
@@ -312,6 +318,6 @@ public sealed partial class AppState : ObservableObject
         }
         return Dialogs.Show(text.Length > 0 ? text : "winget returned no details for this package.", $"{item.Name} - details",
             verbs is null ? MessageBoxButton.OK : MessageBoxButton.YesNo, defaultResult: verbs is null ? MessageBoxResult.None : MessageBoxResult.No,
-            content: PackageDetails.Parse(item.Name, text), links: true, verbs: verbs) == MessageBoxResult.Yes;
+            content: details, links: true, verbs: verbs) == MessageBoxResult.Yes;
     }
 }

@@ -300,7 +300,7 @@ public class UpdatesViewModelTests
         Assert.Equal(("App A - details", true), (d.Title, d.Links));
         Assert.Contains("https://a.example/", d.Text);
         var p = Assert.IsType<PackageDetails>(d.Content);
-        Assert.Equal(("App A", new DetailsRow("Homepage", "https://a.example/")), (p.Name, p.Parts[0].Rows[0]));
+        Assert.Equal(("App A", "A.A", "Installed", new DetailsRow("Homepage", "https://a.example/")), (p.Name, p.Id, p.Parts[0].Title, p.Parts[0].Rows[0]));
         Assert.All(busy, Assert.True);
         Assert.Contains("Reading the details of App A [A.A]...", h.Log);
         Assert.False(h.State.IsBusy);

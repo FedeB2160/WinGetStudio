@@ -88,24 +88,23 @@ public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null, 
 
     // Dettagli come TESTO di winget (ADR 0021): le etichette sono tradotte. list --details per
     // cio' che e' installato, show dal catalogo della sua sorgente; le righe ARP non ne hanno.
-    public async Task<string> GetDetailsAsync(string id, string? source, bool installed)
+    // Le due letture separate: il dialogo dice quale e' quale.
+    public async Task<DetailsReads> GetDetailsAsync(string id, string? source, bool installed)
     {
         ValidateId(id);
-        var reads = new List<string[]>();
-        if (installed) reads.Add(["list", "--id", id, "-e", "--details", "--accept-source-agreements", "--disable-interactivity"]);
-        if (!string.IsNullOrEmpty(source)) reads.Add(["show", "--id", id, "-e", "--source", source, "--accept-source-agreements", "--disable-interactivity"]);
-        var parts = new List<(string Text, bool Success)>();
-        foreach (var a in reads)
+        async Task<(string Text, bool Success)> Read(string[] arguments)
         {
-            var read = await ReadAsync(a);
-            var text = WinGetTable.CleanText(read.Output);
-            if (text.Length > 0) parts.Add((text, read.Success));
+            var read = await ReadAsync(arguments);
+            return (WinGetTable.CleanText(read.Output), read.Success);
         }
+        (string Text, bool Success) list = installed ? await Read(["list", "--id", id, "-e", "--details", "--accept-source-agreements", "--disable-interactivity"]) : ("", false);
+        (string Text, bool Success) show = !string.IsNullOrEmpty(source) ? await Read(["show", "--id", id, "-e", "--source", source, "--accept-source-agreements", "--disable-interactivity"]) : ("", false);
         // Una lettura fallita accanto a una riuscita si lascia fuori: un winget senza list --details
         // stampa errore e guida, che la tabella dei dettagli leggerebbe come etichette. Se nessuna
         // riesce, tutto il testo, com'e'.
-        var shown = parts.Any(p => p.Success) ? parts.Where(p => p.Success) : parts;
-        return string.Join("\r\n\r\n", shown.Select(p => p.Text));
+        if (list.Success || show.Success)
+            return new(list.Success ? list.Text : "", show.Success ? show.Text : "");
+        return new(list.Text, show.Text);
     }
 
     // Gli Id vengono dal catalogo e dal registro ARP, dove il nome lo scrive l'installer: uno

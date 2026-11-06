@@ -15,5 +15,13 @@ public interface IWinGetBackend
     Task<ReadResult<PackageRow>> GetInstalledAsync();
     Task<ReadResult<PackageRow>> GetUpgradesAsync(bool includeUnknown);
     Task<ReadResult<string>> GetPinsAsync();
-    Task<string> GetDetailsAsync(string id, string? source, bool installed);
+    Task<DetailsReads> GetDetailsAsync(string id, string? source, bool installed);
+}
+
+// I dettagli di un pacchetto: list --details (Installed) e show (Catalog), testo di winget pulito,
+// "" dove la lettura non c'e'. Text: le due insieme, separate da una riga vuota, per chi le mostra
+// com'e' (ADR 0021).
+public sealed record DetailsReads(string Installed, string Catalog)
+{
+    public string Text => string.Join("\r\n\r\n", new[] { Installed, Catalog }.Where(t => t.Length > 0));
 }
