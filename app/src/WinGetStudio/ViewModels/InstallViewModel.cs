@@ -185,7 +185,7 @@ public sealed partial class InstallViewModel : PackageListViewModel
         var total = Items.Count;
         var selected = Items.Count(i => i.Selected);
         InfoText = selected > 0 ? $"{selected} selected"
-            : total > 0 ? $"{total} result{(total == 1 ? "" : "s")} - tick the ones to install, or double click a row for details"
+            : total > 0 ? $"{total} result{(total == 1 ? "" : "s")}: tick the packages to install, or double click a row for details"
             : "";
         OnPropertyChanged(nameof(Searching));
         InstallCommand?.NotifyCanExecuteChanged();

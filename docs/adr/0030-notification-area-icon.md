@@ -21,14 +21,14 @@ Windows desktop runtime the app already uses, a library (H.NotifyIcon, Hardcodet
    `System.Windows.Forms` and `System.Drawing` implicit usings removed (their `Application`,
    `MessageBox`, `Color` and others clash with WPF's) and the one file that uses them importing them
    under the aliases `Forms` and `Drawing` (`TrayIcon.cs`). The icon is always there while the app runs.
-2. **The colour of the icon's badge says the state**, by priority: yellow, an operation in progress
+2. **The color of the icon's badge says the state**, by priority: yellow, an operation in progress
    (the busy state of ADR 0003, scans included); red, failures in the last queue; green, updates
    available; blue, nothing to report (the icon as it is). The tooltip says the same in words
    ("WinGet Studio - 3 updates available"). The four icons are made once at startup from the frame of
    `assets\icon.ico` (embedded as a resource) at the system small-icon size, 16 px at 100%, with no
    scaling: the frames are drawn on the pixel grid (ADR 0017), and a larger image would be scaled down
-   by Windows and blur. Only the badge is recoloured, arrow included: its pixels are the badge blue
-   mixed with the white of the arrow, and the mix is kept with the new colours. On yellow the arrow is
+   by Windows and blur. Only the badge is recolored, arrow included: its pixels are the badge blue
+   mixed with the white of the arrow, and the mix is kept with the new colors. On yellow the arrow is
    dark, as in Windows' caution signs; elsewhere it stays white. A dot drawn over the icon (the first
    version) covered the badge and blurred at 16 px.
 3. **The menu is a WPF `ContextMenu`**, not the WinForms one, so it follows the Fluent theme (ADR 0027)
@@ -45,6 +45,11 @@ Windows desktop runtime the app already uses, a library (H.NotifyIcon, Hardcodet
    already listed does. Clicking it opens the Updates tab. Check for updates from the menu always
    reports, "No updates available." included, even with the window active: whoever asked is looking
    at the icon. "Active" means a window of the app that is visible and active.
+   *Amended 2026-11-06 (UI/UX review R23):* a balloon carries its kind and its tab (`TrayNotice`).
+   A scan that winget could not answer shows the Windows error icon, "Another winget operation is
+   still running" the warning icon, and results no icon, as before. A click opens the tab of the
+   last balloon shown: Updates for scan results; the current tab for the busy notice, since the
+   queue's progress row shows on every tab.
 5. **Settings gains a "Notification area" card**, at the top of the right column, above Updates
    (ADR 0028, point 11: settings widen, not lengthen):
    - **Close to tray**, preference `CloseToTray`, off by default: off, the X closes the app as before;
@@ -85,7 +90,7 @@ Windows desktop runtime the app already uses, a library (H.NotifyIcon, Hardcodet
 2. **`Shell_NotifyIcon` by hand** — no WinForms, but the message window, the taskbar-restart message
    and the balloon all to write and test.
 3. **The WinForms `ContextMenuStrip`** — native to `NotifyIcon`, but drawn light only unless the
-   experimental WinForms colour mode is turned on, and it would not match the Fluent window.
+   experimental WinForms color mode is turned on, and it would not match the Fluent window.
 4. **Only the badge in the tray**, filling the 16 px, the way Teams and Outlook show the simplest form
    of their logo — reads better at 16 px, but drops the box, which is the app's mark. Turned down by
    the user (2026-11-02); the tray keeps the app icon.

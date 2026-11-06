@@ -19,17 +19,32 @@
                 <DataGrid ItemsSource="{Binding Rows}" MaxHeight="260" AutoGenerateColumns="False" CanUserAddRows="False"
                           IsReadOnly="True" HeadersVisibility="Column">
                     <DataGrid.Columns>
-                        <DataGridTemplateColumn Width="44">
+                        <!-- Seleziona tutto come nelle griglie principali (SelectAllHeader, Styles.xaml). -->
+                        <DataGridTemplateColumn Width="44" HeaderTemplate="{StaticResource SelectAllHeader}">
                             <DataGridTemplateColumn.CellTemplate>
                                 <DataTemplate>
-                                    <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" MinWidth="0"
+                                    <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}"
                                               HorizontalAlignment="Center" AutomationProperties.Name="Import"/>
                                 </DataTemplate>
                             </DataGridTemplateColumn.CellTemplate>
                         </DataGridTemplateColumn>
                         <DataGridTextColumn Header="Package ID" Width="200" Binding="{Binding Id}"/>
                         <DataGridTextColumn Header="Source" Width="90" Binding="{Binding Source}"/>
-                        <DataGridTextColumn Header="Version" Width="80" Binding="{Binding Version}"/>
+                        <!-- Senza versione nel file (l'export dell'app non la salva) winget installa l'ultima: lo si dice. -->
+                        <DataGridTemplateColumn Header="Version" Width="80">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <TextBlock x:Name="version" Text="{Binding Version}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                    <DataTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Version}" Value="">
+                                            <Setter TargetName="version" Property="Text" Value="latest"/>
+                                            <Setter TargetName="version" Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}"/>
+                                            <Setter TargetName="version" Property="ToolTip" Value="No version in the file: winget installs the latest"/>
+                                        </DataTrigger>
+                                    </DataTemplate.Triggers>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                     </DataGrid.Columns>
                 </DataGrid>
                 <!-- Spenta: si sceglie di riapplicare gli argomenti salvati, non di toglierli. -->

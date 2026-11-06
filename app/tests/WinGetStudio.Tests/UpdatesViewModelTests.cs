@@ -81,6 +81,44 @@ public class UpdatesViewModelTests
         Assert.Contains(h.WinGet.Calls, c => c is ["upgrade", "--accept-source-agreements", "--include-unknown"]);
     }
 
+    // Update spento senza spunte: il perche' accanto al pulsante (2.0 UI/UX review R19).
+    [Fact]
+    public async Task UpdateIsExplainedWhenNothingIsTicked()
+    {
+        using var h = Create([A, B]);
+        var vm = h.Vm.Updates;
+        await vm.LoadAsync();
+        Assert.Equal("Tick the packages to update", vm.SelectedText);
+        vm.Items[0].Selected = true;
+        Assert.Equal("1 selected", vm.SelectedText);
+    }
+
+    // Mentre un altro winget lavora le spunte sono spente: niente invito a spuntare.
+    [Fact]
+    public async Task NoHintWhileAnotherOperationRuns()
+    {
+        using var h = Create([A]);
+        var vm = h.Vm.Updates;
+        await vm.LoadAsync();
+        var release = new TaskCompletionSource();
+        h.WinGet.Before = a => a[0] == "uninstall" ? release.Task : Task.CompletedTask;
+        var other = h.State.RunQueueAsync(new QueueRequest(QueueVerb.Uninstall, [A], WinGetCommands.Uninstall), [], null);
+        Assert.Equal("", vm.SelectedText);
+        release.SetResult();
+        await other;
+        Assert.Equal("Tick the packages to update", vm.SelectedText);
+    }
+
+    // Tutte con pin: nessuna si spunta, quindi niente invito a spuntare.
+    [Fact]
+    public async Task NoHintWhenEveryRowIsPinned()
+    {
+        using var h = Create([A], ["A.A"]);
+        var vm = h.Vm.Updates;
+        await vm.LoadAsync();
+        Assert.Equal("", vm.SelectedText);
+    }
+
     [Fact]
     public async Task SelectAllSkipsPinnedRows()
     {
@@ -154,7 +192,7 @@ public class UpdatesViewModelTests
     }
 
     [Fact]
-    public async Task UpdateBecomesCancelAndFinishesThePackageInProgress()
+    public async Task UpdateBecomesStopAndFinishesThePackageInProgress()
     {
         using var h = Create([A, B, C]);
         var vm = h.Vm.Updates;
@@ -164,18 +202,18 @@ public class UpdatesViewModelTests
         h.WinGet.Before = a => a[1] == "--id" && a[2] == "A.A" ? release.Task : Task.CompletedTask;
 
         var queue = vm.UpdateAsync();
-        Assert.Equal("Cancel", vm.UpdateButtonText);
+        Assert.Equal("Stop", vm.UpdateButtonText);
         Assert.True(vm.UpdateCommand.CanExecute(null));
 
-        var cancel = vm.UpdateAsync();   // secondo clic: Cancel
-        Assert.Equal("Cancelling...", vm.UpdateButtonText);
+        var cancel = vm.UpdateAsync();   // secondo clic: Stop
+        Assert.Equal("Stopping...", vm.UpdateButtonText);
         Assert.False(vm.UpdateCommand.CanExecute(null));
         release.SetResult();
         await Task.WhenAll(queue, cancel);
 
         Assert.Equal(["A.A"], h.WinGet.Calls.Where(c => c[1] == "--id").Select(c => c[2]));
-        Assert.Contains("Cancelling: the package in progress will finish, then the queue stops.", h.Log);
-        Assert.Contains("Update cancelled after 1 of 3 packages; the rest were left untouched: 1 ok, 2 not run.", h.Log);
+        Assert.Contains("Stopping: the package in progress will finish, then the queue stops.", h.Log);
+        Assert.Contains("Update stopped after 1 of 3 packages; the rest were left untouched: 1 ok, 2 not run.", h.Log);
         Assert.Equal("Update", vm.UpdateButtonText);
     }
 
@@ -261,6 +299,8 @@ public class UpdatesViewModelTests
         var d = Assert.Single(h.Dialogs.Calls);
         Assert.Equal(("App A - details", true), (d.Title, d.Links));
         Assert.Contains("https://a.example/", d.Text);
+        var p = Assert.IsType<PackageDetails>(d.Content);
+        Assert.Equal(("App A", "A.A", "Installed", new DetailsRow("Homepage", "https://a.example/")), (p.Name, p.Id, p.Parts[0].Title, p.Parts[0].Rows[0]));
         Assert.All(busy, Assert.True);
         Assert.Contains("Reading the details of App A [A.A]...", h.Log);
         Assert.False(h.State.IsBusy);

@@ -40,7 +40,7 @@ public static class ExitCodes
     {
         [0x8A150019] = "Needs administrator rights",                                        // COMMAND_REQUIRES_ADMIN
         [0x8A150030] = "The uninstaller failed, often for lack of administrator rights",    // EXEC_UNINSTALL_COMMAND_FAILED
-        [1223] = "Cancelled at the administrator prompt",                                   // ERROR_CANCELLED
+        [1223] = "Canceled at the administrator prompt",                                   // ERROR_CANCELLED
         [0x8A15007D] = "winget refuses this as administrator for a per-user package",       // operazione vietata da amministratore
         [0x8A150101] = "The application is running: close it and try again",               // INSTALL_PACKAGE_IN_USE
         [0x8A150102] = "Another installation is in progress: try again later",             // INSTALL_INSTALL_IN_PROGRESS

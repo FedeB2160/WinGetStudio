@@ -34,7 +34,7 @@ reports its outcome.
 **The install channel decides how a copy updates.** `Get-InstallChannel` (`App.Update.ps1`), checked in
 this order:
 
-| Channel | How it is recognised | How it updates |
+| Channel | How it is recognized | How it updates |
 |---|---|---|
 | `source` | no running exe: `main.ps1` from a checkout | not at all; use git |
 | `winget-portable` | exe under `\Microsoft\WinGet\Packages\` | only `winget upgrade FedeB2160.WinGetStudio` |
@@ -81,7 +81,7 @@ closing the window, which must not happen while a runspace is inside winget.
 
 **The app keeps itself out of its own Updates list.** winget cannot overwrite a running executable, so
 ticking WinGet Studio in Updates would always fail. `Test-IsSelfPackage` matches by containment, not
-equality: from the catalogue the Id is `FedeB2160.WinGetStudio`, from a local manifest winget records
+equality: from the catalog the Id is `FedeB2160.WinGetStudio`, from a local manifest winget records
 `ARP\User\X64\FedeB2160.WinGetStudio__DefaultSource`.
 
 ## Consequences

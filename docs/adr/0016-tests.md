@@ -49,9 +49,9 @@ manual gate before a release.
   its result and unhooks itself; every control the code asks for exists in `UI.xaml`.
 - **Themes and layout.** Same keys in both themes, every `DynamicResource` resolves, contrast pairs,
   surface step and borders measured (ADR 0010), header grippers present, column headers non-empty,
-  uppercase and centred, every glyph present in both system icon fonts, no tooltip resolving to a
+  uppercase and centered, every glyph present in both system icon fonts, no tooltip resolving to a
   `TabItem` (ADR 0011), the About table alignments, no em dash in UI text.
-- **Behaviour that must not regress.** Confirmations for uninstall and self-update come *before*
+- **Behavior that must not regress.** Confirmations for uninstall and self-update come *before*
   anything is queued or downloaded, are Yes/No and default to No; reads use `$wingetPath` and every job
   passes it; the two grid-freeze regressions; `$AppVersion` is found, is `x.y.z`, reaches the settings
   screen and is forwarded by `build.ps1`.
@@ -83,7 +83,7 @@ key ever reaches CI** (ADR 0012).
   test, so no suite covers it. It is tested by hand in Windows Sandbox: install a setup built with a
   lower `$AppVersion`, let the app find the latest release, download and verify the setup, close,
   update and reopen. Done on 2026-10-08, from a 1.10.9 test build to the published v1.11.0 (ADR 0013).
-  The installer's interactive behaviour is tested by hand the same way (ADR 0014).
+  The installer's interactive behavior is tested by hand the same way (ADR 0014).
 
 ## Alternatives considered
 

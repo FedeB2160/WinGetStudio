@@ -53,21 +53,33 @@ public class WindowSmokeTests
         Assert.True(all.IsEnabled);
         all.IsChecked = true;
         Assert.True(h.Vm.Updates.Items[0].Selected);
-        // Titoli delle colonne a sinistra, dove comincia il testo delle celle; al centro solo le
-        // colonne fisse (ADR 0028, punto 17). La spunta di Seleziona tutto resta sopra quelle delle
-        // righe (i 7 px di SelectAllHeader).
+        // Tutti i titoli al centro della colonna (scelta dell'utente, ADR 0028 punto 18), e Seleziona
+        // tutto sopra le spunte delle righe. Lo spazio che l'intestazione Fluent tiene a destra per
+        // la freccia di ordinamento dipende dal font dei glifi (piu' grande qui sotto): HeaderBalance
+        // lo rende anche a sinistra, con qualunque font.
         var updatesGrid = (DataGrid)w.FindName("GridUpdates");
         var firstRow = FindChild<DataGridRow>(updatesGrid)!;
         double Left(FrameworkElement e) => e.TranslatePoint(new Point(), updatesGrid).X;
         double Middle(FrameworkElement e) => Left(e) + e.ActualWidth / 2;
-        var name = FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Package Name");
-        Assert.Equal(HorizontalAlignment.Left, name.HorizontalContentAlignment);
-        var nameCell = FindAll<DataGridCell>(firstRow).First(c => c.Column == name.Column);
-        Assert.Equal(Left(FindChild<TextBlock>(nameCell)!), Left(FindChild<TextBlock>(name)!), 1.0);
-        Assert.Equal(HorizontalAlignment.Center, FindAll<DataGridColumnHeader>(headers).First(c => c.Content as string == "Result").HorizontalContentAlignment);
-        // 2 px: lo spazio che l'intestazione Fluent tiene per la freccia di ordinamento dipende dal
-        // font dei glifi, e sul runner della CI (Windows Server) la spunta finiva 1,3 px piu' in la'.
-        Assert.Equal(Middle(FindChild<CheckBox>(firstRow)!), Middle(all), 2.0);
+        // Il quadratino, non il controllo: il template Fluent lo disegna a sinistra, e un controllo
+        // con piu' padding ha il centro altrove.
+        FrameworkElement Box(CheckBox c) => (FrameworkElement)c.Template.FindName("ControlBorderIconPresenter", c);
+        void SelectAllCentered() => Assert.Equal(Middle(Box(FindChild<CheckBox>(firstRow)!)), Middle(Box(all)), 0.5);
+        void HeadersCentered()
+        {
+            foreach (var header in FindAll<DataGridColumnHeader>(headers).Where(c => c.Column is not null))
+            {
+                FrameworkElement content = header.Content is string ? FindChild<TextBlock>(header)! : FindChild<CheckBox>(header)!;
+                Assert.True(Math.Abs(Middle(header) - Middle(content)) <= 0.5, $"{header.Content}: {Middle(header)} vs {Middle(content)}");
+            }
+            SelectAllCentered();
+        }
+        HeadersCentered();
+        updatesGrid.Resources["DataGridSortIndicatorIconFontSize"] = 18d;
+        Pump(() => true);
+        SelectAllCentered();
+        updatesGrid.Resources.Remove("DataGridSortIndicatorIconFontSize");
+        Pump(() => true);
         // Una colonna allargata oltre la griglia (doppio clic sul bordo): dopo Refit tutte le
         // colonne, Result compresa, stanno dentro e le fisse non cambiano larghezza. Le altre
         // elastiche non restano schiacciate ai 20 px minimi del DataGrid: tengono almeno il titolo.
@@ -144,6 +156,19 @@ public class WindowSmokeTests
         // contenuto sta nel TabControl, non nella TabItem.
         Assert.Contains(FindAll<Button>(tabs), b => b.Content as string == "Check for updates");
         Assert.Contains(FindAll<CheckBox>(tabs), c => c.Content as string == "Include unknown versions");
+        // Un nome solo per lo Store (2.0 UI/UX review R18).
+        Assert.Equal("Microsoft Store", ((CheckBox)w.FindName("ChkStore")).Content);
+        // Le scorciatoie nei tooltip e per i lettori di schermo (2.0 UI/UX review R21).
+        foreach (var (element, tip, key) in new[]
+        {
+            ("BtnRefresh", "Read the installed packages again (F5)", "F5"),
+            ("BtnCheck", "Look for newer versions of the installed packages (F5)", "F5"),
+            ("TxtSearch", "Search the winget catalog (Ctrl+F)", "Ctrl+F"),
+        })
+        {
+            var control = (FrameworkElement)w.FindName(element);
+            Assert.Equal((tip, key), (control.ToolTip as string, System.Windows.Automation.AutomationProperties.GetAcceleratorKey(control)));
+        }
         var scope = (ComboBox)w.FindName("CmbScope");
         Assert.Equal(["Auto", "Current user", "All users"], scope.Items.Cast<ScopeChoice>().Select(s => s.Label));
         Assert.Equal("Auto", ((ScopeChoice)scope.SelectedItem).Label);
@@ -161,11 +186,18 @@ public class WindowSmokeTests
         h.Vm.Install.SearchText = "";
         tabs.SelectedIndex = MainViewModel.UpdatesTab;
         Pump(() => true);
+        // Il velo sotto un dialogo copre tutta l'area della finestra, margine della griglia compreso.
+        w.SetDim(true);
+        Pump(() => true);
+        var dim = (FrameworkElement)w.FindName("DialogDim");
+        var area = (FrameworkElement)VisualTreeHelper.GetParent((Visual)w.Content);
+        Assert.Equal(new Rect(0, 0, area.ActualWidth, area.ActualHeight), dim.TransformToAncestor(area).TransformBounds(new Rect(dim.RenderSize)));
+        w.SetDim(false);
         // Settings e About sono finestre a parte (ADR 0028): si aprono, col logo, e si chiudono.
         var about = new AboutWindow("2.0.0") { Owner = w, ShowActivated = false };
         about.Show();
         Pump(() => true);
-        Assert.True(about.FindName("TxtVersion") is TextBlock { Text: "Version 2.0.0" });
+        Assert.True(about.FindName("TxtVersion") is TextBlock { Text: "v2.0.0" });
         Assert.NotNull(FindChild<Image>(about)?.Source);
         about.Close();
         var settings = new SettingsWindow { DataContext = h.Vm.Settings, Owner = w, ShowActivated = false };
@@ -190,6 +222,14 @@ public class WindowSmokeTests
         Pump(() => nav.ActualWidth < 60);
         Assert.True(nav.ActualWidth < 60 && wide > 150, $"{wide} -> {nav.ActualWidth}");
         Assert.Equal(y, last.TranslatePoint(new Point(), nav).Y);
+        settings.NavCompact = false;
+        // App updates: etichetta e valore sulla stessa riga, centrati (2.0 UI/UX review R20).
+        nav.SelectedIndex = 2;
+        Pump(() => true);
+        double Center(TextBlock t) => t.TranslatePoint(new Point(0, t.ActualHeight / 2), settings).Y;
+        var shown = FindAll<TextBlock>(settings).Where(t => t.IsVisible).ToList();
+        foreach (var (label, value) in new[] { ("WinGet Studio", h.Vm.Settings.VersionText), ("winget", h.Vm.Settings.WinGetVersionText) })
+            Assert.Equal(Center(shown.First(t => t.Text == label)), Center(shown.First(t => t.Text == value)), 1.0);
         h.Vm.Settings.ApplyTheme = name => app.ThemeMode = App.Theme(name);
         Assert.Contains("Found 30 updates.", ((TextBox)w.FindName("TxtLog")).Text);
         foreach (var key in FluentKeys) Assert.True(w.TryFindResource(key) is not null, key);
@@ -223,6 +263,57 @@ public class WindowSmokeTests
         Assert.Equal(details.FontFamily, rich.Document.FontFamily);
         Assert.Equal((12d, 680d), (rich.Document.FontSize, rich.Width));
         details.Close();
+        // Dettagli letti per posizione (ADR 0021): il nome come titolo e l'Id sotto, poi una sezione
+        // per lettura col nome dato dall'app e una tabella etichetta/valore, etichette secondarie e
+        // allineate a sinistra, link cliccabili; un valore lungo va a capo, la finestra non si allarga.
+        var parsed = PackageDetails.Parse("App A", "A.A", new DetailsReads("",
+            "Found App A [A.A]\r\nHomepage: https://example.com\r\nTags:\r\n  one\r\n  two\r\nSHA256: " + new string('a', 64)), "winget")!;
+        var table = new AppDialog("text", "App A - details", MessageBoxButton.OK, MessageBoxImage.None, MessageBoxResult.None, parsed, links: true)
+        {
+            Owner = w, ShowActivated = false,
+        };
+        var detailsViewer = ((StackPanel)table.FindName("DlgBody")).Children.OfType<FlowDocumentScrollViewer>().First();
+        var doc = detailsViewer.Document;
+        Assert.Equal(table.FontFamily, doc.FontFamily);
+        Assert.Equal(TextAlignment.Left, doc.TextAlignment);
+        var blocks = doc.Blocks.ToList();
+        string Text(TextElement e) => new TextRange(e.ContentStart, e.ContentEnd).Text;
+        var title = Assert.IsType<Paragraph>(blocks[0]);
+        Assert.Equal(("App A", 14d, FontWeights.SemiBold), (Text(title), title.FontSize, title.FontWeight));
+        Assert.Equal("A.A", Text(blocks[1]));
+        Assert.Equal("Catalog (winget)", Text(blocks[2]));
+        var tableRows = Assert.Single(blocks.OfType<Table>()).RowGroups.SelectMany(g => g.Rows).ToList();
+        Assert.Equal(["Homepage", "Tags", "SHA256"], tableRows.Select(r => Text(r.Cells[0]).Trim()));
+        Assert.Equal("one, two", Text(tableRows[1].Cells[1]).Trim());
+        Assert.Equal(((SolidColorBrush)w.FindResource("TextFillColorSecondaryBrush")).Color, ((SolidColorBrush)tableRows[0].Cells[0].Foreground).Color);
+        var link = Assert.Single(FindLinks(doc));
+        Assert.Equal("https://example.com/", link.NavigateUri.AbsoluteUri);
+        // Un pulsante solo: Close, come la scheda Install.
+        Assert.Equal("Close", ((StackPanel)table.FindName("DlgButtons")).Children.Cast<Button>().Single().Content);
+        table.Show();
+        Pump(() => true);
+        Assert.True(table.ActualWidth <= 760, $"{table.ActualWidth}");
+        // Il valore comincia dopo la colonna delle etichette, larga quanto la piu' lunga.
+        Assert.InRange(link.ContentStart.GetCharacterRect(LogicalDirection.Forward).X, 90, 240);
+        table.Close();
+        // Anteprima dell'import (2.0 UI/UX review R22): Seleziona tutto sopra le spunte delle righe,
+        // "latest" in secondario dove il file non ha la versione.
+        var import = new AppDialog("Install?", "Confirm import", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No,
+            new ImportPreviewViewModel(InstalledViewModelTests.TwoPackages()), links: false) { Owner = w, ShowActivated = false };
+        import.Show();
+        Pump(() => true);
+        var importGrid = FindChild<DataGrid>(import)!;
+        var importAll = FindChild<CheckBox>(FindChild<DataGridColumnHeadersPresenter>(importGrid)!)!;
+        Assert.True(importAll.IsChecked);
+        var importRow = FindChild<DataGridRow>(importGrid)!;
+        double ImportMiddle(FrameworkElement e) => e.TranslatePoint(new Point(), importGrid).X + e.ActualWidth / 2;
+        FrameworkElement ImportBox(CheckBox c) => (FrameworkElement)c.Template.FindName("ControlBorderIconPresenter", c);
+        Assert.Equal(ImportMiddle(ImportBox(FindChild<CheckBox>(importRow)!)), ImportMiddle(ImportBox(importAll)), 0.5);
+        var texts = FindAll<TextBlock>(importGrid).ToList();
+        Assert.Contains(texts, t => t.Text == "1.0");
+        var latest = texts.Single(t => t.Text == "latest");
+        Assert.Equal(((SolidColorBrush)w.FindResource("TextFillColorSecondaryBrush")).Color, ((SolidColorBrush)latest.Foreground).Color);
+        import.Close();
 
         settings.Close();
         w.Close();
@@ -249,6 +340,10 @@ public class WindowSmokeTests
             foreach (var d in FindAll<T>(c)) yield return d;
         }
     }
+
+    private static IEnumerable<Hyperlink> FindLinks(FlowDocument doc) =>
+        doc.Blocks.OfType<Table>().SelectMany(t => t.RowGroups).SelectMany(g => g.Rows).SelectMany(r => r.Cells)
+            .SelectMany(c => c.Blocks.OfType<Paragraph>()).SelectMany(p => p.Inlines.OfType<Hyperlink>());
 
     private static T? FindChild<T>(DependencyObject parent) where T : DependencyObject
     {

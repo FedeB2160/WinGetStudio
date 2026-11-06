@@ -9,7 +9,7 @@
 
 The app has a light and a dark theme from v1.0.0, chosen as `Light`, `Dark` or `System` (called
 `Auto` until v1.10.0) and switched while the window is open. The system WPF theme (Aero2) hardcodes
-light colours in places no external setter can reach, and a colour that works in one theme can be
+light colors in places no external setter can reach, and a color that works in one theme can be
 unreadable in the other. Each of the rules below was a visible defect first.
 
 ## Decision
@@ -19,17 +19,17 @@ unreadable in the other. Each of the rules below was a visible defect first.
 is repainted without being rebuilt; in dark it also sets the DWM immersive dark mode attribute,
 since the title bar is drawn by Windows, not WPF.
 
-**Colours are always `{DynamicResource ...}`.** `StaticResource` resolves once and would not follow
+**Colors are always `{DynamicResource ...}`.** `StaticResource` resolves once and would not follow
 a theme change. **Both theme files define the same keys.**
 
-**No colour is hardcoded in `UI.xaml`.** The *Update to vX.Y.Z* button carried `Foreground="White"`:
+**No color is hardcoded in `UI.xaml`.** The *Update to vX.Y.Z* button carried `Foreground="White"`:
 4.53:1 on the light accent (`#0078D4`), **2.01:1** on the dark one (`#4CC2FF`) — unreadable on the
 one button that only appears when there is something important to say. Its foreground is now a
 theme key, `AccentFgBrush` (`#00243A` in dark, 7.97:1).
 
 **Contrast floors are measured, not eyeballed.** Every foreground/background pair in both themes
 is checked against WCAG: 4.5:1 for text, 3:1 for graphical elements such as the status glyphs and
-the progress fill. The light warning colour failed at 2.86:1 and was darkened (`#8A6F00`, 4.35:1
+the progress fill. The light warning color failed at 2.86:1 and was darkened (`#8A6F00`, 4.35:1
 in the file's own note).
 
 **A control needs a surface step or a visible border.** The light theme had neither: `BgBrush`
@@ -49,7 +49,7 @@ on purpose: on a dark ground the surface step does the work, and a 3:1 outline i
 anything Windows 11 draws — still three times the `#3D3D3D` it replaces. A disabled button keeps its
 outline and dims only its label; the disabled trigger no longer uses `Opacity`.
 
-**Controls Aero2 paints in light colours are re-templated:**
+**Controls Aero2 paints in light colors are re-templated:**
 
 - **CheckBox** — the tick is filled with `#FF212121` declared as a `StaticResource` inside the system
   theme, so in dark it was black on black.
@@ -77,14 +77,14 @@ on, and ps2exe compiles against 5.1, where it stays the literal text `u{E706}`.
 ## Consequences
 
 **Positive**
-- A theme switch repaints in place, and every colour follows it.
+- A theme switch repaints in place, and every color follows it.
 - A contrast or border regression fails the suite instead of shipping.
 
 **To watch**
-- Adding a colour means adding it to both theme files and, if anything sits on top of it, adding the
+- Adding a color means adding it to both theme files and, if anything sits on top of it, adding the
   pair to the contrast check in `Test-Ui.ps1`.
 - `Test-Ui.ps1` fails on a key present in only one theme, on a `DynamicResource` that does not
-  resolve (only keys containing `Brush` are checked, because of two non-colour keys, ADR 0011), on
+  resolve (only keys containing `Brush` are checked, because of two non-color keys, ADR 0011), on
   missing header grippers, on a `&#x....;` glyph absent from either system icon font, and if the
   disabled trigger goes back to `Opacity`. It also measures the surface step and both border pairs.
 - If paging on the horizontal scrollbar ever goes the wrong way, name its two repeat buttons and

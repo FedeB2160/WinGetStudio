@@ -9,7 +9,7 @@
 
 Two concurrent winget invocations make one of them fail with exit 1. The app has three tabs
 that each start winget — scans, searches, update, install, uninstall and pin queues, export and
-import — and they all run in background runspaces (ADR 0008), so nothing serialises them by
+import — and they all run in background runspaces (ADR 0008), so nothing serializes them by
 default.
 
 The rule was learnt twice:
@@ -52,7 +52,7 @@ assignment after, the Updates button never became Cancel — and `Set-AppBusy $f
 *before* calling the handlers so each sees the final state. The button label is assigned on
 every call, as a function of (busy, which queue), not inside one branch.
 
-**Cancelling a queue is cooperative.** `Start-WinGetQueue` shares a synchronized hashtable with
+**Canceling a queue is cooperative.** `Start-WinGetQueue` shares a synchronized hashtable with
 its runspace and checks `Requested` at the top of each iteration, so the package in flight always
 finishes. A hashtable rather than a `$script:` variable because the runspace has its own scope;
 a hashtable is a reference type, so both threads see the same object. A fresh one per queue, so

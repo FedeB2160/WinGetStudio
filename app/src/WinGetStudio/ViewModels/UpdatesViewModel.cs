@@ -30,6 +30,9 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     // aggiornati. Update si spegne finche' non si rilegge; riaprire la scheda rilegge.
     public bool Stale { get; private set; }
 
+    // L'ultima scansione non ha avuto risposta da winget: il fumetto del tray e' un errore.
+    public bool ScanFailed { get; private set; }
+
     // --include-unknown, salvata e subito applicata: una spunta che cambia COSA c'e' nell'elenco
     // senza cambiare l'elenco costringe a premere Check per capire cosa ha fatto.
     public bool IncludeUnknown
@@ -50,7 +53,7 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     [ObservableProperty] public partial string UpdateButtonText { get; private set; }
     [ObservableProperty] public partial string? UpdateButtonToolTip { get; private set; }
 
-    // Update a riposo, Cancel mentre gira LA NOSTRA coda.
+    // Update a riposo, Stop mentre gira LA NOSTRA coda.
     public IAsyncRelayCommand UpdateCommand { get; }
 
     private bool OurQueue => State.IsBusy && State.QueueVerb == Core.QueueVerb.Update;
@@ -86,6 +89,7 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         var read = await State.Backend.GetUpgradesAsync(IncludeUnknown);
         var pins = await State.Backend.GetPinsAsync();
         Loading = false;
+        ScanFailed = !read.Success;
         // WinGet Studio resta fuori: winget non sovrascrive un exe in esecuzione, quindi spuntarlo
         // fallirebbe sempre. Ci si aggiorna da Settings (ADR 0013).
         if (read.Success) Fill(read.Rows.Where(r => !SelfUpdate.IsSelfPackage(r.Id)), outcomes);
@@ -106,7 +110,7 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     // Fine di ogni scansione, riuscita o no: l'area di notifica decide se annunciarla (ADR 0030).
     public event Action? Scanned;
 
-    // Il pulsante: Update, o Cancel se la coda in corso e' questa.
+    // Il pulsante: Update, o Stop se la coda in corso e' questa.
     public Task UpdateAsync()
     {
         if (OurQueue)
@@ -155,9 +159,12 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         var total = Items.Count;
         var selected = Items.Count(i => i.Selected);
         AvailableText = total switch { 0 => "", 1 => "1 update available", _ => $"{total} updates available" };
-        // A lista vecchia il contatore cede il posto al motivo per cui Update e' spento.
-        SelectedText = Stale ? "List out of date: press Check for updates." : selected > 0 ? $"{selected} selected" : "";
-        UpdateButtonText = OurQueue ? State.Cancelling ? "Cancelling..." : "Cancel" : "Update";
+        // A lista vecchia il contatore cede il posto al motivo per cui Update e' spento; senza
+        // spunte, l'invito a spuntare (solo se si puo': non coi soli pinnati, non con un winget in corso).
+        SelectedText = Stale ? "List out of date: press Check for updates."
+            : selected > 0 ? $"{selected} selected"
+            : CanCheckAll ? "Tick the packages to update" : "";
+        UpdateButtonText = OurQueue ? State.Cancelling ? "Stopping..." : "Stop" : "Update";
         UpdateButtonToolTip = OurQueue ? "Finish the package in progress, then stop without starting the others" : null;
         UpdateCommand?.NotifyCanExecuteChanged();
         CheckCommand.NotifyCanExecuteChanged();

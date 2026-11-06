@@ -28,7 +28,7 @@ Windows ships with, and a result that can be reviewed and rebuilt.
 - `>_` stamped on the box's side, for the command line the package comes from;
 - a blue badge with a download arrow, cut out from the box by a transparent ring.
 
-The box is cardboard, not blue. In a taskbar full of blue squares a warm hexagon is recognised at a
+The box is cardboard, not blue. In a taskbar full of blue squares a warm hexagon is recognized at a
 glance, and a blue box with an arrow would look like one of Microsoft's own icons, since winget ships
 with App Installer. The badge keeps the blue of the previous icon.
 
@@ -78,9 +78,9 @@ accepted. Windows reads PNG frames at any size since Vista.
 
 ## Alternatives considered
 
-1. **An SVG master rasterised by Inkscape or ImageMagick** — the usual route for icons. Turned down:
+1. **An SVG master rasterized by Inkscape or ImageMagick** — the usual route for icons. Turned down:
    every machine that rebuilds the icon would need an external tool.
-2. **An SVG rasterised by Edge headless** — available on every Windows machine. Turned down: the
+2. **An SVG rasterized by Edge headless** — available on every Windows machine. Turned down: the
    minimum window size and the transparent background make exact 16–48 px renders unreliable.
 3. **Drawn by hand in an icon editor** — fine once, but not reproducible, and a binary `.ico` gives
    nothing to review.

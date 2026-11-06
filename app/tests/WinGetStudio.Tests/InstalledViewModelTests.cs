@@ -113,7 +113,7 @@ public class InstalledViewModelTests
         Assert.Equal(("Uninstall", "Cancel"), ask.Verbs);
         Assert.Equal("Uninstall 2 packages?\n\n  - Alpha\n  - Beta\n\n1 of them are currently hidden by the filter.\n\nThis cannot be undone.", ask.Text);
         Assert.Equal(0, h.WinGet.Count("uninstall"));
-        Assert.Contains("Uninstall cancelled.", h.Log);
+        Assert.Contains("Uninstall canceled.", h.Log);
     }
 
     [Fact]
@@ -152,6 +152,38 @@ public class InstalledViewModelTests
             Assert.Contains("Export done: 2 packages.", h.Log);
             Assert.Contains("  1 installed packages are in no source and were left out.", h.Log);
         }
+        finally { File.Delete(file); }
+    }
+
+    // Seleziona tutto nell'anteprima, come nelle griglie (2.0 UI/UX review R22).
+    [Fact]
+    public void ImportPreviewSelectAll()
+    {
+        var preview = new ImportPreviewViewModel(TwoPackages());
+        Assert.Equal((true, true), (preview.AllChecked, preview.CanCheckAll));
+
+        preview.AllChecked = false;
+        Assert.Empty(preview.KeptIndices);
+        Assert.False(preview.AllChecked);
+
+        var raised = new List<string?>();
+        preview.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        preview.Rows[1].Selected = true;
+        Assert.Null(preview.AllChecked);
+        Assert.Contains(nameof(ImportPreviewViewModel.AllChecked), raised);
+        Assert.Equal([1], preview.KeptIndices);
+    }
+
+    // Due pacchetti, uno con la versione e uno senza.
+    internal static PackageList TwoPackages()
+    {
+        var file = Path.Combine(Path.GetTempPath(), $"wgt-test-{Guid.NewGuid():N}.json");
+        File.WriteAllText(file, """
+            {"Sources":[{"SourceDetails":{"Name":"winget"},"Packages":[
+              {"PackageIdentifier":"A.A","Version":"1.0"},
+              {"PackageIdentifier":"B.B"}]}]}
+            """);
+        try { return PackageList.Load(file)!; }
         finally { File.Delete(file); }
     }
 

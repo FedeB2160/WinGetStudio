@@ -56,7 +56,7 @@ one `-Vars` entry and the variable is `$null` inside the runspace, the read come
 it looks like winget found nothing.
 
 **Unbalanced quotes are refused, not run.** The line handed to `cmd` is built by concatenation and
-each caller interpolates the package Id between quotes. Ids come from the catalogue and from ARP
+each caller interpolates the package Id between quotes. Ids come from the catalog and from ARP
 display names written by whoever authored the installer, and this process is elevated. An odd
 number of double quotes throws instead of running.
 
@@ -72,7 +72,7 @@ registry.
 **The exit code of a write becomes ok, warning or error** in `Get-UpdateStatus`. Warnings are
 `0x8A150109` (reboot required to finish), `0x8A15010B` (reboot initiated), `0x8A15010D` (already
 installed), `3010` and `1641`; anything else non-zero is an error. Up to v1.12.0 the list was shifted
-by one, so a failed or cancelled installation (`0x8A15010A`, `0x8A15010C`) showed as a warning, Retry
+by one, so a failed or canceled installation (`0x8A15010A`, `0x8A15010C`) showed as a warning, Retry
 failed skipped it, and "already installed" showed as an error. The names were checked with
 `winget error <code>` on winget 1.29.380, and `Test-InvokeWinGet.ps1` asserts each code.
 

@@ -34,14 +34,19 @@ public abstract partial class PackageListViewModel : ObservableObject
     public string RetryText => $"Retry failed packages ({RetryCount})";
     public bool RetryVisible => RetryCount > 0;
 
-    // Retry as administrator (ADR 0024): mentre il suo batch gira il pulsante diventa Cancel, che
+    // Retry as administrator (ADR 0024): mentre il suo batch gira il pulsante diventa Stop, che
     // puo' anche smettere di aspettare l'UAC. Solo nella scheda che l'ha avviato.
     private bool _elevating;
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(RetryAdminText), nameof(RetryAdminVisible))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(RetryAdminText), nameof(RetryAdminVisible), nameof(RetryAdminToolTip))]
     public partial int RetryAdminCount { get; private set; }
 
-    public string RetryAdminText => _elevating ? State.Cancelling ? "Cancelling..." : "Cancel" : $"Retry as administrator ({RetryAdminCount})";
+    public string RetryAdminText => _elevating ? State.Cancelling ? "Stopping..." : "Stop" : $"Retry as administrator ({RetryAdminCount})";
+
+    // Il tooltip segue il pulsante: da Stop non e' piu' "riprova".
+    public string RetryAdminToolTip => _elevating
+        ? "Stop waiting for administrator approval, or stop after the package in progress"
+        : "Run the failed operation again as administrator: one Windows prompt for all of these packages";
     public bool RetryAdminVisible => _elevating || RetryAdminCount > 0;
 
     [RelayCommand(CanExecute = nameof(CanRetryAdmin), AllowConcurrentExecutions = true)]
@@ -132,6 +137,7 @@ public abstract partial class PackageListViewModel : ObservableObject
         RetryCount = State.RetryItems(Items).Count;
         RetryAdminCount = State.ElevateItems(Items).Count;
         OnPropertyChanged(nameof(RetryAdminText));
+        OnPropertyChanged(nameof(RetryAdminToolTip));
         OnPropertyChanged(nameof(RetryAdminVisible));
         OnPropertyChanged(nameof(HasItems));
         OnPropertyChanged(nameof(IsEmpty));

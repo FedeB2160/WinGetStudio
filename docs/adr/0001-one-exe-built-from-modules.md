@@ -82,4 +82,4 @@ when concatenated. `Start-App` is a function, so it assigns the controls with `$
    ends up outside the exe without anyone noticing.
 2. **Ship the XAML files next to the exe as a runtime requirement** — turned down: the exe must
    stay a single file that can be copied to another machine on its own. Files on disk are still
-   honoured when present.
+   honored when present.

@@ -27,8 +27,8 @@ The MessageBox also gave a few things for free, and some of them are safety rule
   and the static checks on "confirmation before action, default No" still hold.
 - `New-AppDialog` builds the window without showing it, so the tests can inspect it. Its XAML is a
   here-string in the module, so `build.ps1` needs no fourth file and no new marker.
-- **Styles and colours come from the main window.** `$window.Resources` is merged into the dialog's
-  resources, so the dialog uses the same Button template and the current theme's brushes. Colours
+- **Styles and colors come from the main window.** `$window.Resources` is merged into the dialog's
+  resources, so the dialog uses the same Button template and the current theme's brushes. Colors
   are `DynamicResource`, as everywhere (ADR 0010).
 - **Its own title bar follows the theme.** `Set-TitleBarDark` takes the target window, and the
   dialog calls it at `SourceInitialized` with the theme that `Set-Theme` records.
@@ -36,7 +36,7 @@ The MessageBox also gave a few things for free, and some of them are safety rule
   warning `E814` in `WarnBrush`, plus `E946` (information) and `E9CE` (question) in `AccentBrush`.
 - **The text is a read-only TextBox**, so it can be selected and copied.
 - **The buttons:**
-  - the default one (No on confirmations) answers Enter and has the accent colour, so the button
+  - the default one (No on confirmations) answers Enter and has the accent color, so the button
     Enter will press is visible;
   - the last one answers Esc, and so does the close button: No, or OK;
   - the default button has the focus when the dialog opens;
@@ -46,7 +46,7 @@ The MessageBox also gave a few things for free, and some of them are safety rule
     `verbs` to `IDialogService.Show`: a bare Yes / No made the reader go back to the question.
     The results are still Yes and No, and the second button is still the default, the accent
     and the Esc answer. The MessageBox fallback shows plain Yes / No.
-- **Placement**: centred on the app (`Owner` plus `CenterOwner`), never in the taskbar, not
+- **Placement**: centered on the app (`Owner` plus `CenterOwner`), never in the taskbar, not
   resizable.
 - **The sound**: the one the MessageBox plays for the same image.
 - **The main window dims behind the dialog.** A `DialogDim` border covers the whole window, its
@@ -60,11 +60,11 @@ The MessageBox also gave a few things for free, and some of them are safety rule
 
 **Positive**
 - Dialogs match the window in both themes, title bar included, and open over the app.
-- Every behaviour the MessageBox gave for free is kept, and the default-No rule still holds.
+- Every behavior the MessageBox gave for free is kept, and the default-No rule still holds.
 
 **To watch**
 - **`Owner` only on a visible window.** WPF throws when the owner has never been shown. Before the
-  window opens, and in the hidden test window, the dialog centres on the screen instead.
+  window opens, and in the hidden test window, the dialog centers on the screen instead.
 - **No fade of the dialog itself.** A window's opacity needs `AllowsTransparency=True`, which forces
   `WindowStyle=None` and would lose the themed title bar. Windows animates the window's opening
   anyway.
@@ -76,7 +76,7 @@ The MessageBox also gave a few things for free, and some of them are safety rule
 
 ## Alternatives considered
 
-1. **The system MessageBox** — white in Dark, and centred on the screen when no owner is passed.
+1. **The system MessageBox** — white in Dark, and centered on the screen when no owner is passed.
 2. **A dialog drawn inside the main window**, like the Windows 11 ContentDialog. It cannot be
    moved, and waiting for the answer needs a nested dispatcher frame and focus handling. A separate
    modal window gives that for free; the dim gives the same "the app is waiting" look.

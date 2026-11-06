@@ -28,13 +28,16 @@ internal sealed class TrayIcon : IDisposable
         Menu = BuildMenu(exit);
         Update();
         vm.Tray.PropertyChanged += (_, _) => Update();
-        vm.Tray.Notify += (title, text) =>
+        vm.Tray.Notify += n =>
         {
+            // Avvisi ed errori con l'icona di Windows; l'esito normale col solo logo dell'app.
+            var icon = n.Kind switch { NoticeKind.Error => Forms.ToolTipIcon.Error, NoticeKind.Warning => Forms.ToolTipIcon.Warning, _ => Forms.ToolTipIcon.None };
             // Un fumetto senza testo lancia un'eccezione: il titolo diventa il testo.
-            if (text.Length == 0) _icon.ShowBalloonTip(5000, "WinGet Studio", title, Forms.ToolTipIcon.None);
-            else _icon.ShowBalloonTip(5000, title, text, Forms.ToolTipIcon.None);
+            if (n.Text.Length == 0) _icon.ShowBalloonTip(5000, "WinGet Studio", n.Title, icon);
+            else _icon.ShowBalloonTip(5000, n.Title, n.Text, icon);
         };
-        _icon.BalloonTipClicked += (_, _) => ShowWindow(MainViewModel.UpdatesTab);
+        // La scheda da cui nasce l'ultimo fumetto (null: quella aperta).
+        _icon.BalloonTipClicked += (_, _) => ShowWindow(vm.Tray.LastNotice?.Tab);
         _icon.MouseDoubleClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ShowWindow(null); };
         _icon.MouseUp += (_, e) => { if (e.Button == Forms.MouseButtons.Right) OpenMenu(); };
 

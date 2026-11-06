@@ -105,7 +105,7 @@ public class SettingsViewModelTests
         Assert.True(busyDuringCheck);
         Assert.True(h.Vm.Settings.UpdateAppVisible);
         Assert.Equal("Update to v9.0.0", h.Vm.Settings.UpdateAppText);
-        Assert.Contains("Version v9.0.0 is available (you have v2.0.0).", h.Log);
+        Assert.Contains("WinGet Studio v9.0.0 is available (you have v2.0.0).", h.Log);
         // Il pulsante resta spento finche' la scansione non finisce.
         Assert.False(h.Vm.Settings.UpdateAppCommand.CanExecute(null));
         scanning.SetResult();
@@ -267,7 +267,7 @@ public class SettingsViewModelTests
         await h.Vm.Settings.CheckAsync(manual: false);
         var s = h.Vm.Settings;
         Assert.Equal((true, "Update to v1.30.0"), (s.UpdateWinGetVisible, s.UpdateWinGetText));
-        Assert.Contains("winget v1.30.0 is available (winget 1.29.380 is installed).", h.Log);
+        Assert.Contains("winget v1.30.0 is available (you have v1.29.380).", h.Log);
 
         await s.UpdateWinGetCommand.ExecuteAsync(null);
         Assert.Equal(MessageBoxResult.No, Assert.Single(h.Dialogs.Calls).Default);

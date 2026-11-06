@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="About WinGet Studio" Width="660" SizeToContent="Height" ResizeMode="NoResize" ShowInTaskbar="False" FontSize="{DynamicResource BaseFontSize}"
-        AutomationProperties.HelpText="What this app does, where to report a bug, and the licence">
+        AutomationProperties.HelpText="What this app does, where to report a bug, and the license">
     <!-- About come finestra modale (ADR 0028): logo e versione, le funzioni in una tabella senza
          bordi (nome a sinistra, descrizione a destra), poi note, link e crediti. -->
     <Window.Resources>
@@ -55,7 +55,7 @@
                            Text="List what has a newer version and update the packages you tick, one at a time, each with its own outcome. A running queue can be stopped: the package in progress finishes, the rest are left alone."/>
                 <TextBlock Grid.Row="1" Text="Install" Style="{StaticResource Name}"/>
                 <TextBlock Grid.Row="1" Grid.Column="1" Style="{StaticResource Text}"
-                           Text="Search the winget catalogue as you type, optionally the Microsoft Store, and pick who the package is installed for."/>
+                           Text="Search the winget catalog as you type, optionally the Microsoft Store, and pick who the package is installed for."/>
                 <TextBlock Grid.Row="2" Text="Installed" Style="{StaticResource Name}"/>
                 <TextBlock Grid.Row="2" Grid.Column="1" Style="{StaticResource Text}"
                            Text="Everything on the machine, programs installed without winget included, with a filter and an uninstall behind a confirmation."/>
@@ -89,7 +89,7 @@
                 <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/issues">Report a bug or an idea</Hyperlink> &#183;
                 <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio">Source code</Hyperlink> &#183;
                 <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/releases">Release notes</Hyperlink> &#183;
-                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE">MIT licence</Hyperlink><LineBreak/>
+                <Hyperlink NavigateUri="https://github.com/FedeB2160/WinGetStudio/blob/main/LICENSE">MIT license</Hyperlink><LineBreak/>
                 Made by <Hyperlink NavigateUri="https://github.com/FedeB2160">FedeB2160</Hyperlink>,
                 with the help of <Italic>Claude Code</Italic> (Anthropic).
             </TextBlock>

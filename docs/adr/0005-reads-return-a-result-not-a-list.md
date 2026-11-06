@@ -25,7 +25,7 @@ the rows and returns the same object.
 **The one non-zero exit that is a valid result** — `0x8A150014`,
 `APPINSTALLER_CLI_ERROR_NO_APPLICATIONS_FOUND`, no match — is mapped to success in
 `Get-WinGetSearch`, the only reader that can get it: `list` and `upgrade` without filters list
-everything installed and never produce it. The exit code is normalised to unsigned 32 bits before
+everything installed and never produce it. The exit code is normalized to unsigned 32 bits before
 the comparison, as in `Get-UpdateStatus`.
 
 **Messages use the last two meaningful lines of winget's output** (`Get-WinGetOutputTail`), the
@@ -57,5 +57,5 @@ leaves the job empty and the log silent.
 
 ## Alternatives considered
 
-The previous behaviour — return the parsed rows regardless of exit code — is the only alternative
+The previous behavior — return the parsed rows regardless of exit code — is the only alternative
 the sources record, and it is the bug this decision fixes.

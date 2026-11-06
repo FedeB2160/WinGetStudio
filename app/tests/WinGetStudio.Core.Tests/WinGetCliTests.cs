@@ -222,7 +222,34 @@ public class WinGetCliTests
     public async Task DetailsAreCleanText()
     {
         var (cli, _) = Create("  -\r  \\\rTrovato 7-Zip [7zip.7zip]\r\nVersione: 26.04\r\nTag:\r\n  zip\r\n");
-        Assert.Equal("Trovato 7-Zip [7zip.7zip]\r\nVersione: 26.04\r\nTag:\r\n  zip", await cli.GetDetailsAsync("7zip.7zip", "winget", false));
+        Assert.Equal(new DetailsReads("", "Trovato 7-Zip [7zip.7zip]\r\nVersione: 26.04\r\nTag:\r\n  zip"), await cli.GetDetailsAsync("7zip.7zip", "winget", false));
+    }
+
+    // Le due letture restano separate: il dialogo dice quale e' l'installato e quale il catalogo.
+    [Fact]
+    public async Task DetailsKeepTheTwoReadsApart()
+    {
+        var (cli, runner) = Create();
+        runner.Respond = a => FakeRunner.Result(0, a[0] == "list" ? "Pkg 1.0 [Pkg.Id]\r\nVersion: 1.0" : "Found Pkg [Pkg.Id]\r\nVersion: 2.0");
+        var reads = await cli.GetDetailsAsync("Pkg.Id", "winget", true);
+        Assert.Equal(new DetailsReads("Pkg 1.0 [Pkg.Id]\r\nVersion: 1.0", "Found Pkg [Pkg.Id]\r\nVersion: 2.0"), reads);
+        Assert.Equal("Pkg 1.0 [Pkg.Id]\r\nVersion: 1.0\r\n\r\nFound Pkg [Pkg.Id]\r\nVersion: 2.0", reads.Text);
+    }
+
+    // Un winget senza list --details stampa errore e guida: se show risponde, resta solo show,
+    // che il dialogo legge come tabella. Se nessuna lettura riesce, tutto il testo, com'e'.
+    [Fact]
+    public async Task AFailedReadIsDroppedWhenAnotherSucceeds()
+    {
+        var (cli, runner) = Create();
+        runner.Respond = a => a[0] == "list"
+            ? FakeRunner.Result(-1978335222, "Argument name was not recognized: --details\r\nUsage: winget list [<options>]")
+            : FakeRunner.Result(0, "Found 7-Zip [7zip.7zip]\r\nVersion: 26.05");
+        Assert.Equal(new DetailsReads("", "Found 7-Zip [7zip.7zip]\r\nVersion: 26.05"), await cli.GetDetailsAsync("7zip.7zip", "winget", true));
+
+        runner.Respond = _ => FakeRunner.Result(-1978335222, "Argument name was not recognized: --details");
+        Assert.Equal("Argument name was not recognized: --details\r\n\r\nArgument name was not recognized: --details",
+            (await cli.GetDetailsAsync("7zip.7zip", "winget", true)).Text);
     }
 
     // Gli Id vengono dal catalogo e dal registro ARP, cioe' da terzi: uno che sembri un'opzione

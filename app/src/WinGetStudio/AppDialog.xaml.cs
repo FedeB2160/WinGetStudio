@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Documents;
@@ -32,12 +33,21 @@ public partial class AppDialog : Window
         _button = button;
         Title = title;
         DlgText.Text = text;
-        if (links)
+        // I dettagli di un pacchetto come tabella (ADR 0021); il testo resta per il ripiego.
+        if (content is PackageDetails details)
         {
-            DlgBody.Children.Insert(0, LinkedText(text));
+            DlgBody.Children.Insert(0, DetailsView(details));
             DlgText.Visibility = Visibility.Collapsed;
         }
-        DlgContent.Content = content;
+        else
+        {
+            if (links)
+            {
+                DlgBody.Children.Insert(0, LinkedText(text));
+                DlgText.Visibility = Visibility.Collapsed;
+            }
+            DlgContent.Content = content;
+        }
 
         if (Icons.TryGetValue(image, out var icon))
         {
@@ -52,7 +62,9 @@ public partial class AppDialog : Window
         foreach (var a in answers)
         {
             // Il verbo dice cosa succede: "Uninstall" / "Cancel" invece di Yes / No.
-            var label = verbs is { } v && answers.Length == 2 ? (a == MessageBoxResult.Yes ? v.Yes : v.No) : a.ToString();
+            // Un pulsante solo sotto i dettagli: Close, come accanto a Install.
+            var label = verbs is { } v && answers.Length == 2 ? (a == MessageBoxResult.Yes ? v.Yes : v.No)
+                : content is PackageDetails ? "Close" : a.ToString();
             var b = new Button { Content = label, MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), IsDefault = a == preferred, IsCancel = a == answers[^1] };
             if (b.IsDefault) b.SetResourceReference(StyleProperty, "AccentButtonStyle");
             b.Click += (_, _) => { _answer = a; Close(); };
@@ -71,6 +83,89 @@ public partial class AppDialog : Window
 
     // Esc o la X: la risposta prudente.
     public MessageBoxResult Answer => _answer ?? (_button == MessageBoxButton.YesNo ? MessageBoxResult.No : MessageBoxResult.OK);
+
+    // Dettagli come tabella (ADR 0021): il nome come titolo e l'Id sotto, poi una sezione per
+    // lettura col nome che le da' l'app, e le coppie etichetta/valore. Etichette in secondario,
+    // valori coi link, gruppi rientrati. In un FlowDocumentScrollViewer: il testo resta selezionabile
+    // e si copia (ADR 0020), senza l'aspetto di un campo di testo.
+    private const double DetailsWidth = 620, NestedIndent = 12;
+
+    private FlowDocumentScrollViewer DetailsView(PackageDetails details)
+    {
+        // La colonna delle etichette larga quanto la piu' lunga (fra 100 e 220 px): nelle lingue con
+        // etichette lunghe vanno a capo, nelle altre il valore non resta lontano.
+        var typeface = new Typeface(FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+        double Measure(string s) => new FormattedText(s, CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, 12, Brushes.Black,
+            VisualTreeHelper.GetDpi(this).PixelsPerDip).WidthIncludingTrailingWhitespace;
+        var labelWidth = Math.Clamp(details.Parts.SelectMany(p => p.Rows).Where(r => r.Label.Length > 0)
+            .Select(r => Measure(r.Label) + (r.Nested ? NestedIndent : 0)).DefaultIfEmpty(0).Max() + 16, 100, 220);
+
+        Paragraph Text(string value, double indent = 0)
+        {
+            var p = new Paragraph { Margin = new Thickness(indent, 0, 0, 0) };
+            var lines = value.Split('\n');
+            for (var i = 0; i < lines.Length; i++)
+            {
+                foreach (var part in LinkText.Split(lines[i]))
+                    p.Inlines.Add(part.IsLink ? new Hyperlink(new Run(part.Text)) { NavigateUri = new Uri(part.Text) } : new Run(part.Text));
+                if (i < lines.Length - 1) p.Inlines.Add(new LineBreak());
+            }
+            return p;
+        }
+        T Secondary<T>(T e) where T : TextElement
+        {
+            e.SetResourceReference(TextElement.ForegroundProperty, "TextFillColorSecondaryBrush");
+            return e;
+        }
+
+        var doc = new FlowDocument { PagePadding = new Thickness(0, 0, 16, 0), FontSize = 12, TextAlignment = TextAlignment.Left };
+        doc.SetBinding(FlowDocument.FontFamilyProperty, new System.Windows.Data.Binding(nameof(FontFamily)) { Source = this });
+        doc.SetResourceReference(FlowDocument.ForegroundProperty, "TextFillColorPrimaryBrush");
+        var title = new Paragraph(new Run(details.Name)) { FontWeight = FontWeights.SemiBold, Margin = new Thickness(0) };
+        title.SetResourceReference(TextElement.FontSizeProperty, "SectionFontSize");
+        doc.Blocks.Add(title);
+        doc.Blocks.Add(Secondary(new Paragraph(new Run(details.Id)) { Margin = new Thickness(0, 2, 0, 0) }));
+        foreach (var part in details.Parts)
+        {
+            // Il nome della sezione con una riga sotto: catalogo e installato non si confondono.
+            var header = new Paragraph(new Run(part.Title))
+            {
+                FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 16, 0, 6), Padding = new Thickness(0, 0, 0, 4),
+                BorderThickness = new Thickness(0, 0, 0, 1),
+            };
+            header.SetResourceReference(Block.BorderBrushProperty, "AreaStrokeBrush");
+            doc.Blocks.Add(header);
+            var table = new Table { CellSpacing = 0, Margin = new Thickness(0) };
+            // Larghezze assolute: in un documento una colonna '*' non prende lo spazio rimasto.
+            table.Columns.Add(new TableColumn { Width = new GridLength(labelWidth) });
+            table.Columns.Add(new TableColumn { Width = new GridLength(DetailsWidth - labelWidth - 40) });
+            var group = new TableRowGroup();
+            foreach (var row in part.Rows)
+            {
+                var r = new TableRow();
+                if (row.Label.Length == 0) r.Cells.Add(new TableCell(Text(row.Value)) { ColumnSpan = 2, Padding = new Thickness(0, 3, 0, 3) });
+                else
+                {
+                    r.Cells.Add(Secondary(new TableCell(Text(row.Label, row.Nested ? NestedIndent : 0)) { Padding = new Thickness(0, 3, 12, 3) }));
+                    r.Cells.Add(new TableCell(Text(row.Value)) { Padding = new Thickness(0, 3, 0, 3) });
+                }
+                group.Rows.Add(r);
+            }
+            table.RowGroups.Add(group);
+            doc.Blocks.Add(table);
+        }
+        MaxWidth = 760;
+        return new FlowDocumentScrollViewer
+        {
+            Document = doc,
+            IsToolBarVisible = false,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Width = DetailsWidth,
+            MaxHeight = 520,
+            Background = Brushes.Transparent,
+        };
+    }
 
     // Testo coi link cliccabili (ADR 0021), in sola lettura ma selezionabile. Larghezza fissa:
     // in un dialogo che prende la misura del contenuto un RichTextBox non ne ha una sua. E' il

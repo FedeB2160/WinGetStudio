@@ -6,6 +6,12 @@ namespace WinGetStudio.ViewModels;
 // Il pallino sull'icona, in ordine di priorita' (ADR 0030).
 public enum TrayDot { Idle, Updates, Errors, Busy }
 
+// Che fumetto e': un avviso o un errore hanno l'icona di Windows, l'esito normale no.
+public enum NoticeKind { Info, Warning, Error }
+
+// Un fumetto. Tab: la scheda che il clic apre; null lascia quella aperta.
+public sealed record TrayNotice(string Title, string Text, NoticeKind Kind, int? Tab);
+
 // Icona nell'area di notifica (ADR 0030): pallino e tooltip dallo stato, notifica degli
 // aggiornamenti nuovi a finestra non attiva, controllo periodico sotto il lock di winget.
 public sealed partial class TrayViewModel : ObservableObject
@@ -32,8 +38,17 @@ public sealed partial class TrayViewModel : ObservableObject
     // Una finestra dell'app in primo piano: l'utente vede gia' la lista. La imposta la vista.
     public bool WindowActive { get; set; }
 
-    // Titolo e testo del fumetto.
-    public event Action<string, string>? Notify;
+    // Il fumetto da mostrare.
+    public event Action<TrayNotice>? Notify;
+
+    // L'ultimo fumetto mostrato: il clic su un fumetto porta alla sua scheda (2.0 UI/UX review R23).
+    public TrayNotice? LastNotice { get; private set; }
+
+    private void Show(TrayNotice notice)
+    {
+        LastNotice = notice;
+        Notify?.Invoke(notice);
+    }
 
     // Il timer del controllo periodico. Sopra un altro winget non parte (ADR 0003): resta dovuto e
     // parte appena il lock si libera, invece di saltare un intervallo intero.
@@ -54,7 +69,8 @@ public sealed partial class TrayViewModel : ObservableObject
     {
         if (_state.IsWinGetBusy)
         {
-            Notify?.Invoke("Another winget operation is still running", "Try again in a moment.");
+            // Nessuna scheda: la riga di avanzamento della coda si vede da tutte.
+            Show(new TrayNotice("Another winget operation is still running", "Try again in a moment.", NoticeKind.Warning, null));
             return;
         }
         _manual = true;
@@ -76,9 +92,9 @@ public sealed partial class TrayViewModel : ObservableObject
         _seen = now;
         // Dal menu si risponde sempre: chi ha chiesto guarda l'icona, non la finestra.
         if (!_manual && (WindowActive || !fresh)) return;
-        if (items.Count == 0) Notify?.Invoke(_updates.EmptyText, "");
-        else Notify?.Invoke($"{items.Count} update{(items.Count == 1 ? "" : "s")} available",
-            string.Join(", ", items.Take(5).Select(i => i.Name)) + (items.Count > 5 ? $" and {items.Count - 5} more" : ""));
+        if (items.Count == 0) Show(new TrayNotice(_updates.EmptyText, "", _updates.ScanFailed ? NoticeKind.Error : NoticeKind.Info, MainViewModel.UpdatesTab));
+        else Show(new TrayNotice($"{items.Count} update{(items.Count == 1 ? "" : "s")} available",
+            string.Join(", ", items.Take(5).Select(i => i.Name)) + (items.Count > 5 ? $" and {items.Count - 5} more" : ""), NoticeKind.Info, MainViewModel.UpdatesTab));
     }
 
     private void Refresh()

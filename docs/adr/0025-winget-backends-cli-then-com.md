@@ -15,7 +15,7 @@ unelevated .NET 10 process with `Microsoft.WindowsPackageManager.ComInterop` 1.2
 
 - activation in 44-117 ms; 326 installed packages in 3.3 s (108 ARP, 122 MSIX, one "Unknown" version);
   the same 4 upgradable Ids as `winget upgrade --include-unknown`, and every COM Id present in
-  `winget list`; structured metadata (publisher, licence, homepage, icons);
+  `winget list`; structured metadata (publisher, license, homepage, icons);
 - installs with progress events: download percentage, then installing and post-install states;
 - the projection requires the `windows10.0.26100` TFM;
 - lists from the server do not expose `IIterable` to the proxy, so `foreach` fails and they are read by

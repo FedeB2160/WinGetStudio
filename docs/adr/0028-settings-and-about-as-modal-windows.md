@@ -31,14 +31,14 @@ list on all four sides.
 2. **Settings keeps its view model.** `SettingsViewModel` does not change; only where it is shown.
 3. **Areas get cards**: a section header and a `Border` with the Fluent card keys
    (`CardBackgroundFillColorDefaultBrush`, `CardStrokeColorDefaultBrush`, `OverlayCornerRadius`),
-   as in the Windows 11 Settings app. Still no colour and no template of our own.
+   as in the Windows 11 Settings app. Still no color and no template of our own.
 4. **About carries the logo** (`assets\icon\icon-128.png`, the same file as the README) and the
    version, a longer list of what the app does, and a "Good to know" card. The exe gets
    `assets\icon.ico` as its icon, which WPF also uses for every window.
 5. **Grids are open at the sides**: `BorderThickness="0,1"` and a transparent background (the Fluent
    background is rounded and drew the sides on its own), horizontal lines only. Text columns get an
-   element style that centres the `TextBlock` vertically: the cell's `VerticalContentAlignment` does
-   not reach it. **A click selects the whole row**: the clicked cell keeps the row's selection colour
+   element style that centers the `TextBlock` vertically: the cell's `VerticalContentAlignment` does
+   not reach it. **A click selects the whole row**: the clicked cell keeps the row's selection color
    and loses its focus frame. **Grids stay anchored to both sides**: no horizontal scroll bar, so
    widening a column narrows the `*` columns instead of pushing the grid past the edge.
    **Select all is a check box in the header** of the Updates grid: on, off, or indeterminate when
@@ -49,9 +49,9 @@ list on all four sides.
    content a 12 px margin. **The shared progress bar is 8 px** instead of the Fluent 4: it is the only
    sign, from every tab, that a queue is working.
 7. **A solid window background instead of Mica** (amends ADR 0027, point 6): Mica tints the window
-   with the colour of the desktop wallpaper, which read as blue in the dark theme. The runtime
+   with the color of the desktop wallpaper, which read as blue in the dark theme. The runtime
    switch `Switch.System.Windows.Appearance.DisableFluentThemeWindowBackdrop` (in the project file)
-   makes the Fluent theme use its `WindowBackground`, the plain Windows dark or light grey.
+   makes the Fluent theme use its `WindowBackground`, the plain Windows dark or light gray.
 8. **States that can be seen.** Several Fluent defaults vanish on the dark theme (the card stroke is
    black at 10%, a hovered button goes from 6% to 8% white). The app redefines, in its own
    resources, the keys the Fluent templates already read, with brushes bound to other Fluent
@@ -70,15 +70,15 @@ list on all four sides.
 10. **Every grid has Select all in its header** (on, off, indeterminate), on the rows the tab allows:
     all in Install, the non-pinned ones in Updates, the visible ones in Installed (never rows the
     filter hides). The check box, pin and result columns cannot be resized. Column titles are
-    centred through an implicit `DataGridColumnHeader` style: with the Fluent theme the headers take
+    centered through an implicit `DataGridColumnHeader` style: with the Fluent theme the headers take
     the style by type and ignore the grid's `ColumnHeaderStyle`. (Since point 17, left-aligned
     except those three columns.) Truncated cell text shows in full
     in a tooltip.
 11. **Third review (2026-10-30).** Borders of areas, tabs, grids and buttons use the theme's strong
     stroke (`ControlStrongStrokeColorDefault`, white on dark and black on light) at 55%: the Fluent
-    grey, the same in both themes, made the window read as one block. Grids are closed on all four
+    gray, the same in both themes, made the window read as one block. Grids are closed on all four
     sides by the rounded Fluent border again (open sides left the header ending in nothing),
-    with horizontal lines only inside. Inactive tabs are grey; the active one is bold at the same
+    with horizontal lines only inside. Inactive tabs are gray; the active one is bold at the same
     size (a larger title sat below its icon). The shared progress bar becomes a status line,
     "Updating 2 of 3: LibreOffice", with a 10 px bar clipped to rounded corners on the strong
     stroke as track, and the Result column shows the spinner while a row runs. Columns cannot be
@@ -87,8 +87,8 @@ list on all four sides.
     Result out of the grid. Settings is compact, in two columns (Appearance and Startup, Updates) so
     that new settings widen it instead of making it taller, with outcomes and notes on their own
     wrapped line. The count of updates is a badge overlaid on the top-right corner of the Updates tab (drawn
-    shifted, so the tab keeps its width), in the accent colour, seen
-    from every tab (grey, as if disabled, when another tab is active), instead of a
+    shifted, so the tab keeps its width), in the accent color, seen
+    from every tab (gray, as if disabled, when another tab is active), instead of a
     "N updates available" line inside it. An update queue with failures no longer reloads the list
     (issue #24 reloaded after every queue): the rows keep their outcomes, the list is marked out of
     date (Update off, Retry failed on) and the next check is the user's. The pin menu shows Pin
@@ -131,7 +131,7 @@ list on all four sides.
     tabs' 1 px (the Fluent tab template fixes its border at 1 px on an inner `Border` that ignores
     `BorderThickness`, so the code sets it there). The strokes were translucent, and where they
     overlapped (tab edges on the area's top line) their light added up into bright dots: the main
-    window now uses the same colours already blended on the window background, opaque, recomputed
+    window now uses the same colors already blended on the window background, opaque, recomputed
     when the theme changes. Inactive tabs end above the area's line; only the active one covers it.
 16. **Accessibility (2026-11-05), the high-severity findings of the UI/UX review.**
     - **Inactive tab text is secondary, not tertiary**: 6.07:1 in the light theme and 9.37:1 in
@@ -151,12 +151,12 @@ list on all four sides.
       of their own either (`RowCellCheck`): with the focus on one, the two frames showed together.
       Select all, in the column header, keeps its own.
       It is an adorner and not the row's `BorderThickness`, which the Fluent row template does
-      honour, because a border takes layout space. The cells presenter is held at `RowHeight`,
+      honor, because a border takes layout space. The cells presenter is held at `RowHeight`,
       so rows would grow from 28 to 32 px. The DataGrid measures the cells' offset from its
       scroll viewer, so the cells would also shift 2 px right of their titles, and the Result
       column would lose 2 px. The adorner lives in the scroll content presenter's layer, which
       clips to the grid's content.
-      Its colour is `FocusStrokeColorOuterBrush`, nearly opaque, and not the translucent
+      Its color is `FocusStrokeColorOuterBrush`, nearly opaque, and not the translucent
       `KeyboardFocusBorderColorBrush` of the other controls' frames: over the selected row's blue,
       that one drops to about 2:1.
     - **Space checks the row with the focus.** The DataGrid does not use Space, and a check box
@@ -183,7 +183,7 @@ list on all four sides.
       installed package matches 'x'." and, on its own line, "Clear the filter to see all N.", as an Install search with
       no result does.
     - **Install for is a choice in sight.** The "Scope: Auto" button cycled through three values
-      it did not show. It is now a Fluent `ComboBox` labelled "Install for", with Auto, Current
+      it did not show. It is now a Fluent `ComboBox` labeled "Install for", with Auto, Current
       user and All users; each item's tooltip says what it passes to winget. The saved values
       (`InstallScope`: Auto, User, Machine) do not change.
     - **A double click opens, it does not run.** In Install a double click on a row installed it at
@@ -207,7 +207,7 @@ list on all four sides.
       the Narrator check.
     - **Column titles sit over their text** (amends point 10): left-aligned, with a 3 px padding
       that starts them where the cell text starts, as in the import preview. Only the check box,
-      Pin and Result columns stay centred. The implicit header style tells them apart by the
+      Pin and Result columns stay centered. The implicit header style tells them apart by the
       header's own `CanUserSort` (template columns have no sort path): a binding on
       `Column.CanUserResize` is evaluated before the header gets its column, and `Column` does
       not notify. The Select all check box keeps its 7 px shift and sits over the rows' ones.
@@ -215,6 +215,40 @@ list on all four sides.
       "Retry failed packages (2)", and its confirmation is titled the same, with Retry and
       Cancel. The Updates check box "Unknown" said what it changes only in its tooltip; it is
       "Include unknown versions".
+18. **Polish (2026-11-06), the low-severity findings of the UI/UX review.**
+    - **Stop, not Cancel.** The queue button finishes the package in progress and stops; in dialogs
+      Cancel means leaving without doing anything. It says **Stop** / **Stopping...**, on Update and
+      on Retry as administrator (whose tooltip follows it), and the log and the queue summary say
+      "stopped" (ADR 0024).
+    - **Details are a titled table**: the package name, then a label/value table read by position,
+      never by label (ADR 0021, amended).
+    - **One word for each thing.** American spelling in the UI (catalog, license, canceled),
+      "Microsoft Store" also on the Install check box, and versions always as "v2.0.0", like the
+      GitHub tags on the update buttons.
+    - **A disabled Update says why**: "Tick the packages to update" when nothing is ticked and
+      something can be; Install's hint already said so.
+    - **App updates aligns label and value**: each shares a grid row with its version line, centered;
+      the check outcome moves to the row below. The value stays SemiBold.
+    - **Shortcuts are named**: Refresh and Check for updates say "(F5)", the search field "(Ctrl+F)",
+      also as `AutomationProperties.AcceleratorKey`.
+    - **The import preview has Select all** in its header, shared with the main grids through
+      `Styles.xaml`, and a missing version reads "latest" in secondary text.
+    - **Notifications have an icon and a target** (ADR 0030, amended).
+    - **Column titles are centered, all of them (2026-11-06, the user's choice; amends point 17).** The
+      Fluent header keeps the room of its sort arrow on the right even when the arrow is hidden, so
+      centered content sat left of the column's center by half of it, an amount that depends on the
+      glyph font. `HeaderBalance` (on the implicit header style) measures that room and gives it back
+      as left padding, never more than the title leaves free; on columns that cannot be sorted
+      (check box, Pin, Result) it collapses the arrow instead. The Select all check box lost its 7 px
+      shift: it now sits over the rows' ones by layout, with the same width, since the Fluent
+      template widens an empty check box to 30 px through a trigger that a local `MinWidth` would
+      override. The import preview shares the same header style and check boxes.
+    - **The dialog veil covers the whole window** (`Margin="-12"`, the grid's own margin; it left a
+      2 px light frame). The title bar, drawn by Windows, stays undimmed.
+    - **Retry stays at the top right (R24, declined).** The review suggested moving the two Retry
+      buttons next to Update, only if the bottom band did not crowd. At the 760 px minimum, after a
+      failure that band would hold Update, both Retry buttons and "List out of date: press Check for
+      updates.", and the text would be cut; Install and Installed keep Retry at the top anyway.
 
 ## Consequences
 

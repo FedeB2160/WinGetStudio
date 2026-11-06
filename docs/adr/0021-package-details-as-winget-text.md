@@ -7,9 +7,9 @@
 ## Context
 
 [Issue #24](https://github.com/FedeB2160/WinGetStudio/issues/24) asked for a Details action, showing
-a package's description, publisher, website, licence and versions, plus installed scope, installer
+a package's description, publisher, website, license and versions, plus installed scope, installer
 type and location. winget has two commands for this:
-- `show` gives the catalogue manifest;
+- `show` gives the catalog manifest;
 - `list --details`, stable since winget 1.29, gives what is installed.
 
 Both print a list of `label: value` lines, and **the labels are translated**. On an Italian Windows,
@@ -21,7 +21,7 @@ The table readers do not have this problem: they parse by column position, never
 (ADR 0006).
 
 Two more facts shaped the decision:
-- **Which catalogue answers depends on the row.** A search with **MS Store** ticked mixes two
+- **Which catalog answers depends on the row.** A search with **MS Store** ticked mixes two
   sources, and `install --id X -e` without `--source` looks the Id up in every source, including the
   Store, which goes over the network.
 - **Details are a winget process like any other.** Two at once make one of them fail (ADR 0003).
@@ -34,7 +34,7 @@ Two more facts shaped the decision:
   `Invoke-WinGetRead` (UTF-8, no shell, ADR 0004):
   - `list --id X -e --details`, for an installed package (Installed and Updates tabs);
   - `show --id X -e --source S`, when the row has a source. An ARP-only program has none, and no
-    catalogue knows it.
+    catalog knows it.
 - Of each line it keeps the last `\r` segment, drops lines that are only a spinner frame, and keeps
   the indentation `show` uses for groups.
 - `Show-PackageDetails` (`App.Ui.ps1`) runs it in a background job, behind `Test-WinGetBusy` and the
@@ -66,6 +66,34 @@ Two more facts shaped the decision:
 - **Install passes the row's source** (`--source "<Source>"`) when the row has one. Updates and
   Installed do not: winget already correlates the installed package.
 
+### Amended 2026-11-06 (version 2): a table read by position
+
+The 2.0 UI/UX review (finding R17) found the details popup hard to scan: `Name: ...` lines of plain
+text in a wide, half-empty window. The details are now a titled table, still without knowing a single
+label:
+- `PackageDetails.Parse` reads the **layout only**. A blank line separates the two reads; the first line
+  of each read is its heading (`7-Zip 26.05 (x64) [7zip.7zip]`, `Trovato 7-Zip [7zip.7zip]`), even if it
+  contains `": "`. Every other line splits at its first `": "` into label and value, a line ending in `":"`
+  opens a group, and indented lines continue the value above (tags, release notes, the installer group).
+  No label is ever matched by name, so alternative 1 below stays rejected and every language works.
+- The dialog shows the package name as a title (14 SemiBold) and a two-column table, labels and
+  headings in secondary text, values with their links. It is still a read-only `RichTextBox`, so the text
+  can be selected and copied.
+- **Redrawn the same day, after a look at a real package.** `GetDetailsAsync` returns the two reads apart
+  (`DetailsReads`: `Installed`, `Catalog`), so the dialog names its sections itself, "Catalog (winget)"
+  and "Installed", and no longer shows winget's opening lines: the package name is the title and its Id
+  the line under it. **The catalog comes first** (what the package is, then where and how it is
+  installed; this amends "The installed part comes first" below: the section names now say which is
+  which). Labels are left-aligned in a column as wide as the longest (100 to 220 px), a group of
+  `label: value` lines (the installer, the documentation) becomes indented rows under its title, and
+  one-word lines (the tags) are joined with commas. The document sits in a `FlowDocumentScrollViewer`,
+  still selectable, without the look of a text field, and the single button says **Close**.
+- Text with no `label: value` line at all (an error, an old winget, no details) is shown verbatim, as
+  before.
+- A read that fails is left out when the other one succeeds: an older winget without `list --details`
+  prints an error and its usage help, which would otherwise be drawn as labels. When no read succeeds,
+  all the text is shown verbatim.
+
 ## Consequences
 
 **Positive**
@@ -78,7 +106,7 @@ Two more facts shaped the decision:
 **To watch**
 - The text is in the system language and in winget's layout. It is not a formatted card.
 - `show` prints the manifest of the **latest** version. For an installed package that is out of date,
-  the catalogue part can describe a newer version than the one installed. The installed part comes
+  the catalog part can describe a newer version than the one installed. The installed part comes
   first for that reason.
 - A search with the Store is two winget processes in a row, never at the same time (ADR 0003). The
   Store part goes over the network and takes about 5 s, which is why it still runs only on Enter or

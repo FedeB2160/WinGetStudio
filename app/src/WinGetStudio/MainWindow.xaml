@@ -33,23 +33,6 @@
             <DataTemplate x:Key="SelectCell" DataType="{x:Type vm:PackageItem}">
                 <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}" Style="{StaticResource RowCellCheck}"/>
             </DataTemplate>
-            <!-- Seleziona tutto, nell'intestazione della colonna delle spunte di ogni griglia: spenta,
-                 tutte, alcune (indeterminata); quali righe tocca lo decide la scheda (Selectable).
-                 In un template e non come Header diretto: un controllo messo li' viene legato
-                 prima di entrare nell'albero e non trova la griglia. -->
-            <DataTemplate x:Key="SelectAllHeader">
-                <!-- 7 px a destra: l'intestazione Fluent tiene a destra lo spazio della freccia di
-                     ordinamento anche nascosta, e la spunta finiva a sinistra di quelle sotto. Un
-                     margine non ci sta nella colonna stretta: si sposta solo il disegno. -->
-                <CheckBox Style="{StaticResource RowCheck}" AutomationProperties.Name="Select all"
-                          ToolTip="Select or clear every package in the list"
-                          IsChecked="{Binding DataContext.AllChecked, RelativeSource={RelativeSource AncestorType=DataGrid}}"
-                          IsEnabled="{Binding DataContext.CanCheckAll, RelativeSource={RelativeSource AncestorType=DataGrid}}">
-                    <CheckBox.RenderTransform>
-                        <TranslateTransform X="7"/>
-                    </CheckBox.RenderTransform>
-                </CheckBox>
-            </DataTemplate>
             <!-- In Updates una riga con un pin non si spunta: non e' aggiornabile. -->
             <DataTemplate x:Key="SelectUnpinnedCell" DataType="{x:Type vm:PackageItem}">
                 <CheckBox IsChecked="{Binding Selected, UpdateSourceTrigger=PropertyChanged}">
@@ -304,27 +287,6 @@
                 <Setter Property="ItemsSource" Value="{Binding Items}"/>
                 <Setter Property="Visibility" Value="{Binding HasItems, Converter={StaticResource Visible}}"/>
             </Style>
-            <!-- Titoli delle colonne a sinistra, dove comincia il testo delle celle (smoke test); al
-                 centro solo spunta, Pin e Result, le colonne a modello, che non si ordinano. Il
-                 trigger e' su CanUserSort perche' e' una proprieta' dell'intestazione: Column non
-                 notifica, e un binding su Column.CanUserResize resta a null. Stile implicito e non
-                 ColumnHeaderStyle della griglia: col tema Fluent le intestazioni prendono lo stile
-                 per tipo e ignorano quello. -->
-            <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
-                <Setter Property="HorizontalContentAlignment" Value="Left"/>
-                <!-- Niente separatori verticali: come le righe, solo linee orizzontali. -->
-                <Setter Property="SeparatorVisibility" Value="Collapsed"/>
-                <Setter Property="FontSize" Value="{StaticResource CaptionFontSize}"/>
-                <Setter Property="Padding" Value="3,0,0,0"/>
-                <Style.Triggers>
-                    <Trigger Property="CanUserSort" Value="False">
-                        <Setter Property="HorizontalContentAlignment" Value="Center"/>
-                        <!-- Il padding Fluent e' solo a sinistra: spostava la spunta di Seleziona tutto
-                             rispetto a quelle delle righe. -->
-                        <Setter Property="Padding" Value="0"/>
-                    </Trigger>
-                </Style.Triggers>
-            </Style>
             <!-- Testo delle colonne: VerticalContentAlignment della cella non arriva al TextBlock,
                  che si stende e lascia il testo in alto. Lo si centra qui. Testo lungo: i puntini. -->
             <Style x:Key="CellText" TargetType="TextBlock" BasedOn="{x:Static DataGridTextColumn.DefaultElementStyle}">
@@ -340,7 +302,7 @@
                 <Setter Property="ToolTip" Value="Run the last operation again on the packages in this list where it failed"/>
             </Style>
             <!-- Retry as administrator (ADR 0024): solo per i fallimenti che l'elevazione puo' risolvere,
-                 col glifo dello scudo; mentre il suo batch gira e' il Cancel che smette di aspettare l'UAC. -->
+                 col glifo dello scudo; mentre il suo batch gira e' lo Stop che smette di aspettare l'UAC. -->
             <Style x:Key="RetryAdmin" TargetType="Button" BasedOn="{StaticResource PageButton}">
                 <Setter Property="Padding" Value="11,5,11,6"/>
                 <Setter Property="Margin" Value="0,0,8,0"/>
@@ -348,7 +310,7 @@
                 <Setter Property="Content" Value="{Binding RetryAdminText}"/>
                 <Setter Property="Command" Value="{Binding RetryAdminCommand}"/>
                 <Setter Property="Visibility" Value="{Binding RetryAdminVisible, Converter={StaticResource Visible}}"/>
-                <Setter Property="ToolTip" Value="Run the failed operation again as administrator: one Windows prompt for all of these packages"/>
+                <Setter Property="ToolTip" Value="{Binding RetryAdminToolTip}"/>
             </Style>
             <!-- Pin e Unpin sulle righe EVIDENZIATE, non sulle spuntate: la spunta di una riga con
                  un pin e' spenta, e con le spunte il pin non si toglierebbe piu'. Ognuna compare
@@ -399,7 +361,7 @@
             <Button Style="{StaticResource PageButton}" Tag="&#xE713;" Content="Settings" Command="{Binding OpenSettingsCommand}"
                     ToolTip="Theme, tab strip, version and updates"/>
             <Button Style="{StaticResource PageButton}" Tag="&#xE946;" Content="About" Command="{Binding OpenAboutCommand}" Margin="6,0,0,0"
-                    ToolTip="What this app does, where to report a bug, and the licence"/>
+                    ToolTip="What this app does, where to report a bug, and the license"/>
         </StackPanel>
 
         <!-- Il riquadro delle schede: bordo e sfondo delle card, che il template Fluent usa gia'
@@ -407,7 +369,7 @@
         <TabControl x:Name="TabMain" Grid.Row="1" SelectedIndex="{Binding SelectedTab}" BorderThickness="2" AlternationCount="3"
                     BorderBrush="{DynamicResource AreaStrokeBrush}" Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}">
             <TabItem Header="Install" Tag="&#xE896;" DataContext="{Binding Install}"
-                     AutomationProperties.HelpText="Search the winget catalogue as you type and install what you pick">
+                     AutomationProperties.HelpText="Search the winget catalog as you type and install what you pick">
                 <Grid Margin="12">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -420,7 +382,8 @@
                             <Grid Width="380">
                                 <TextBox x:Name="TxtSearch" Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
                                          IsEnabled="{Binding State.IsIdle}"
-                                         AutomationProperties.Name="Package name or ID, at least 3 characters">
+                                         AutomationProperties.Name="Package name or ID, at least 3 characters"
+                                         ToolTip="Search the winget catalog (Ctrl+F)" AutomationProperties.AcceleratorKey="Ctrl+F">
                                     <TextBox.InputBindings>
                                         <KeyBinding Key="Return" Command="{Binding SearchNowCommand}"/>
                                     </TextBox.InputBindings>
@@ -428,7 +391,7 @@
                                 <TextBlock x:Name="HintSearch" Style="{StaticResource Placeholder}" Tag="{Binding ElementName=TxtSearch}" Text="Search by name or ID"/>
                             </Grid>
                             <Button Content="Search" MinWidth="96" Margin="8,0,0,0" Command="{Binding SearchNowCommand}"/>
-                            <CheckBox Content="MS Store" Margin="12,0,0,0" VerticalAlignment="Center"
+                            <CheckBox x:Name="ChkStore" Content="Microsoft Store" Margin="12,0,0,0" VerticalAlignment="Center"
                                       IsChecked="{Binding IncludeStore}" IsEnabled="{Binding State.IsIdle}"
                                       ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"/>
                             <local:Spinner Margin="12,0,0,0" Visibility="{Binding Searching, Converter={StaticResource Visible}}"/>
@@ -463,7 +426,7 @@
                                 <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package Name" Width="2*" Binding="{Binding Name}"/>
                                 <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Package ID" Width="2.4*" Binding="{Binding Id}"/>
                                 <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Version" Width="1.2*" Binding="{Binding Version}"/>
-                                <!-- Con MS Store i risultati vengono da due sorgenti: l'installazione usa quella della riga. -->
+                                <!-- Con Microsoft Store i risultati vengono da due sorgenti: l'installazione usa quella della riga. -->
                                 <DataGridTextColumn ElementStyle="{StaticResource CellText}" Header="Source" Width="90" Binding="{Binding Source}"/>
                                 <DataGridTemplateColumn Header="Result" Width="56" CanUserResize="False" CellTemplate="{StaticResource ResultCell}"/>
                             </DataGrid.Columns>
@@ -502,7 +465,9 @@
                     </Grid.RowDefinitions>
                     <Grid Margin="0,0,0,8">
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="Refresh" MinWidth="96" Command="{Binding ReloadCommand}"/>
+                            <!-- La scorciatoia nel tooltip e per i lettori di schermo (F5, MainWindow.OnPreviewKeyDown). -->
+                            <Button x:Name="BtnRefresh" Content="Refresh" MinWidth="96" Command="{Binding ReloadCommand}"
+                                    ToolTip="Read the installed packages again (F5)" AutomationProperties.AcceleratorKey="F5"/>
                             <!-- Filtro locale sull'elenco gia' caricato: non richiama winget. -->
                             <Grid Width="300" Margin="8,0,0,0">
                                 <TextBox x:Name="TxtFilter" Text="{Binding FilterText, UpdateSourceTrigger=PropertyChanged}"
@@ -561,7 +526,8 @@
                     </Grid.RowDefinitions>
                     <!-- LastChildFill spento: Retry e' l'ultimo e senza riempirebbe lo spazio da sinistra. -->
                     <DockPanel Margin="0,0,0,8" LastChildFill="False">
-                        <Button DockPanel.Dock="Left" MinWidth="96" Content="Check for updates" Command="{Binding CheckCommand}"/>
+                        <Button x:Name="BtnCheck" DockPanel.Dock="Left" MinWidth="96" Content="Check for updates" Command="{Binding CheckCommand}"
+                                ToolTip="Look for newer versions of the installed packages (F5)" AutomationProperties.AcceleratorKey="F5"/>
                         <CheckBox DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" Content="Include unknown versions"
                                   IsChecked="{Binding IncludeUnknown}" IsEnabled="{Binding State.IsIdle}"
                                   ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"/>
@@ -644,8 +610,9 @@
             </TextBox.ContextMenu>
         </TextBox>
 
-        <!-- Velo sotto un dialogo (ADR 0020): copre tutta la finestra, margine compreso. -->
-        <Border x:Name="DialogDim" Grid.RowSpan="5" Margin="-10" Panel.ZIndex="100" Visibility="Collapsed"
+        <!-- Velo sotto un dialogo (ADR 0020): copre tutta la finestra, margine compreso (-12 come il
+             Margin della griglia: con -10 restava una cornice chiara di 2 px). -->
+        <Border x:Name="DialogDim" Grid.RowSpan="5" Margin="-12" Panel.ZIndex="100" Visibility="Collapsed"
                 Background="{DynamicResource SmokeFillColorDefaultBrush}"/>
     </Grid>
 </Window>
