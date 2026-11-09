@@ -93,6 +93,15 @@ public class WindowSmokeTests
             SelectAllCentered();
         }
         HeadersCentered();
+        // Spunte con etichetta: centro del testo sul centro del quadratino (ADR 0028 punto 20).
+        // Entro 1 px: il font del runner CI non e' quello di Windows 11.
+        void LabelCentered(CheckBox c)
+        {
+            var text = FindChild<TextBlock>((ContentPresenter)c.Template.FindName("ContentPresenter", c))!;
+            double Mid(FrameworkElement e) => e.TranslatePoint(new Point(0, e.ActualHeight / 2), c).Y;
+            Assert.True(Math.Abs(Mid(Box(c)) - Mid(text)) <= 1.0, $"{c.Content}: {Mid(Box(c))} vs {Mid(text)}");
+        }
+        LabelCentered(FindAll<CheckBox>(w).First(c => c.Content as string == "Include unknown versions"));
         updatesGrid.Resources["DataGridSortIndicatorIconFontSize"] = 18d;
         Pump(() => true);
         SelectAllCentered();
@@ -230,6 +239,8 @@ public class WindowSmokeTests
         nav.SelectedIndex = 1;
         Pump(() => true);
         Assert.Contains(FindAll<CheckBox>(settings), c => c.IsVisible && (string)c.Content == "Close to tray");
+        var tray = FindAll<CheckBox>(settings).First(c => c.Content as string == "Close to tray");
+        LabelCentered(tray);
         Assert.False(FindChild<ComboBox>(settings)!.IsVisible);
         // Il pulsante in alto comprime il menu alle sole icone.
         // Le voci restano alla stessa altezza: senza il nome non salgono.
@@ -240,6 +251,7 @@ public class WindowSmokeTests
         Pump(() => nav.ActualWidth < 60);
         Assert.True(nav.ActualWidth < 60 && wide > 150, $"{wide} -> {nav.ActualWidth}");
         Assert.Equal(y, last.TranslatePoint(new Point(), nav).Y);
+        LabelCentered(tray);
         settings.NavCompact = false;
         // App updates: etichetta e valore sulla stessa riga, centrati (2.0 UI/UX review R20).
         nav.SelectedIndex = 2;

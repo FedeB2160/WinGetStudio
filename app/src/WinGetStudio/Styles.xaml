@@ -60,6 +60,16 @@
         </CheckBox>
     </DataTemplate>
 
+    <!-- Spunta con etichetta: testo centrato sul quadratino (ADR 0028 punto 20). Il template Fluent
+         mette il testo in alto con 5 px sopra (Padding 8,5,0,0), pensati per i 14 px: a 12 il testo
+         restava 2 px piu' su. Centrato e senza spazio sopra coincide col quadratino, che il template
+         centra, con qualunque font. Le spunte senza testo non cambiano: il template azzera il margine
+         del contenuto vuoto, e quelle delle righe hanno Padding 0 (RowCheck, Seleziona tutto). -->
+    <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Type CheckBox}}">
+        <Setter Property="Padding" Value="8,0,0,0"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+
     <!-- Titoli delle colonne al centro, tutti (scelta dell'utente, ADR 0028 punto 18): al centro
          della colonna, non dello spazio lasciato dalla freccia di ordinamento (HeaderBalance).
          Stile implicito e non ColumnHeaderStyle della griglia: col tema Fluent le intestazioni
