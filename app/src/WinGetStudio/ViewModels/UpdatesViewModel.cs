@@ -82,13 +82,14 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
         // La lettura che si sta per fare E' la nuova fotografia.
         Stale = false;
         State.Log.Write("Searching for updates...");
-        Items.Clear();
         EmptyText = "";
         Loading = true;
         // I pin nella stessa operazione, dopo: due winget insieme fanno fallire uno dei due.
         var read = await State.Backend.GetUpgradesAsync(IncludeUnknown);
         var pins = await State.Backend.GetPinsAsync();
         Loading = false;
+        // Le righe vecchie restano sotto il velo (BusyOverlay) finche' arrivano le nuove.
+        Items.Clear();
         ScanFailed = !read.Success;
         // WinGet Studio resta fuori: winget non sovrascrive un exe in esecuzione, quindi spuntarlo
         // fallirebbe sempre. Ci si aggiorna da Settings (ADR 0013).

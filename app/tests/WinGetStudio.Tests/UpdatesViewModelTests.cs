@@ -57,6 +57,29 @@ public class UpdatesViewModelTests
         Assert.Equal(1, h.WinGet.MaxRunning);
     }
 
+    // Un nuovo controllo lascia le righe di prima sotto il velo finche' winget risponde, poi le
+    // sostituisce (ADR 0028, punto 19).
+    [Fact]
+    public async Task CheckKeepsTheOldRowsUntilTheNewOnesArrive()
+    {
+        var available = new List<PackageRow> { A, B, C };
+        using var h = Create(available);
+        var vm = h.Vm.Updates;
+        await vm.LoadAsync();
+        available.Remove(C);
+        int? during = null;
+        h.WinGet.Before = a =>
+        {
+            if (a[0] == "upgrade") during = vm.Items.Count;
+            return Task.CompletedTask;
+        };
+
+        await vm.LoadAsync();
+
+        Assert.Equal(3, during);
+        Assert.Equal(["A.A", "B.B"], vm.Items.Select(i => i.Id));
+    }
+
     [Fact]
     public async Task EmptyAndFailedReadsSayDifferentThings()
     {
