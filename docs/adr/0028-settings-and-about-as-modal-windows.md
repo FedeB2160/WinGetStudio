@@ -265,6 +265,15 @@ list on all four sides.
     Installed and Updates no longer empty their grid when a read starts: the old rows stay under the
     veil and are replaced when winget answers, so Refresh and Check for updates on a full list keep
     it on screen.
+20. **Check box labels centered on the box (2026-11-09).** The Fluent check box puts its label at
+    the top with 5 px above it (`Padding` 8,5,0,0, `VerticalContentAlignment` Top), sized for 14 px
+    text; at 12 px (point 13) the label's center sat 2 px above the box's (14.0 against 16.0 in a
+    32 px control). An implicit `CheckBox` style in `Styles.xaml` sets `Padding` 8,0,0,0 and
+    `VerticalContentAlignment` Center: the template already centers the box, so the two centers
+    match with any font, rather than a top padding tuned to one. Check boxes without text are
+    unchanged: the template zeroes the margin of empty content, and the row checks and Select all
+    have `Padding` 0. The smoke test checks "Include unknown versions" and "Close to tray" (menu
+    expanded and compact) within 1 px.
 
 ## Consequences
 
