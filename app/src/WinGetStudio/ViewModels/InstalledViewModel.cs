@@ -36,6 +36,8 @@ public sealed partial class InstalledViewModel : PackageListViewModel
     }
 
     [ObservableProperty] public partial bool Loading { get; private set; }
+    // La scritta sotto lo spinner al centro della griglia (BusyOverlay): cosa sta facendo winget.
+    [ObservableProperty] public partial string LoadingText { get; private set; } = "";
     [ObservableProperty] public partial string EmptyText { get; private set; }
     [ObservableProperty] public partial string CountText { get; private set; }
     [ObservableProperty] public partial string InfoText { get; private set; }
@@ -68,13 +70,15 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         var outcomes = keepOutcome ? SnapshotOutcomes() : null;
         Loaded = true;
         State.Log.Write("Listing installed packages...");
-        Items.Clear();
         EmptyText = "";
+        LoadingText = "Listing installed packages...";
         Loading = true;
         // I pin nella stessa operazione: due winget insieme fanno fallire uno dei due.
         var read = await State.Backend.GetInstalledAsync();
         var pins = await State.Backend.GetPinsAsync();
         Loading = false;
+        // Le righe vecchie restano sotto il velo (BusyOverlay) finche' arrivano le nuove.
+        Items.Clear();
         if (read.Success) Fill(read.Rows, outcomes);
         if (Items.Count == 0)
         {
@@ -121,6 +125,7 @@ public sealed partial class InstalledViewModel : PackageListViewModel
         var file = State.Dialogs.PickSaveFile("Export installed packages", ListFilter, $"winget-packages-{DateTime.Now:yyyy-MM-dd}.json");
         // Di nuovo: fra la scelta del file e qui puo' essere rientrata una ricerca.
         if (file is null || !State.TryBegin()) return;
+        LoadingText = "Exporting the package list...";
         Loading = true;
         State.Log.Write($"Exporting the package list to {file} ...");
         string? failure = null;
@@ -216,6 +221,7 @@ public sealed partial class InstalledViewModel : PackageListViewModel
     private async Task RunImportAsync(string file, int count)
     {
         if (!State.TryBegin()) return;
+        LoadingText = "Importing packages...";
         Loading = true;
         State.ProgressIndeterminate = true;
         State.Log.Write($"Importing {count} packages from {file} ...");

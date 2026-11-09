@@ -1,0 +1,23 @@
+<!-- Lavoro in corso sopra la griglia di una scheda (ADR 0028, punto 19): velo tenue, lo Spinner
+     grande al centro e una scritta. Compare dopo 400 ms (BusyOverlay.xaml.cs); non prende clic.
+     Opacity 0 di base: tolta l'animazione resta invisibile, senza un fotogramma pieno. -->
+<UserControl x:Class="WinGetStudio.BusyOverlay"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:WinGetStudio"
+             Visibility="Collapsed" Opacity="0" IsHitTestVisible="False" Focusable="False">
+    <Grid>
+        <!-- Il colore dell'area delle schede: sulle righe le attenua, dove la griglia e' vuota non si vede. -->
+        <Border Background="{DynamicResource SolidBackgroundFillColorTertiaryBrush}" Opacity="0.75"
+                CornerRadius="{DynamicResource ControlCornerRadius}"/>
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+            <!-- Lo Spinner e' disegnato a 18 px: la Viewbox scala arco e spessore insieme. -->
+            <Viewbox Width="48" Height="48">
+                <local:Spinner/>
+            </Viewbox>
+            <!-- Vuoto da spento: prende il testo quando compare, e Narrator lo legge allora. -->
+            <TextBlock x:Name="Caption" Margin="0,12,0,0" FontSize="16" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                       HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" local:LiveRegion.Announce="True"/>
+        </StackPanel>
+    </Grid>
+</UserControl>

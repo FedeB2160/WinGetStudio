@@ -394,7 +394,6 @@
                             <CheckBox x:Name="ChkStore" Content="Microsoft Store" Margin="12,0,0,0" VerticalAlignment="Center"
                                       IsChecked="{Binding IncludeStore}" IsEnabled="{Binding State.IsIdle}"
                                       ToolTip="Also search the Microsoft Store. Slower (goes online), so it only applies when you press Enter or the Search button"/>
-                            <local:Spinner Margin="12,0,0,0" Visibility="{Binding Searching, Converter={StaticResource Visible}}"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                             <Button Style="{StaticResource RetryAdmin}"/>
@@ -434,6 +433,8 @@
                         <ScrollBar x:Name="BarSearch" Grid.Column="1" Margin="4,0,0,0" Visibility="Hidden"/>
                     </Grid>
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding Message}"/>
+                    <!-- Lavoro in corso al centro della griglia, sopra le righe (ADR 0028, punto 19). -->
+                    <local:BusyOverlay x:Name="BusySearch" Grid.Row="1" IsActive="{Binding Searching}" Text="Searching the winget catalog..."/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">
                         <!-- Per chi installare (scope di winget): tre voci, ognuna col tooltip che dice cosa fa; sulla
@@ -474,7 +475,6 @@
                                          IsEnabled="{Binding State.IsIdle}" AutomationProperties.Name="Filter by name or ID"/>
                                 <TextBlock Style="{StaticResource Placeholder}" Tag="{Binding ElementName=TxtFilter}" Text="Filter by name or ID"/>
                             </Grid>
-                            <local:Spinner Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
                             <TextBlock Margin="12,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" Text="{Binding CountText}"/>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
@@ -503,6 +503,7 @@
                         <ScrollBar x:Name="BarInstalled" Grid.Column="1" Margin="4,0,0,0" Visibility="Hidden"/>
                     </Grid>
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding EmptyText}"/>
+                    <local:BusyOverlay x:Name="BusyInstalled" Grid.Row="1" IsActive="{Binding Loading}" Text="{Binding LoadingText}"/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">
                         <Button DockPanel.Dock="Left" MinWidth="96" Content="Uninstall" Command="{Binding UninstallCommand}"/>
@@ -531,7 +532,6 @@
                         <CheckBox DockPanel.Dock="Left" Margin="12,0,0,0" VerticalAlignment="Center" Content="Include unknown versions"
                                   IsChecked="{Binding IncludeUnknown}" IsEnabled="{Binding State.IsIdle}"
                                   ToolTip="Pass --include-unknown to winget: also list packages whose installed version winget cannot determine"/>
-                        <local:Spinner DockPanel.Dock="Left" Margin="12,0,0,0" Visibility="{Binding Loading, Converter={StaticResource Visible}}"/>
                         <Button DockPanel.Dock="Right" Style="{StaticResource Retry}"/>
                         <Button DockPanel.Dock="Right" Style="{StaticResource RetryAdmin}"/>
                     </DockPanel>
@@ -555,6 +555,7 @@
                         <ScrollBar x:Name="BarUpdates" Grid.Column="1" Margin="4,0,0,0" Visibility="Hidden"/>
                     </Grid>
                     <TextBlock Grid.Row="1" Style="{StaticResource EmptyMessage}" Text="{Binding EmptyText}"/>
+                    <local:BusyOverlay x:Name="BusyUpdates" Grid.Row="1" IsActive="{Binding Loading}" Text="Checking for updates..."/>
 
                     <DockPanel Grid.Row="2" Margin="0,8,0,0">
                         <Button DockPanel.Dock="Left" MinWidth="96" Style="{StaticResource AccentButtonStyle}"

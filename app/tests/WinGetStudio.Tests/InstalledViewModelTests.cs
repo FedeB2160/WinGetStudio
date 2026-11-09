@@ -251,6 +251,48 @@ public class InstalledViewModelTests
         finally { File.Delete(file); }
     }
 
+    // La scritta sotto lo spinner al centro della griglia dice cosa sta facendo winget, mentre lo fa
+    // (ADR 0028, punto 19). L'import rilegge poi l'elenco, con la scritta della lettura e le righe
+    // di prima ancora a schermo.
+    [Fact]
+    public async Task LoadingTextSaysWhatWinGetIsDoing()
+    {
+        var export = Path.Combine(Path.GetTempPath(), $"wgt-test-{Guid.NewGuid():N}.json");
+        var import = Path.Combine(Path.GetTempPath(), $"wgt-test-{Guid.NewGuid():N}.json");
+        File.WriteAllText(import, """{"Sources":[{"SourceDetails":{"Name":"winget"},"Packages":[{"PackageIdentifier":"A.A"}]}]}""");
+        using var h = Create([A]);
+        var vm = h.Vm.Installed;
+        var seen = new List<(string, bool, string, int)>();
+        h.WinGet.Before = a =>
+        {
+            if (a[0] is "list" or "export" or "import") seen.Add((a[0], vm.Loading, vm.LoadingText, vm.Items.Count));
+            return Task.CompletedTask;
+        };
+        h.Dialogs.SaveFile = export;
+        h.Dialogs.OpenFile = import;
+        h.Dialogs.Answer = _ => MessageBoxResult.Yes;
+        try
+        {
+            await vm.LoadAsync();
+            await vm.ExportAsync();
+            await vm.ImportAsync();
+
+            Assert.Equal([
+                ("list", true, "Listing installed packages...", 0),
+                ("export", true, "Exporting the package list...", 1),
+                ("import", true, "Importing packages...", 1),
+                // Rilettura: la riga di prima resta sotto il velo finche' arrivano le nuove.
+                ("list", true, "Listing installed packages...", 1),
+            ], seen);
+            Assert.False(vm.Loading);
+        }
+        finally
+        {
+            File.Delete(export);
+            File.Delete(import);
+        }
+    }
+
     // Export fallito: non solo nel log. Un dialogo col motivo noto del codice e cosa fare, dopo
     // lo stato occupato; FAILED maiuscolo resta solo nel log.
     [Fact]

@@ -67,6 +67,7 @@ list on all four sides.
    spinner next to their button (`Spinner`, an arc drawn and turned by the app, still when Windows
    animations are off). The shared progress bar shows only during a queue or a long operation
    without a spinner of its own (`AppState.ShowProgress`), hidden otherwise without moving the log.
+   *Amended by point 19:* the spinner is no longer next to the button but large, over the grid.
 10. **Every grid has Select all in its header** (on, off, indeterminate), on the rows the tab allows:
     all in Install, the non-pinned ones in Updates, the visible ones in Installed (never rows the
     filter hides). The check box, pin and result columns cannot be resized. Column titles are
@@ -249,6 +250,21 @@ list on all four sides.
       buttons next to Update, only if the bottom band did not crowd. At the 760 px minimum, after a
       failure that band would hold Update, both Retry buttons and "List out of date: press Check for
       updates.", and the text would be cut; Install and Installed keep Retry at the top anyway.
+19. **Work in progress over the grid (2026-11-09, the user's choice; amends point 9).** The 18 px
+    spinner next to the tab buttons was easy to miss. Each tab now lays a `BusyOverlay` over its grid
+    area while winget reads: Install while it searches ("Searching the winget catalog..."), Installed
+    while it lists, exports or imports (`InstalledViewModel.LoadingText`), Updates while it checks
+    ("Checking for updates..."). The overlay is a veil of the tab area's color at 0.75 opacity (it
+    dims rows already there and is invisible on an empty grid), the `Spinner` in a 48 px `Viewbox`
+    and the text below in 16 px secondary color. It shows only after 400 ms, through a discrete key
+    frame on `Opacity` rather than a fade, so it works with Windows animations off and a search
+    typed letter by letter does not flash. The text is set only when the overlay shows and emptied
+    when it goes, and is announced to screen readers (`LiveRegion`), so a short search says nothing.
+    It takes no clicks (`IsHitTestVisible="False"`); the controls are already disabled by the busy
+    state. The spinner in Settings › App updates and the one in the Result column stay.
+    Installed and Updates no longer empty their grid when a read starts: the old rows stay under the
+    veil and are replaced when winget answers, so Refresh and Check for updates on a full list keep
+    it on screen.
 
 ## Consequences
 

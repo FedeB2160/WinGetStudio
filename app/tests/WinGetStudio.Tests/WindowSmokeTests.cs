@@ -33,14 +33,32 @@ public class WindowSmokeTests
         var app = new Application { ShutdownMode = ShutdownMode.OnExplicitShutdown, ThemeMode = ThemeMode.Light };
         // Piu' righe di quante ne stanno: la barra di scorrimento serve.
         var rows = Enumerable.Range(0, 30).Select(i => new PackageRow(i == 0 ? "App A" : $"App {i}", i == 0 ? "A.A" : $"A.{i}", "1.0", "2.0")).ToArray();
-        using var h = new Harness(h => h.WinGet.Respond = a => FakeWinGet.Result(0,
-            a[0] == "upgrade" ? FakeWinGet.Upgrades(rows) : ""));
+        // La lettura degli aggiornamenti resta in corso finche' il test non apre il cancello.
+        var gate = new TaskCompletionSource();
+        using var h = new Harness(h =>
+        {
+            h.WinGet.Respond = a => FakeWinGet.Result(0, a[0] == "upgrade" ? FakeWinGet.Upgrades(rows) : "");
+            h.WinGet.Before = a => a[0] == "upgrade" ? gate.Task : Task.CompletedTask;
+        });
         var w = new MainWindow(h.Vm)
         {
             ShowActivated = false, ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.Manual, Left = -20000, Top = -20000,
         };
         w.Show();
+        // Con winget al lavoro: lo spinner grande al centro della griglia e la scritta, dopo 400 ms;
+        // a lavoro finito sparisce e la scritta si vuota (ADR 0028, punto 19).
+        var busy = (BusyOverlay)w.FindName("BusyUpdates");
+        var caption = (TextBlock)busy.FindName("Caption");
+        Pump(() => caption.Text.Length > 0);
+        Assert.Equal((Visibility.Visible, 1d, "Checking for updates..."), (busy.Visibility, busy.Opacity, caption.Text));
+        // Nessuno spinner accanto ai pulsanti delle schede: gli unici della finestra sono nei tre overlay.
+        var overlays = FindLogical<BusyOverlay>(w).ToList();
+        Assert.Equal(3, overlays.Count);
+        Assert.Equal(3, FindLogical<Spinner>(w).Count());
+        Assert.Equal(3, overlays.Sum(o => FindLogical<Spinner>(o).Count()));
+        gate.SetResult();
         Pump(() => !h.State.IsBusy && h.Vm.Updates.Items.Count == rows.Length);
+        Assert.Equal((Visibility.Collapsed, ""), (busy.Visibility, caption.Text));
 
         var tabs = (TabControl)w.FindName("TabMain");
         Assert.Equal(["Install", "Installed", "Updates"], tabs.Items.Cast<TabItem>().Select(t => (string)t.Header));
@@ -338,6 +356,16 @@ public class WindowSmokeTests
             var c = VisualTreeHelper.GetChild(parent, i);
             if (c is T t) yield return t;
             foreach (var d in FindAll<T>(c)) yield return d;
+        }
+    }
+
+    // Albero logico: arriva anche nelle schede non selezionate, che non hanno ancora un albero visuale.
+    private static IEnumerable<T> FindLogical<T>(DependencyObject parent) where T : DependencyObject
+    {
+        foreach (var c in LogicalTreeHelper.GetChildren(parent).OfType<DependencyObject>())
+        {
+            if (c is T t) yield return t;
+            foreach (var d in FindLogical<T>(c)) yield return d;
         }
     }
 
