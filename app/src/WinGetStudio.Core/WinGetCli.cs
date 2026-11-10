@@ -76,8 +76,10 @@ public sealed class WinGetCli(string wingetPath, IProcessRunner? runner = null, 
             new PackageRow(f[0], f[1], f[2].StartsWith('>') ? f[2][1..].TrimStart() : f[2], Source: f.Length >= 4 ? f[^1] : ""));
 
     // Colonne: Nome | Id | Versione | Disponibile | [Origine].
+    // --include-pinned: senza, i pin bloccanti spariscono dall'elenco (ADR 0007); con, winget li
+    // stampa in una tabella a parte dopo gli altri, che il parser legge come la seconda.
     public Task<ReadResult<PackageRow>> GetUpgradesAsync(bool includeUnknown) =>
-        ReadRowsAsync(includeUnknown ? ["upgrade", "--accept-source-agreements", "--include-unknown"] : ["upgrade", "--accept-source-agreements"],
+        ReadRowsAsync(includeUnknown ? ["upgrade", "--accept-source-agreements", "--include-pinned", "--include-unknown"] : ["upgrade", "--accept-source-agreements", "--include-pinned"],
             // Senza la colonna Disponibile non e' un aggiornamento.
             f => f.Length < 4 ? null : new PackageRow(f[0], f[1], f[2], f[3], f.Length >= 5 ? f[4] : ""));
 

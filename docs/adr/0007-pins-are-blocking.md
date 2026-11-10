@@ -28,6 +28,14 @@ pin could never be removed.
 **Only rows that actually change state are queued**: re-pinning a pinned package makes winget exit
 with an error, which would be marked red in the Result column.
 
+**Pinned packages stay in Updates (2.0).** `winget upgrade` leaves blocking pins out of its list,
+so the 2.0 reads it with `--include-pinned`: winget then prints the pinned packages in a separate
+table after the others, which the parser reads like any second table (ADR 0006). Checked on
+winget 1.29 with a *Blocking* pin, although the option's help mentions only non-blocking ones.
+The pinned row shows 📌 and can be unpinned from the same tab, but it is not an update the app can
+make: it is left out of the count, the tab badge, "Found N updates." in the log, and the tray dot
+and notification. The 1.x keeps its behaviour.
+
 **winget is the source of truth.** After a pin or unpin the pins are re-read rather than assumed
 from the queue's outcome, so a pin added from the command line shows up too. That re-read is the
 last step and releases the busy state (ADR 0003).

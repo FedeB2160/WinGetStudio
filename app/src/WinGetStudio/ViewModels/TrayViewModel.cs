@@ -29,6 +29,8 @@ public sealed partial class TrayViewModel : ObservableObject
         ToolTip = "WinGet Studio";
         state.PropertyChanged += OnStateChanged;
         updates.Items.CollectionChanged += (_, _) => Refresh();
+        // Un pin messo o tolto cambia il conteggio senza cambiare l'elenco.
+        updates.PropertyChanged += (_, e) => { if (e.PropertyName is nameof(UpdatesViewModel.Badge)) Refresh(); };
         updates.Scanned += OnScanned;
     }
 
@@ -86,13 +88,15 @@ public sealed partial class TrayViewModel : ObservableObject
 
     private void OnScanned()
     {
-        var items = _updates.Items;
+        // Le righe col pin non si annunciano: winget non le aggiorna finche' il pin resta (ADR 0007).
+        var items = _updates.Items.Where(i => !i.Pinned).ToList();
         var now = items.Select(i => $"{i.Id} {i.Row.Available}").ToHashSet(StringComparer.OrdinalIgnoreCase);
         var fresh = !now.IsSubsetOf(_seen);
         _seen = now;
         // Dal menu si risponde sempre: chi ha chiesto guarda l'icona, non la finestra.
         if (!_manual && (WindowActive || !fresh)) return;
-        if (items.Count == 0) Show(new TrayNotice(_updates.EmptyText, "", _updates.ScanFailed ? NoticeKind.Error : NoticeKind.Info, MainViewModel.UpdatesTab));
+        // Solo righe col pin: l'elenco non e' vuoto, quindi EmptyText e' vuoto.
+        if (items.Count == 0) Show(new TrayNotice(_updates.Items.Count > 0 ? "No updates available." : _updates.EmptyText, "", _updates.ScanFailed ? NoticeKind.Error : NoticeKind.Info, MainViewModel.UpdatesTab));
         else Show(new TrayNotice($"{items.Count} update{(items.Count == 1 ? "" : "s")} available",
             string.Join(", ", items.Take(5).Select(i => i.Name)) + (items.Count > 5 ? $" and {items.Count - 5} more" : ""), NoticeKind.Info, MainViewModel.UpdatesTab));
     }
@@ -100,12 +104,13 @@ public sealed partial class TrayViewModel : ObservableObject
     private void Refresh()
     {
         var failed = _state.Last?.Result.FailedIds.Count ?? 0;
-        Dot = _state.IsBusy ? TrayDot.Busy : failed > 0 ? TrayDot.Errors : _updates.Items.Count > 0 ? TrayDot.Updates : TrayDot.Idle;
+        var pending = _updates.Pending;
+        Dot = _state.IsBusy ? TrayDot.Busy : failed > 0 ? TrayDot.Errors : pending > 0 ? TrayDot.Updates : TrayDot.Idle;
         ToolTip = "WinGet Studio" + Dot switch
         {
             TrayDot.Busy => " - working",
             TrayDot.Errors => $" - {failed} failed in the last {_state.Last!.Result.Request.Verb.ToString().ToLowerInvariant()}",
-            TrayDot.Updates => $" - {_updates.Items.Count} update{(_updates.Items.Count == 1 ? "" : "s")} available",
+            TrayDot.Updates => $" - {pending} update{(pending == 1 ? "" : "s")} available",
             _ => "",
         };
     }

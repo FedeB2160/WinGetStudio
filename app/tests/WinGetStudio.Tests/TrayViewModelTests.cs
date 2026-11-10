@@ -11,10 +11,11 @@ public class TrayViewModelTests
     private static readonly PackageRow B = new("App B", "B.B", "1.0", "2.0");
 
     // upgrade: le righe in "available"; upgrade --id: exit da exitFor.
-    private static Harness Create(List<PackageRow> available, Func<string, int>? exitFor = null) =>
+    private static Harness Create(List<PackageRow> available, Func<string, int>? exitFor = null, string[]? pins = null) =>
         new(h => h.WinGet.Respond = a => a switch
         {
             ["upgrade", "--accept-source-agreements", ..] => FakeWinGet.Result(0, FakeWinGet.Upgrades([.. available])),
+            ["pin", "list", ..] => FakeWinGet.Result(0, FakeWinGet.Pins(pins ?? [])),
             ["upgrade", "--id", var id, ..] => FakeWinGet.Result(exitFor?.Invoke(id) ?? 0, ""),
             _ => FakeWinGet.Result(0, ""),
         });
@@ -67,6 +68,25 @@ public class TrayViewModelTests
 
         await tray.BackgroundCheckAsync();
         Assert.Single(shown);
+    }
+
+    // Un pacchetto col pin resta in Updates (ADR 0007) ma non e' un aggiornamento da annunciare:
+    // niente fumetto, pallino blu; dal menu, "nessun aggiornamento".
+    [Fact]
+    public async Task PinnedPackagesAreNotAnnounced()
+    {
+        using var h = Create([A], pins: ["A.A"]);
+        var tray = h.Vm.Tray;
+        var shown = new List<string>();
+        tray.Notify += n => shown.Add(n.Title);
+
+        await tray.BackgroundCheckAsync();
+        Assert.Single(h.Vm.Updates.Items);
+        Assert.Empty(shown);
+        Assert.Equal((TrayDot.Idle, "WinGet Studio"), (tray.Dot, tray.ToolTip));
+
+        await tray.CheckNowAsync();
+        Assert.Equal(["No updates available."], shown);
     }
 
     // Check for updates dal menu: l'esito si dice sempre, anche senza novita' e a finestra attiva.

@@ -25,7 +25,31 @@ public class WinGetCliTests
         Assert.True(r.Success);
         Assert.Equal(5, r.Rows.Count);
         Assert.Equal(new PackageRow("Discord", "Discord.Discord", "1.0.9249", "1.0.9250", "winget"), r.Rows[4]);
-        Assert.Equal(["upgrade", "--accept-source-agreements", "--include-unknown", "--no-progress"], runner.Calls.Single());
+        Assert.Equal(["upgrade", "--accept-source-agreements", "--include-pinned", "--include-unknown", "--no-progress"], runner.Calls.Single());
+    }
+
+    // Con --include-pinned winget 1.29 stampa i pin bloccanti in una tabella a parte, dopo una riga
+    // di prosa (output reale, 2026-11-10). Senza l'opzione la riga spariva da Updates (ADR 0007).
+    [Fact]
+    public async Task UpgradesIncludeBlockingPins()
+    {
+        var (cli, runner) = Create("""
+            Nome               Id                 Versione       Disponibile    Origine
+            ---------------------------------------------------------------------------
+            Antigravity 2.29.0 Google.Antigravity 2.29.0         2.30.0         winget
+            ChatGPT            OpenAI.ChatGPT     26.1103.4239.0 26.1103.7773.0 winget
+            3 aggiornamenti disponibili.
+
+            1 pacchetti hanno un PIN che deve essere rimosso prima dell'aggiornamento
+            Nome               Id                                Versione Disponibile Origine
+            ---------------------------------------------------------------------------------
+            PDF-XChange Editor TrackerSoftware.PDF-XChangeEditor 11.1.1.0 11.1.2.0    winget
+            """);
+        var r = await cli.GetUpgradesAsync(includeUnknown: false);
+
+        Assert.Equal(["Google.Antigravity", "OpenAI.ChatGPT", "TrackerSoftware.PDF-XChangeEditor"], r.Rows.Select(p => p.Id));
+        Assert.Equal(new PackageRow("PDF-XChange Editor", "TrackerSoftware.PDF-XChangeEditor", "11.1.1.0", "11.1.2.0", "winget"), r.Rows[2]);
+        Assert.Equal(["upgrade", "--accept-source-agreements", "--include-pinned", "--no-progress"], runner.Calls.Single());
     }
 
     // Prima della 1.29 --no-progress non c'e': i frame \r li toglie il parser.
@@ -35,7 +59,7 @@ public class WinGetCliTests
         var (cli, runner) = Create();
         runner.Version = "v1.28.240";
         await cli.GetUpgradesAsync(includeUnknown: false);
-        Assert.Equal(["upgrade", "--accept-source-agreements"], runner.Calls.Single());
+        Assert.Equal(["upgrade", "--accept-source-agreements", "--include-pinned"], runner.Calls.Single());
     }
 
     [Fact]
