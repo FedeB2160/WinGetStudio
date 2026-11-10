@@ -93,6 +93,17 @@ public class UpdatesViewModelTests
         Assert.Equal("winget upgrade failed (exit -1978335231): x Failed to open the source", failed.Vm.Updates.EmptyText);
     }
 
+    // Un codice con suggerimento lo mette prima della coda di winget (0x8A15000F, collaudo di parita').
+    [Fact]
+    public async Task FailedReadShowsTheHint()
+    {
+        using var failed = new Harness(h => h.WinGet.Respond = a => a[0] == "upgrade"
+            ? FakeWinGet.Result(unchecked((int)0x8A15000F), "Failed when searching source: winget\r\n") : FakeWinGet.Result(0, ""));
+        await failed.Vm.Updates.LoadAsync();
+        Assert.Equal("winget upgrade failed (exit -1978335217): winget's catalog is not ready for this account: sign in with it once, "
+            + "or run 'winget source reset --force'. Failed when searching source: winget", failed.Vm.Updates.EmptyText);
+    }
+
     [Fact]
     public async Task UnknownIsSavedAndReloads()
     {
