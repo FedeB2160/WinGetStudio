@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using WinGetStudio.Core;
 using WinGetStudio.ViewModels;
@@ -9,6 +10,8 @@ public sealed class UpdateHost(WinGetCli cli) : IUpdateHost
 {
     // Il file in esecuzione, solo se single-file (pubblicato): una build di sviluppo ha la dll
     // accanto e non si aggiorna da sola.
+    // IL3000 avverte che Location è vuota nel single-file: è proprio ciò che qui si vuole rilevare.
+    [UnconditionalSuppressMessage("SingleFile", "IL3000", Justification = "Location vuota = exe single-file, voluto (ADR 0026).")]
     public static string? ExePath => string.IsNullOrEmpty(typeof(App).Assembly.Location) ? Environment.ProcessPath : null;
 
     public InstallChannel Channel { get; } = SelfUpdate.Channel(ExePath, SelfUpdate.InstalledLocation());

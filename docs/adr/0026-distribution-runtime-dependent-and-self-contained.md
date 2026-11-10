@@ -62,3 +62,15 @@ Measured on 2026-10-29 with the .NET 10 prototype (win-x64, signed with the proj
    only by our releases.
 2. **Framework-dependent everywhere** — a 200 KB portable that does not start on machines without the
    runtime, which is where a portable is most often used.
+
+## Note 2026-11-10 — single-file publish and IL3000
+
+The parity check found that `dotnet publish -p:PublishSingleFile=true` stopped on `IL3000` in
+`UpdateHost.ExePath`, because `TreatWarningsAsErrors` (`app\Directory.Build.props`) turns the
+single-file analyzer warnings into errors and a plain build never runs that analyzer. An empty
+`Assembly.Location` is exactly how `ExePath` tells the published exe from a development build, so the
+warning is suppressed on that property only (`UnconditionalSuppressMessage`), with the reason. Both
+publishes above (`--no-self-contained`, and `--self-contained -p:EnableCompressionInSingleFile=true`,
+also with `-p:IncludeNativeLibrariesForSelfExtract=true`) then succeed with no other IL3000/IL3002, and
+the published exe reports the Portable channel. The `dotnet` CI job now runs the framework-dependent
+single-file publish, so the regression cannot come back unnoticed.

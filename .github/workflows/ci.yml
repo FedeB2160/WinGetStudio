@@ -49,6 +49,9 @@ jobs:
         run: dotnet build app\WinGetStudio.sln -c Release
       - name: Core tests
         run: dotnet test --solution app\WinGetStudio.sln -c Release --no-build
+      # Il single-file attiva analizzatori (IL3000/IL3002) che la build normale non esegue (ADR 0026).
+      - name: Single-file publish (framework-dependent)
+        run: dotnet publish app\src\WinGetStudio\WinGetStudio.csproj -c Release -r win-x64 -p:PublishSingleFile=true --no-self-contained -o publish
 
   build:
     name: Build and verify executable
