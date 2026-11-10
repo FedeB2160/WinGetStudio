@@ -32,6 +32,11 @@ unelevated .NET 10 process with `Microsoft.WindowsPackageManager.ComInterop` 1.2
    `%` expansion to guard against. Arguments are an argument list, never a string for a shell. Ids are
    validated. `--no-progress` is passed when winget is 1.29 or later (it is accepted though `--help` does
    not list it); the `\r` filtering stays for older versions.
+   Install, upgrade, uninstall, pin add and pin remove pass `--source <row's source>` after `-e` when
+   the row has one (ARP rows and rows read without a source column do not): without it winget looks
+   the Id up in every source, and a broken `msstore` (`0x8A15003B`, seen in Windows Sandbox on
+   2026-11-10) fails the whole command. The source travels with the row, so Retry failed, Retry as
+   administrator and the unelevated retry of ADR 0018 repeat the same command line.
 3. **The COM backend comes after parity** (plan phase 4), only when unelevated: reads with structured
    fields, details, icons, and installs, updates and uninstalls with per-row progress. If activation fails
    the CLI takes over. Lists are read by index.

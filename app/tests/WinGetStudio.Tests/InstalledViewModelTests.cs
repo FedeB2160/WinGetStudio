@@ -127,7 +127,8 @@ public class InstalledViewModelTests
 
         await vm.UninstallAsync();
 
-        Assert.Equal(WinGetCommands.Uninstall(A), Assert.Single(h.WinGet.Calls, c => c[0] == "uninstall"));
+        // La sorgente letta dalla lista arriva alla riga di comando.
+        Assert.Equal(WinGetCommands.Uninstall(A with { Source = "winget" }), Assert.Single(h.WinGet.Calls, c => c[0] == "uninstall"));
         Assert.Equal(["B.B"], vm.Items.Select(i => i.Id));
         Assert.True(h.Vm.Updates.Stale);
         Assert.Contains("Uninstall complete: 1 ok.", h.Log);
