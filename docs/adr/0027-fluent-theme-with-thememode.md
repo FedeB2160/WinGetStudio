@@ -37,6 +37,11 @@ A prototype of the 1.x layout on .NET 10 (2026-10-29), with no template or color
    `DWMWA_TEXT_COLOR` and redone when the theme changes, so the title bar is no longer the accent
    when Windows shows the accent on title bars. The window border stays Windows'; Windows 10 ignores
    the attribute (`TitleBar.cs`).*
+   *2026-11-10: Windows 10 has no caption color, and `ThemeMode` does not darken its title bar: with
+   Windows light and the app Dark it stayed white, a regression from 1.x. `TitleBar.cs` now also sets
+   `DWMWA_USE_IMMERSIVE_DARK_MODE` (20, Windows 10 2004 and later), on when the window background is
+   dark, before the colors, which win on Windows 11. Builds before 2004 used attribute 19 and are not
+   handled.*
 2. **Own resources only for meaning**, and always as references to Fluent keys: result glyphs use
    `SystemFillColorSuccess/Caution/CriticalBrush`, hints `TextFillColorSecondaryBrush`.
 3. **Primary actions use `AccentButtonStyle`** (Update, Install, the default button of a dialog).
