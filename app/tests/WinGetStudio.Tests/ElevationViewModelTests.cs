@@ -72,7 +72,8 @@ public class ElevationViewModelTests
         var lists = h.WinGet.Count("list");
         await vm.RetryAdminAsync();
 
-        Assert.Equal([[WinGetCommands.Uninstall(A)]], h.Elevation.Batches);
+        // La sorgente della riga arriva anche al lotto elevato.
+        Assert.Equal([[WinGetCommands.Uninstall(A with { Source = "winget" })]], h.Elevation.Batches);
         Assert.Equal(lists + 1, h.WinGet.Count("list"));
         Assert.Equal(["B.B"], vm.Items.Select(i => i.Id));
         Assert.False(vm.RetryAdminVisible);

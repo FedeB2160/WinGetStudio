@@ -12,30 +12,27 @@ public enum InstallScope { Auto, User, Machine }
 public static partial class WinGetCommands
 {
     public static string[] Upgrade(PackageRow row) =>
-        ["upgrade", "--id", Id(row), "--include-unknown", "-e", "--silent", "--disable-interactivity",
+        ["upgrade", "--id", Id(row), "--include-unknown", "-e", .. Source(row), "--silent", "--disable-interactivity",
          "--accept-source-agreements", "--accept-package-agreements"];
 
-    // --source della riga: senza, winget cerca l'Id in TUTTE le sorgenti, Store compreso, che
-    // passa dalla rete. Vuota quando la ricerca non l'ha stampata.
     public static string[] Install(PackageRow row, InstallScope scope) =>
     [
-        "install", "--id", Id(row), "-e",
-        .. string.IsNullOrEmpty(row.Source) ? Array.Empty<string>() : ["--source", row.Source],
+        "install", "--id", Id(row), "-e", .. Source(row),
         "--silent", "--disable-interactivity", "--accept-source-agreements", "--accept-package-agreements",
         .. scope switch { InstallScope.User => ["--scope", "user"], InstallScope.Machine => ["--scope", "machine"], _ => Array.Empty<string>() },
     ];
 
     // Vale anche per i programmi non installati con winget: Id "ARP\Machine\X64\Nome" con spazi.
     public static string[] Uninstall(PackageRow row) =>
-        ["uninstall", "--id", Id(row), "-e", "--silent", "--disable-interactivity", "--accept-source-agreements"];
+        ["uninstall", "--id", Id(row), "-e", .. Source(row), "--silent", "--disable-interactivity", "--accept-source-agreements"];
 
     // --blocking (ADR 0007): un pin Pinning winget lo rispetta solo con upgrade --all, e su
     // upgrade --id, cioe' come aggiorna questa app, lo ignora.
     public static string[] PinAdd(PackageRow row) =>
-        ["pin", "add", "--blocking", "--id", Id(row), "-e", "--accept-source-agreements"];
+        ["pin", "add", "--blocking", "--id", Id(row), "-e", .. Source(row), "--accept-source-agreements"];
 
     public static string[] PinRemove(PackageRow row) =>
-        ["pin", "remove", "--id", Id(row), "-e", "--accept-source-agreements"];
+        ["pin", "remove", "--id", Id(row), "-e", .. Source(row), "--accept-source-agreements"];
 
     // Niente --include-versions: fissare le versioni rende l'import fragile (una versione non
     // piu' pubblicata lo fa fallire). L'import prende l'ultima disponibile.
@@ -55,6 +52,12 @@ public static partial class WinGetCommands
         WinGetCli.ValidateId(row.Id);
         return row.Id;
     }
+
+    // --source della riga: senza, winget cerca l'Id in TUTTE le sorgenti, Store compreso, che
+    // passa dalla rete, e un msstore guasto (0x8a15003b) fa fallire il comando intero. Vuota
+    // per le righe ARP e quando la lettura non l'ha stampata: allora come prima.
+    private static string[] Source(PackageRow row) =>
+        string.IsNullOrEmpty(row.Source) ? [] : ["--source", row.Source];
 
     [GeneratedRegex("available from any source|disponibile in alcuna origine")]
     private static partial Regex NotInAnySource();

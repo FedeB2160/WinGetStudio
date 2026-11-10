@@ -299,6 +299,8 @@ public class UpdatesViewModelTests
         h.Dialogs.Answer = _ => MessageBoxResult.Yes;
         await vm.RetryAsync();
         Assert.Equal(["A.A", "C.C", "C.C"], h.WinGet.Calls.Where(c => c[1] == "--id").Select(c => c[2]));
+        // La sorgente letta da winget upgrade arriva all'update e al suo Retry failed.
+        Assert.All(h.WinGet.Calls.Where(c => c[1] == "--id"), c => Assert.Contains("-e --source winget", string.Join(' ', c)));
         Assert.Empty(vm.Items);
         Assert.Equal(0, vm.RetryCount);
     }
@@ -327,6 +329,7 @@ public class UpdatesViewModelTests
         await vm.UnpinAsync([vm.Items[1]]);
         Assert.Equal(["A.A"], pins);
         Assert.False(vm.Items[1].Pinned);
+        Assert.All(h.WinGet.Calls.Where(c => c is ["pin", "add" or "remove", ..]), c => Assert.Contains("-e --source winget", string.Join(' ', c)));
     }
 
     [Fact]
