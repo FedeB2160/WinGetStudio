@@ -23,7 +23,11 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     protected override bool DetailsInstalled => true;
 
     // Quanti aggiornamenti, sulla linguetta: si vede da ogni scheda.
-    public override string Badge => Items.Count > 0 ? Items.Count.ToString() : "";
+    public override string Badge => Pending > 0 ? Pending.ToString() : "";
+
+    // Gli aggiornamenti che si possono fare: le righe col pin restano a schermo (ADR 0007) ma non
+    // si contano, ne' qui ne' nel tray.
+    public int Pending => Items.Count(i => !i.Pinned);
 
     // L'elenco e' una fotografia della macchina: dopo un'azione da un'altra scheda le versioni a
     // schermo non valgono piu', e ripremere Update rilancerebbe winget su pacchetti gia'
@@ -102,8 +106,9 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
             EmptyText = read.Success ? "No updates available." : AppState.ReadError("upgrade", read);
             State.Log.Write(EmptyText);
         }
-        else State.Log.Write($"Found {Items.Count} updates.");
         State.ApplyPins(pins);
+        // Dopo i pin: le righe col pin non sono aggiornamenti da fare.
+        if (Items.Count > 0) State.Log.Write(Pending > 0 ? $"Found {Pending} updates." : "No updates available.");
         Refresh();
         Scanned?.Invoke();
     }
@@ -157,7 +162,7 @@ public sealed partial class UpdatesViewModel : PackageListViewModel
     protected override void Refresh()
     {
         base.Refresh();
-        var total = Items.Count;
+        var total = Pending;
         var selected = Items.Count(i => i.Selected);
         AvailableText = total switch { 0 => "", 1 => "1 update available", _ => $"{total} updates available" };
         // A lista vecchia il contatore cede il posto al motivo per cui Update e' spento; senza

@@ -46,12 +46,13 @@ public class UpdatesViewModelTests
 
         Assert.Equal(["A.A", "B.B", "C.C"], vm.Items.Select(i => i.Id));
         Assert.Equal([false, true, false], vm.Items.Select(i => i.Pinned));
-        Assert.Equal("3 updates available", vm.AvailableText);
+        // La riga col pin si vede ma non si conta (ADR 0007).
+        Assert.Equal("2 updates available", vm.AvailableText);
         // Il numero va nel badge della linguetta; le altre schede non ne hanno.
-        Assert.Equal("3", vm.Badge);
+        Assert.Equal("2", vm.Badge);
         Assert.Equal("", h.Vm.Installed.Badge);
         Assert.Contains("Searching for updates...", h.Log);
-        Assert.Contains("Found 3 updates.", h.Log);
+        Assert.Contains("Found 2 updates.", h.Log);
         Assert.False(h.State.IsBusy);
         // Upgrade e pin nella stessa operazione, uno dopo l'altro (ADR 0003).
         Assert.Equal(1, h.WinGet.MaxRunning);
@@ -101,7 +102,7 @@ public class UpdatesViewModelTests
         await h.State.LastFired;
 
         Assert.True(h.Prefs.GetBool(Preferences.IncludeUnknown, false));
-        Assert.Contains(h.WinGet.Calls, c => c is ["upgrade", "--accept-source-agreements", "--include-unknown"]);
+        Assert.Contains(h.WinGet.Calls, c => c is ["upgrade", "--accept-source-agreements", "--include-pinned", "--include-unknown"]);
     }
 
     // Update spento senza spunte: il perche' accanto al pulsante (2.0 UI/UX review R19).
@@ -140,6 +141,26 @@ public class UpdatesViewModelTests
         var vm = h.Vm.Updates;
         await vm.LoadAsync();
         Assert.Equal("", vm.SelectedText);
+    }
+
+    // Solo righe col pin: l'elenco resta, ma niente conteggio ne' badge; tolto il pin, la riga
+    // torna un aggiornamento da spuntare.
+    [Fact]
+    public async Task PinnedOnlyRowsAreListedButNotCounted()
+    {
+        List<string> pins = ["A.A"];
+        using var h = Create([A], pins);
+        var vm = h.Vm.Updates;
+        await vm.LoadAsync();
+
+        Assert.Equal(["A.A"], vm.Items.Select(i => i.Id));
+        Assert.Equal(("", "", ""), (vm.AvailableText, vm.Badge, vm.EmptyText));
+        Assert.Contains("No updates available.", h.Log);
+        Assert.False(vm.CanCheckAll);
+
+        await vm.UnpinAsync([vm.Items[0]]);
+        Assert.Equal(("1 update available", "1"), (vm.AvailableText, vm.Badge));
+        Assert.True(vm.CanCheckAll);
     }
 
     [Fact]
