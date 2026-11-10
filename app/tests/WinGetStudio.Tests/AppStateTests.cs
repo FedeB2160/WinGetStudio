@@ -123,12 +123,15 @@ public class AppStateTests
     }
 
     // Righe dal thread del processo (il tick ogni 30 s): passano dal contesto della UI.
+    // Un Thread dedicato, non Task.Run: il pool puo' riusare il thread che ha costruito il log.
     [Fact]
-    public async Task LinesFromAnotherThreadArePostedToTheUi()
+    public void LinesFromAnotherThreadArePostedToTheUi()
     {
         var ui = new RecordingContext();
         var log = new LogViewModel(ui);
-        await Task.Run(() => log.Write("tick"));
+        var writer = new Thread(() => log.Write("tick"));
+        writer.Start();
+        writer.Join();
         Assert.Equal(1, ui.Posts);
         Assert.Contains("tick", log.Text);
     }
