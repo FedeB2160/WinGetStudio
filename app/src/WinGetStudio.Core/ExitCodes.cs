@@ -57,6 +57,8 @@ public static class ExitCodes
         [0x8A150035] = "Some packages were not found in any source",                        // pacchetti richiesti non trovati
         [0x8A150045] = "A source could not be opened: check the internet connection",       // origine non apribile
         [0x8A15004B] = "Some sources could not be opened: check the internet connection",   // una o piu' origini non apribili
+        // SOURCE_DATA_MISSING: tipico elevando come un account mai entrato interattivamente.
+        [0x8A15000F] = "winget's catalog is not ready for this account: sign in with it once, or run 'winget source reset --force'",
     };
 
     public static string? Hint(int code) => Hints.GetValueOrDefault(unchecked((uint)code));

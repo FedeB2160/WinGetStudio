@@ -110,10 +110,12 @@ public sealed partial class AppState : ObservableObject
         IsBusy = false;
     }
 
-    // Messaggio per una lettura fallita, su UNA riga: exit e le ultime due righe di winget.
+    // Messaggio per una lettura fallita, su UNA riga: exit, il suggerimento se il codice ne ha
+    // uno, e le ultime due righe di winget.
     public static string ReadError<T>(string command, ReadResult<T> read)
     {
-        var detail = string.Join(' ', WinGetTable.OutputTail(read.Output));
+        var detail = string.Join(". ", new[] { ExitCodes.Hint(read.ExitCode), string.Join(' ', WinGetTable.OutputTail(read.Output)) }
+            .Where(s => !string.IsNullOrEmpty(s)));
         return $"winget {command} failed (exit {read.ExitCode})" + (detail.Length > 0 ? $": {detail}" : "");
     }
 

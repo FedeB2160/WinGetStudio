@@ -27,6 +27,7 @@ public class ExitCodesTests
     [InlineData(unchecked((int)0x8A150019), "Needs administrator rights")]
     [InlineData(unchecked((int)0x8A150101), "The application is running: close it and try again")]
     [InlineData(3010, "Restart Windows to finish")]
+    [InlineData(unchecked((int)0x8A15000F), "winget's catalog is not ready for this account: sign in with it once, or run 'winget source reset --force'")]
     [InlineData(1, null)]
     [InlineData(-1, null)]
     public void Hint(int code, string? expected) =>
