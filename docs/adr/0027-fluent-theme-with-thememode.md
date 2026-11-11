@@ -42,6 +42,15 @@ A prototype of the 1.x layout on .NET 10 (2026-10-29), with no template or color
    `DWMWA_USE_IMMERSIVE_DARK_MODE` (20, Windows 10 2004 and later), on when the window background is
    dark, before the colors, which win on Windows 11. Builds before 2004 used attribute 19 and are not
    handled.*
+   *2026-11-11: the System theme follows Windows on the accent too. With System, and *Show accent
+   color on title bars and window borders* on in Windows (`HKCU\Software\Microsoft\Windows\DWM`,
+   `ColorPrevalence` = 1), `TitleBar.cs` sets `DWMWA_BORDER_COLOR`, `DWMWA_CAPTION_COLOR` and
+   `DWMWA_TEXT_COLOR` to `DWMWA_COLOR_DEFAULT` and Windows draws the accent, inactive windows
+   included; with the setting off, System is light or dark as before. Light and Dark keep the app's
+   color. Every open window is redone when the theme changes in Settings and on
+   `SystemEvents.UserPreferenceChanged`, which Windows raises when the setting or the accent color
+   changes. Windows 10 has no attributes 34-36: with the setting on, its title bars show the accent
+   in all three themes, and Light and Dark cannot remove it.*
 2. **Own resources only for meaning**, and always as references to Fluent keys: result glyphs use
    `SystemFillColorSuccess/Caution/CriticalBrush`, hints `TextFillColorSecondaryBrush`.
 3. **Primary actions use `AccentButtonStyle`** (Update, Install, the default button of a dialog).

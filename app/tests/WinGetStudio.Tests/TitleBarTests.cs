@@ -22,4 +22,15 @@ public class TitleBarTests
         Assert.Equal(Colors.Black, text);
         Assert.False(dark);
     }
+
+    // L'accento di Windows solo col tema System e l'interruttore di Windows acceso.
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void SystemAccentOnlyWithSystemThemeAndColorPrevalence(bool themeIsSystem, bool colorPrevalence, bool expected)
+    {
+        Assert.Equal(expected, TitleBar.UseSystemAccent(themeIsSystem, colorPrevalence));
+    }
 }

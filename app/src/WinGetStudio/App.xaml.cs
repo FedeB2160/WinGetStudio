@@ -1,4 +1,5 @@
 using System.Windows;
+using Microsoft.Win32;
 using WinGetStudio.Core;
 using WinGetStudio.ViewModels;
 
@@ -27,7 +28,14 @@ public partial class App : Application
             return;
         }
         // A caldo: ThemeMode ridipinge la finestra senza ricrearla (ADR 0027).
-        vm.Settings.ApplyTheme = name => ThemeMode = Theme(name);
+        vm.Settings.ApplyTheme = name =>
+        {
+            ThemeMode = Theme(name);
+            TitleBar.ApplyAll();
+        };
+        // L'interruttore dell'accento sulle barre e il colore d'accento, cambiati ad app aperta.
+        _preferenceChanged = (_, _) => Dispatcher.BeginInvoke(TitleBar.ApplyAll);
+        SystemEvents.UserPreferenceChanged += _preferenceChanged;
         var window = new MainWindow(vm);
         // Prima Settings, se e' aperta: la richiesta puo' venire da li'.
         vm.Settings.CloseRequested += () =>
@@ -71,11 +79,14 @@ public partial class App : Application
     }
 
     private TrayIcon? _tray;
+    private UserPreferenceChangedEventHandler? _preferenceChanged;
 
     // Senza, l'icona resta nell'area di notifica finche' il mouse non ci passa sopra.
     protected override void OnExit(ExitEventArgs e)
     {
         _tray?.Dispose();
+        // Evento statico: agganciato terrebbe in vita l'app.
+        if (_preferenceChanged is not null) SystemEvents.UserPreferenceChanged -= _preferenceChanged;
         base.OnExit(e);
     }
 
