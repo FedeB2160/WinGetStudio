@@ -65,3 +65,18 @@ packages registered for *this* account are the signed-in user's.
 3. **The App Installer version from the package folder name** — no process, but `%ProgramFiles%\WindowsApps`
    cannot be listed by a standard user.
 4. **`pwsh`** — not part of Windows.
+
+## Note 2026-11-11 — what changes with the COM backend
+
+Decided with the user: both choices above stay until phase 4, and phase 4 does the switch.
+
+- **Version:** when the COM backend lands (ADR 0025), the winget version comes from
+  `PackageManager.Version` of the COM API (`1.29.380` in the phase 0 spike, the same number as
+  `winget --version`), with no process. `winget --version` stays as the fallback wherever COM is not
+  available: in "Restart as administrator" mode (activation fails elevated, `0x80040154`), when
+  activation fails, and on a winget too old for the property.
+- **Install and Store check:** `Windows.Management.Deployment.PackageManager` replaces points 2 and 3,
+  once the projection is in the exe for COM anyway.
+- **To watch until then:** on machines where AppLocker or Constrained Language Mode blocks
+  `powershell.exe`, installing App Installer from the app fails; the log shows the PowerShell error
+  and the GitHub/Store links still work.
