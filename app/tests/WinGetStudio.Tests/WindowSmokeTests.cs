@@ -260,7 +260,11 @@ public class WindowSmokeTests
         var shown = FindAll<TextBlock>(settings).Where(t => t.IsVisible).ToList();
         foreach (var (label, value) in new[] { ("WinGet Studio", h.Vm.Settings.VersionText), ("winget", h.Vm.Settings.WinGetVersionText) })
             Assert.Equal(Center(shown.First(t => t.Text == label)), Center(shown.First(t => t.Text == value)), 1.0);
-        h.Vm.Settings.ApplyTheme = name => app.ThemeMode = App.Theme(name);
+        h.Vm.Settings.ApplyTheme = name =>
+        {
+            app.ThemeMode = App.Theme(name);
+            TitleBar.ApplyAll();
+        };
         Assert.Contains("Found 30 updates.", ((TextBox)w.FindName("TxtLog")).Text);
         foreach (var key in FluentKeys) Assert.True(w.TryFindResource(key) is not null, key);
 
