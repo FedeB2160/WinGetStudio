@@ -455,6 +455,18 @@ $missing = @(16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256 | Where-Obj
 if ($missing) { throw "assets\icon.ico senza le dimensioni $($missing -join ', '): rilanciare src\icon.ps1" }
 "OK icon   $($icoFrames.Count) dimensioni in assets\icon.ico"
 
+# 11c) A 16 px l'icona e' sfumata (luce dall'alto) e la freccia sta al centro del badge
+# (ADR 0017): coperchio chiaro in cima, fianco scuro in fondo, asta bianca alla riga 13,
+# niente freccia alla riga 8.
+Add-Type -AssemblyName System.Drawing
+$png16 = [System.Drawing.Bitmap]::new((Join-Path $root 'assets\icon\icon-16.png'))
+try {
+    $shaded = $png16.GetPixel(8, 2).B -gt 148 -and $png16.GetPixel(4, 12).B -lt 82 -and
+              $png16.GetPixel(11, 13).R -ge 240 -and $png16.GetPixel(11, 8).R -lt 120
+} finally { $png16.Dispose() }
+if (-not $shaded) { throw "assets\icon\icon-16.png non sfumata o freccia non abbassata: rilanciare src\icon.ps1" }
+"OK icon   sfumatura e freccia a 16 px"
+
 # 12) L'app si monta davvero? Carica i moduli come fa main.ps1 e chiama Start-App
 # -NoShow: nessuna finestra a schermo, ma finestra costruita, controlli risolti e
 # schede agganciate. E' l'unico controllo che vede gli errori di SCOPE: se un controllo

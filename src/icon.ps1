@@ -31,7 +31,7 @@ $pngSizes = 16, 24, 32, 48, 64, 128, 256, 512, 1024
 $tiers = @(
     @{ Max = 20; Grid = 16; C = 8; W = 7; T = 1; V = 7; TapeF = 0.12; TapeDrop = 0
        Stamp = $null; StampW = 0; Bar = $null
-       X = 11.5; Y = 11.5; R = 4.5; Cut = 5.5; A1 = 3; A2 = 1.5; HW = 2; SW = 1 }
+       X = 11.5; Y = 11.5; R = 4.5; Cut = 5.5; A1 = 2; A2 = 2.5; HW = 2; SW = 1 }   # freccia centrata: con 3 e 1,5 stava 0,75 px sopra
     @{ Max = 40; Grid = 32; C = 15; W = 12; T = 3; V = 13; TapeF = 0.12; TapeDrop = 3.5
        Stamp = @(3, 6.5, 6, 9, 3, 11.5); StampW = 1.8; Bar = $null
        X = 24; Y = 24; R = 7; Cut = 8.5; A1 = 3.5; A2 = 2.7; HW = 2.7; SW = 2.1 }
@@ -45,14 +45,31 @@ function New-Brush([string]$hex) {
     $b.Freeze()
     $b
 }
-$lid      = New-Brush '#EDBE80'   # coperchio
-$leftSide = New-Brush '#D9A15C'
-$rightSide = New-Brush '#BF853F'
-$tape     = New-Brush '#F7E2BC'
-$tapeSide = New-Brush '#DDB57A'   # il nastro che scende sul fianco destro, in ombra
-$ink      = New-Brush '#5A3A1A'   # il timbro >_
-$blue     = New-Brush '#0078D4'   # il blu dell'icona precedente
+# Colori di base: ogni dimensione li sfuma con New-Ramp, sulla sua geometria.
+$lid      = '#EDBE80'   # coperchio
+$leftSide = '#D9A15C'
+$rightSide = '#BF853F'
+$tape     = '#F7E2BC'
+$tapeSide = '#DDB57A'   # il nastro che scende sul fianco destro, in ombra
+$ink      = '#5A3A1A'   # il timbro >_
+$blue     = '#0078D4'   # il blu dell'icona precedente
 $white    = New-Brush '#FFFFFF'
+
+# Luce dall'alto (ADR 0017): da $y0 a $y1 il colore va da +$up (mescolato al bianco) a -$down
+# (mescolato al nero), passando dal colore pieno. Coordinate assolute, in pixel dell'icona.
+function New-Ramp([string]$hex, [double]$y0, [double]$y1, [double]$up, [double]$down) {
+    $c = [Windows.Media.ColorConverter]::ConvertFromString($hex)
+    $mix = { param($t, $f) [Windows.Media.Color]::FromRgb(
+        [byte][Math]::Round($c.R + ($t - $c.R) * $f), [byte][Math]::Round($c.G + ($t - $c.G) * $f), [byte][Math]::Round($c.B + ($t - $c.B) * $f)) }
+    $stops = New-Object Windows.Media.GradientStopCollection
+    $stops.Add((New-Object Windows.Media.GradientStop (& $mix 255 $up), 0))
+    $stops.Add((New-Object Windows.Media.GradientStop $c, ($up / ($up + $down))))
+    $stops.Add((New-Object Windows.Media.GradientStop (& $mix 0 $down), 1))
+    $b = New-Object Windows.Media.LinearGradientBrush $stops, (New-Object Windows.Point 0, $y0), (New-Object Windows.Point 0, $y1)
+    $b.MappingMode = 'Absolute'
+    $b.Freeze()
+    $b
+}
 
 function New-Pen($brush, [double]$width) {
     $p = New-Object Windows.Media.Pen $brush, $width
@@ -96,6 +113,15 @@ function New-IconPng([int]$size) {
     if ($sw % 2) { $bx = [Math]::Floor($t.X * $k) + 0.5; $by = [Math]::Floor($t.Y * $k) + 0.5 }
     else         { $bx = Snap ($t.X * $k);               $by = Snap ($t.Y * $k) }
 
+    # Sfumature sulla geometria di questa dimensione: la scatola dal vertice alto allo spigolo
+    # in basso, il badge dal suo bordo alto a quello basso.
+    $bottom = $y2 + $v
+    $box = @{}
+    foreach ($n in 'lid', 'leftSide', 'rightSide', 'tape', 'tapeSide') {
+        $box[$n] = New-Ramp (Get-Variable $n -ValueOnly) $top $bottom 0.42 0.35
+    }
+    $badge = New-Ramp $blue ($by - $t.R * $k) ($by + $t.R * $k) 0.42 0.28
+
     $dv = New-Object Windows.Media.DrawingVisual
     $dc = $dv.RenderOpen()
 
@@ -107,35 +133,35 @@ function New-IconPng([int]$size) {
     # Prima la sagoma intera nel colore del fianco destro, poi coperchio e fianco sinistro:
     # disegnando le tre facce affiancate l'antialiasing lascerebbe una riga semitrasparente
     # lungo gli spigoli in comune.
-    $dc.DrawGeometry($rightSide, $null, (New-Shape @($c, $top, $r, $y1, $r, ($y1 + $v), $c, ($y2 + $v), $l, ($y1 + $v), $l, $y1)))
-    $dc.DrawGeometry($lid, $null, (New-Shape @($c, $top, $r, $y1, $c, $y2, $l, $y1)))
-    $dc.DrawGeometry($leftSide, $null, (New-Shape @($l, $y1, $c, $y2, $c, ($y2 + $v), $l, ($y1 + $v))))
+    $dc.DrawGeometry($box.rightSide, $null, (New-Shape @($c, $top, $r, $y1, $r, ($y1 + $v), $c, ($y2 + $v), $l, ($y1 + $v), $l, $y1)))
+    $dc.DrawGeometry($box.lid, $null, (New-Shape @($c, $top, $r, $y1, $c, $y2, $l, $y1)))
+    $dc.DrawGeometry($box.leftSide, $null, (New-Shape @($l, $y1, $c, $y2, $c, ($y2 + $v), $l, ($y1 + $v))))
 
     # Nastro: dal centro dello spigolo posteriore sinistro al centro di quello anteriore
     # destro, poi giu' per un tratto sul fianco destro.
     $ox = $t.TapeF * $w; $oy = $t.TapeF * $h
     $ax = ($l + $c) / 2; $ay = $top + $h / 2
     $fx = ($r + $c) / 2; $fy = $top + 1.5 * $h
-    $dc.DrawGeometry($tape, $null, (New-Shape @(($ax - $ox), ($ay + $oy), ($ax + $ox), ($ay - $oy), ($fx + $ox), ($fy - $oy), ($fx - $ox), ($fy + $oy))))
+    $dc.DrawGeometry($box.tape, $null, (New-Shape @(($ax - $ox), ($ay + $oy), ($ax + $ox), ($ay - $oy), ($fx + $ox), ($fy - $oy), ($fx - $ox), ($fy + $oy))))
     if ($t.TapeDrop) {
         $d = $t.TapeDrop * $k
-        $dc.DrawGeometry($tapeSide, $null, (New-Shape @(($fx - $ox), ($fy + $oy), ($fx + $ox), ($fy - $oy), ($fx + $ox), ($fy - $oy + $d), ($fx - $ox), ($fy + $oy + $d))))
+        $dc.DrawGeometry($box.tapeSide, $null, (New-Shape @(($fx - $ox), ($fy + $oy), ($fx + $ox), ($fy - $oy), ($fx + $ox), ($fy - $oy + $d), ($fx - $ox), ($fy + $oy + $d))))
     }
 
     # Timbro sul fianco sinistro: coordinate del fianco, inclinate di 0,5 come i suoi spigoli.
     if ($t.Stamp) {
         $dc.PushTransform((New-Object Windows.Media.MatrixTransform 1, 0.5, 0, 1, $l, $y1))
         $dc.PushTransform((New-Object Windows.Media.ScaleTransform $k, $k))
-        $dc.DrawGeometry($null, (New-Pen $ink $t.StampW), (New-Shape $t.Stamp $false))
+        $dc.DrawGeometry($null, (New-Pen (New-Brush $ink) $t.StampW), (New-Shape $t.Stamp $false))
         if ($t.Bar) {
             $b = $t.Bar
-            $dc.DrawRoundedRectangle($ink, $null, (New-Object Windows.Rect $b[0], $b[1], $b[2], $b[3]), $b[4], $b[4])
+            $dc.DrawRoundedRectangle((New-Brush $ink), $null, (New-Object Windows.Rect $b[0], $b[1], $b[2], $b[3]), $b[4], $b[4])
         }
         $dc.Pop(); $dc.Pop()
     }
     $dc.Pop()
 
-    $dc.DrawEllipse($blue, $null, (New-Object Windows.Point $bx, $by), ($t.R * $k), ($t.R * $k))
+    $dc.DrawEllipse($badge, $null, (New-Object Windows.Point $bx, $by), ($t.R * $k), ($t.R * $k))
     $pen = New-Pen $white $sw
     $a1 = $t.A1 * $k; $a2 = $t.A2 * $k; $hw = $t.HW * $k
     $dc.DrawGeometry($null, $pen, (New-Shape @($bx, ($by - $a1), $bx, ($by + $a2)) $false))
