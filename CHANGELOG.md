@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## v1.13.0
+
+Import shows what it is about to install, every list refreshes itself after an operation and can retry what failed, packages have a Details view, and the self-update checks who signed the download.
+
+> **Coming from v1.12.0:** let the app update itself from **Settings**, or run the new setup. Installed with winget, use `winget upgrade FedeB2160.WinGetStudio`.
 
 - **New icon**: the same box and badge, with light from the top, as Windows' own icons have; at 16 px the arrow sits in the middle of the badge.
 - **Import** shows the packages in the file before installing them, all ticked, so you can leave some out. Installer arguments saved by winget 1.29 (`--custom`, `--override`) are left out unless you tick the box under the list: an import file can come from anyone, and they would reach the installer as administrator.
