@@ -31,6 +31,14 @@ Windows desktop runtime the app already uses, a library (H.NotifyIcon, Hardcodet
    mixed with the white of the arrow, and the mix is kept with the new colors. On yellow the arrow is
    dark, as in Windows' caution signs; elsewhere it stays white. A dot drawn over the icon (the first
    version) covered the badge and blurred at 16 px.
+   *Amended 2026-11-12:* the icon is shaded (ADR 0017), and a shaded badge cannot be recolored from its
+   red channel (on yellow the light top would turn toward the dark arrow). The state icons are now
+   drawn by `src\icon.ps1` in their own colors, into `assets\tray\` (`idle`, `updates`, `errors`,
+   `busy-01` to `busy-13`), each with frames of 16, 20, 24 and 32 px, embedded as resources; the app
+   loads the one at the system small-icon size, read at startup. **While busy, the arrow moves**: it
+   goes down inside the yellow badge, leaves at the bottom and comes back from the top, 13 frames per
+   second (`busy-01` is the still icon). It runs only while Windows' animation effects are on
+   (`SystemParameters.ClientAreaAnimation`); otherwise the icon stays still.
 3. **The menu is a WPF `ContextMenu`**, not the WinForms one, so it follows the Fluent theme (ADR 0027)
    like the rest of the app: Install, Installed, Updates (open the window on that tab), Check for
    updates, Settings, About, Exit. A double click opens the window. (The last item was "Close"
@@ -79,7 +87,8 @@ Windows desktop runtime the app already uses, a library (H.NotifyIcon, Hardcodet
   and Focus assist can hide it. A real toast with buttons needs the Windows App SDK or an AUMID.
 - A WPF `ContextMenu` opened from a hidden window relies on `SetForegroundWindow` to close when the
   user clicks elsewhere: to check by hand on each Windows release.
-- The tests cover the rules (`TrayViewModelTests`); the shell side (icon, menu on a real right click,
+- The tests cover the rules (`TrayViewModelTests`) and that every tray icon loads at every size and
+  only busy animates (`TrayIconTests`); the shell side (icon, animation, menu on a real right click,
   toast) is checked by hand.
 - Red stays until the next queue: a check does not clear the failures of the last queue.
 

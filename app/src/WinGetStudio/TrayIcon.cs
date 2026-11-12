@@ -18,13 +18,31 @@ internal sealed class TrayIcon : IDisposable
     private readonly MainWindow _window;
     private readonly Forms.NotifyIcon _icon = new();
     private readonly Dictionary<TrayDot, Drawing.Icon> _icons;
+    private readonly Drawing.Icon[] _busy;
     private readonly DispatcherTimer _timer = new();
+    // La freccia che scende al lavoro: 13 fotogrammi, un giro al secondo.
+    private readonly DispatcherTimer _spin = new() { Interval = TimeSpan.FromSeconds(1.0 / BusyFrames) };
+    private int _frame;
 
     public TrayIcon(MainViewModel vm, MainWindow window, Action exit)
     {
         _vm = vm;
         _window = window;
-        _icons = DrawIcons();
+        // La misura si legge all'avvio (16 px al 100%): un cambio di scala con l'app aperta non si segue.
+        var size = Forms.SystemInformation.SmallIconSize.Width;
+        _busy = Enumerable.Range(1, BusyFrames).Select(n => LoadIcon($"busy-{n:D2}", size)).ToArray();
+        _icons = new Dictionary<TrayDot, Drawing.Icon>
+        {
+            [TrayDot.Idle] = LoadIcon("idle", size),
+            [TrayDot.Updates] = LoadIcon("updates", size),
+            [TrayDot.Errors] = LoadIcon("errors", size),
+            [TrayDot.Busy] = _busy[0],
+        };
+        _spin.Tick += (_, _) =>
+        {
+            _frame = (_frame + 1) % BusyFrames;
+            _icon.Icon = _busy[_frame];
+        };
         Menu = BuildMenu(exit);
         Update();
         vm.Tray.PropertyChanged += (_, _) => Update();
@@ -62,7 +80,23 @@ internal sealed class TrayIcon : IDisposable
 
     private void Update()
     {
-        _icon.Icon = _icons[_vm.Tray.Dot];
+        var dot = _vm.Tray.Dot;
+        if (Animates(dot, SystemParameters.ClientAreaAnimation))
+        {
+            // Anche il tooltip passa di qui: l'animazione gia' in corso non riparte da capo.
+            if (!_spin.IsEnabled)
+            {
+                _frame = 0;
+                _icon.Icon = _busy[0];
+                _spin.Start();
+            }
+        }
+        else
+        {
+            // Prima si ferma: nessun fotogramma arriva dopo l'icona del nuovo stato.
+            _spin.Stop();
+            _icon.Icon = _icons[dot];
+        }
         // NotifyIcon.Text accetta al massimo 127 caratteri.
         var tip = _vm.Tray.ToolTip;
         _icon.Text = tip.Length > 127 ? tip[..127] : tip;
@@ -118,62 +152,30 @@ internal sealed class TrayIcon : IDisposable
         return modal is null;
     }
 
-    // Il frame dell'icona alla misura dell'area di notifica (16 px al 100%), senza scalarlo: e' gia'
-    // disegnato sulla griglia dei pixel (ADR 0017). Lo stato colora il badge, freccia compresa.
-    internal static Dictionary<TrayDot, Drawing.Icon> DrawIcons()
+    internal const int BusyFrames = 13;
+
+    // Le icone sono disegnate da src\icon.ps1, sfumate e gia' nei colori dello stato (ADR 0030),
+    // a ogni misura dal 100% al 200%: si prende quella dell'area di notifica, senza scalarla.
+    // Col nome dell'assembly: vale anche quando l'Application e' quella dei test.
+    internal static Drawing.Icon LoadIcon(string name, int size)
     {
-        var size = Forms.SystemInformation.SmallIconSize;
-        // Col nome dell'assembly: vale anche quando l'Application e' quella dei test.
-        using var stream = Application.GetResourceStream(new Uri("pack://application:,,,/WinGetStudio;component/Assets/icon.ico")).Stream;
-        using var app = new Drawing.Icon(stream, size);
-        using var frame = app.ToBitmap();
-        Drawing.Color white = Drawing.Color.White, dark = Drawing.Color.FromArgb(0x1A, 0x1A, 0x1A);
-        return new Dictionary<TrayDot, Drawing.Icon>
-        {
-            // Il blu del badge e' gia' quello dell'icona.
-            [TrayDot.Idle] = Recolor(frame, Drawing.Color.FromArgb(0x00, 0x78, 0xD4), white),
-            [TrayDot.Updates] = Recolor(frame, Drawing.Color.FromArgb(0x13, 0xA1, 0x0E), white),
-            [TrayDot.Errors] = Recolor(frame, Drawing.Color.FromArgb(0xE8, 0x11, 0x23), white),
-            // Sul giallo la freccia bianca non si legge: scura, come nei segnali di attenzione di Windows.
-            [TrayDot.Busy] = Recolor(frame, Drawing.Color.FromArgb(0xFF, 0xB9, 0x00), dark),
-        };
+        using var stream = Application.GetResourceStream(new Uri($"pack://application:,,,/WinGetStudio;component/Assets/tray/{name}.ico")).Stream;
+        return new Drawing.Icon(stream, size, size);
     }
 
-    // I pixel del badge sono il blu 0078D4 mescolato al bianco della freccia: quanto blu c'e' si legge
-    // dal rosso (0 nel blu, 255 nel bianco) e si rimescola coi colori nuovi. Il cartone (rosso alto,
-    // blu basso) e la trasparenza non cambiano.
-    private static Drawing.Icon Recolor(Drawing.Bitmap frame, Drawing.Color badge, Drawing.Color arrow)
-    {
-        using var bitmap = new Drawing.Bitmap(frame);
-        for (var y = 0; y < bitmap.Height; y++)
-            for (var x = 0; x < bitmap.Width; x++)
-            {
-                var p = bitmap.GetPixel(x, y);
-                // Blu del badge, o bianco della freccia (nell'icona c'e' solo li').
-                if (p.A == 0 || (p.B - p.R < 20 && Math.Min(p.R, Math.Min(p.G, p.B)) <= 200)) continue;
-                var k = (255 - p.R) / 255f;
-                int Mix(int a, int b) => (int)Math.Round(a * (1 - k) + b * k);
-                bitmap.SetPixel(x, y, Drawing.Color.FromArgb(p.A, Mix(arrow.R, badge.R), Mix(arrow.G, badge.G), Mix(arrow.B, badge.B)));
-            }
-        return Drawing.Icon.FromHandle(bitmap.GetHicon());
-    }
+    // La freccia scende solo al lavoro, e mai con gli effetti di animazione di Windows spenti.
+    internal static bool Animates(TrayDot dot, bool animationsOn) => dot == TrayDot.Busy && animationsOn;
 
     public void Dispose()
     {
         _timer.Stop();
+        _spin.Stop();
         _icon.Visible = false;
         _icon.Dispose();
         _sink?.Dispose();
-        foreach (var i in _icons.Values)
-        {
-            DestroyIcon(i.Handle);
-            i.Dispose();
-        }
+        foreach (var i in _icons.Values.Concat(_busy).Distinct()) i.Dispose();
     }
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(nint hwnd);
-
-    [DllImport("user32.dll")]
-    private static extern bool DestroyIcon(nint icon);
 }

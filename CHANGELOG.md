@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **New icon**: the same box and badge, with light from the top, as Windows' own icons have; at 16 px the arrow sits in the middle of the badge.
 - **Import** shows the packages in the file before installing them, all ticked, so you can leave some out. Installer arguments saved by winget 1.29 (`--custom`, `--override`) are left out unless you tick the box under the list: an import file can come from anyone, and they would reach the installer as administrator.
 - **Self-update checks who signed the download.** Besides the checksum GitHub publishes, the new exe or installer must be signed with the WinGet Studio key, verified by Windows itself, or it is discarded; a release with no checksum is no longer run unverified. If the signature does not match, a message says the update was not installed and links to the latest release, to update by hand. The download waits in a folder only administrators can write, instead of the user's temp folder.
 - **Results of an install or update are right again.** The list of exit codes that count as warnings was off by one: a failed installation (*restart and try again*) or one you cancelled showed as a warning and was skipped by **Retry failed**, while *already installed* and *the PC will restart* showed as failures.

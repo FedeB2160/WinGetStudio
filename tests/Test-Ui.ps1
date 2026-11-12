@@ -455,6 +455,34 @@ $missing = @(16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 256 | Where-Obj
 if ($missing) { throw "assets\icon.ico senza le dimensioni $($missing -join ', '): rilanciare src\icon.ps1" }
 "OK icon   $($icoFrames.Count) dimensioni in assets\icon.ico"
 
+# 11c) A 16 px l'icona e' sfumata (luce dall'alto) e la freccia sta al centro del badge
+# (ADR 0017): coperchio chiaro in cima, fianco scuro in fondo, asta bianca alla riga 13,
+# niente freccia alla riga 8.
+Add-Type -AssemblyName System.Drawing
+$png16 = [System.Drawing.Bitmap]::new((Join-Path $root 'assets\icon\icon-16.png'))
+try {
+    $shaded = $png16.GetPixel(8, 2).B -gt 148 -and $png16.GetPixel(4, 12).B -lt 82 -and
+              $png16.GetPixel(11, 13).R -ge 240 -and $png16.GetPixel(11, 8).R -lt 120
+} finally { $png16.Dispose() }
+if (-not $shaded) { throw "assets\icon\icon-16.png non sfumata o freccia non abbassata: rilanciare src\icon.ps1" }
+"OK icon   sfumatura e freccia a 16 px"
+
+# 11d) Le icone dell'area di notifica della 2.0 (ADR 0030): tre stati fermi e 13 fotogrammi
+# della freccia che scende, ognuna a 16, 20, 24 e 32 px (scala dal 100% al 200%).
+$trayNames = @('idle', 'updates', 'errors') + @(1..13 | ForEach-Object { 'busy-{0:D2}' -f $_ })
+foreach ($n in $trayNames) {
+    $f = Join-Path $root "assets\tray\$n.ico"
+    $sizes = if (Test-Path $f) {
+        $b = [IO.File]::ReadAllBytes($f)
+        @(for ($i = 0; $i -lt [BitConverter]::ToUInt16($b, 4); $i++) { [int]$b[6 + 16 * $i] }) -join ','
+    }
+    if ($sizes -ne '16,20,24,32') { throw "assets\tray\$n.ico mancante o senza 16/20/24/32: rilanciare src\icon.ps1" }
+}
+$busy1 = [IO.File]::ReadAllBytes((Join-Path $root 'assets\tray\busy-01.ico'))
+$busy2 = [IO.File]::ReadAllBytes((Join-Path $root 'assets\tray\busy-02.ico'))
+if ([Convert]::ToBase64String($busy1) -eq [Convert]::ToBase64String($busy2)) { throw "assets\tray\busy-01 e busy-02 uguali: la freccia non si muove" }
+"OK tray   $($trayNames.Count) icone, 4 dimensioni"
+
 # 12) L'app si monta davvero? Carica i moduli come fa main.ps1 e chiama Start-App
 # -NoShow: nessuna finestra a schermo, ma finestra costruita, controlli risolti e
 # schede agganciate. E' l'unico controllo che vede gli errori di SCOPE: se un controllo

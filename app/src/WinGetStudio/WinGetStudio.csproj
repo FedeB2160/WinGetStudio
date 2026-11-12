@@ -18,8 +18,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Resource Include="..\..\..\assets\icon\icon-128.png" Link="Assets\icon-128.png" />
-    <!-- La base dell'icona nell'area di notifica, col pallino disegnato sopra (ADR 0030). -->
-    <Resource Include="..\..\..\assets\icon.ico" Link="Assets\icon.ico" />
+    <!-- Le icone dell'area di notifica, una per stato e 13 fotogrammi al lavoro, disegnate da src\icon.ps1 (ADR 0030). -->
+    <Resource Include="..\..\..\assets\tray\*.ico" Link="Assets\tray\%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- WinForms non entra negli using impliciti: Application, MessageBox e altri nomi

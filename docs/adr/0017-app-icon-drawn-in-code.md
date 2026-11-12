@@ -60,6 +60,17 @@ accepted. Windows reads PNG frames at any size since Vista.
 
 `Test-Ui.ps1` fails if any of the 14 sizes is missing from `assets\icon.ico`.
 
+*Amended 2026-11-12:* **light from the top.** At 16 px, in the notification area, the flat faces read
+as grainy next to Teams and Outlook, whose icons are shaded. Redraws for 16 px (flat pixel art, a
+front view, a line glyph) were drawn and turned down by the user, who kept this drawing and asked for
+light on it. Every part of the box is a vertical gradient from +42% (mixed with white) at its top to
+−35% (mixed with black) at its bottom, through the flat color at 42/77 of its height; the badge goes
+from +42% to −28%. The `>_` stamp stays flat (it is drawn skewed, and near-black), and so does the
+arrow. In the 16–20 px grid the arrow moved down one unit: it sat 0.75 px above the badge's center.
+The script also draws the notification-area icons of 2.0 into `assets\tray\` (ADR 0030).
+`Test-Ui.ps1` checks four pixels of the 16 px PNG for the shading and the arrow, and that every tray
+icon has its four sizes.
+
 ## Consequences
 
 **Positive**
@@ -68,7 +79,7 @@ accepted. Windows reads PNG frames at any size since Vista.
 - No new dependency: WPF ships with Windows, like everything else the app uses.
 
 **To watch**
-- **`assets\icon.ico` and `assets\icon\` are generated.** Edit `src\icon.ps1`, never the files.
+- **`assets\icon.ico`, `assets\icon\` and `assets\tray\` are generated.** Edit `src\icon.ps1`, never the files.
 - **The script needs an STA thread.** `powershell.exe` 5.1 runs on one; `pwsh` needs `-STA`. The script
   says so and stops otherwise.
 - **Explorer caches icons.** After a rebuild the exe may still show the old icon until the cache is
