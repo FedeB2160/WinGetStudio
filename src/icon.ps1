@@ -1,6 +1,7 @@
 <#
     icon.ps1 — disegna l'icona dell'app (scatola di cartone, prompt >_ timbrato sul fianco,
-    badge blu di download) e scrive assets\icon.ico e assets\icon\icon-<n>.png.
+    badge blu di download) e scrive assets\icon.ico, assets\icon\icon-<n>.png e le icone
+    dell'area di notifica della 2.0 in assets\tray\ (uno stato per file, 13 fotogrammi al lavoro).
     NON fa parte della build: l'output e' committato, e build.ps1 e il setup usano
     assets\icon.ico cosi' com'e'. Si rilancia solo per cambiare l'icona:
         powershell -NoProfile -ExecutionPolicy Bypass -File .\src\icon.ps1
@@ -94,8 +95,9 @@ function New-Shape([double[]]$xy, [bool]$closed = $true) {
 
 function Snap([double]$v) { [Math]::Round($v, [MidpointRounding]::AwayFromZero) }
 
-# Ritorna il PNG (byte[]) dell'icona a $size pixel.
-function New-IconPng([int]$size) {
+# Ritorna il PNG (byte[]) dell'icona a $size pixel. Badge e freccia cambiano colore con lo stato
+# dell'area di notifica; $frame (0-12) e' il fotogramma della freccia che scende (0: ferma).
+function New-IconPng([int]$size, [string]$badgeColor = $blue, [string]$arrowColor = '#FFFFFF', [int]$frame = 0) {
     $t = $tiers | Where-Object { $size -le $_.Max } | Select-Object -First 1
     $k = $size / $t.Grid
 
@@ -120,7 +122,7 @@ function New-IconPng([int]$size) {
     foreach ($n in 'lid', 'leftSide', 'rightSide', 'tape', 'tapeSide') {
         $box[$n] = New-Ramp (Get-Variable $n -ValueOnly) $top $bottom 0.42 0.35
     }
-    $badge = New-Ramp $blue ($by - $t.R * $k) ($by + $t.R * $k) 0.42 0.28
+    $badge = New-Ramp $badgeColor ($by - $t.R * $k) ($by + $t.R * $k) 0.42 0.28
 
     $dv = New-Object Windows.Media.DrawingVisual
     $dc = $dv.RenderOpen()
@@ -162,10 +164,22 @@ function New-IconPng([int]$size) {
     $dc.Pop()
 
     $dc.DrawEllipse($badge, $null, (New-Object Windows.Point $bx, $by), ($t.R * $k), ($t.R * $k))
-    $pen = New-Pen $white $sw
+    $pen = New-Pen (New-Brush $arrowColor) $sw
     $a1 = $t.A1 * $k; $a2 = $t.A2 * $k; $hw = $t.HW * $k
-    $dc.DrawGeometry($null, $pen, (New-Shape @($bx, ($by - $a1), $bx, ($by + $a2)) $false))
-    $dc.DrawGeometry($null, $pen, (New-Shape @(($bx - $hw), ($by + $a2 - $hw), $bx, ($by + $a2), ($bx + $hw), ($by + $a2 - $hw)) $false))
+    # Fotogramma n: la freccia scende di n/13 di un giro (13 px a 16 px: badge piu' freccia) e si
+    # disegna anche un giro piu' su, cosi' rientra dall'alto mentre esce in basso. Fuori dal badge
+    # non si vede. Spostamenti a pixel interi: la freccia resta nitida.
+    $p = Snap (26 / 9 * $t.R * $k)
+    $d = Snap ($frame * $p / 13)
+    # Ferma (0): una freccia sola e senza ritaglio, che ne sfumerebbe di un niente i bordi.
+    $clip = if ($frame) { New-Object Windows.Media.EllipseGeometry (New-Object Windows.Point $bx, $by), ($t.R * $k), ($t.R * $k) }
+    $dc.PushClip($clip)
+    foreach ($dy in @(if ($frame) { $d, ($d - $p) } else { 0 })) {
+        $ay = $by + $dy
+        $dc.DrawGeometry($null, $pen, (New-Shape @($bx, ($ay - $a1), $bx, ($ay + $a2)) $false))
+        $dc.DrawGeometry($null, $pen, (New-Shape @(($bx - $hw), ($ay + $a2 - $hw), $bx, ($ay + $a2), ($bx + $hw), ($ay + $a2 - $hw)) $false))
+    }
+    $dc.Pop()
     $dc.Close()
 
     $bmp = New-Object Windows.Media.Imaging.RenderTargetBitmap $size, $size, 96, 96, ([Windows.Media.PixelFormats]::Pbgra32)
@@ -188,20 +202,44 @@ foreach ($s in $pngSizes) { [IO.File]::WriteAllBytes((Join-Path $dir "icon-$s.pn
 # ponytail: frame tutti PNG. Windows li legge a ogni dimensione da Vista, e il 256 PNG di
 # prima andava gia' bene a ps2exe e a Inno. Se un programma rifiuta i PNG piccoli, i frame
 # fino a 48 px vanno scritti come BMP a 32 bit.
-$ms = New-Object IO.MemoryStream
-$bw = New-Object IO.BinaryWriter $ms
-$bw.Write([uint16]0); $bw.Write([uint16]1); $bw.Write([uint16]$icoSizes.Count)
-$offset = 6 + 16 * $icoSizes.Count
-foreach ($s in $icoSizes) {
-    $d = if ($s -ge 256) { 0 } else { $s }      # nel formato .ico 0 vuol dire 256
-    $bw.Write([byte]$d); $bw.Write([byte]$d)
-    $bw.Write([uint16]0)                         # colori in palette e byte riservato
-    $bw.Write([uint16]1); $bw.Write([uint16]32)  # piani, bit per pixel
-    $bw.Write([uint32]$png[$s].Length); $bw.Write([uint32]$offset)
-    $offset += $png[$s].Length
+function Write-Ico([string]$path, [int[]]$sizes, [hashtable]$pngBySize) {
+    $ms = New-Object IO.MemoryStream
+    $bw = New-Object IO.BinaryWriter $ms
+    $bw.Write([uint16]0); $bw.Write([uint16]1); $bw.Write([uint16]$sizes.Count)
+    $offset = 6 + 16 * $sizes.Count
+    foreach ($s in $sizes) {
+        $d = if ($s -ge 256) { 0 } else { $s }      # nel formato .ico 0 vuol dire 256
+        $bw.Write([byte]$d); $bw.Write([byte]$d)
+        $bw.Write([uint16]0)                         # colori in palette e byte riservato
+        $bw.Write([uint16]1); $bw.Write([uint16]32)  # piani, bit per pixel
+        $bw.Write([uint32]$pngBySize[$s].Length); $bw.Write([uint32]$offset)
+        $offset += $pngBySize[$s].Length
+    }
+    foreach ($s in $sizes) { $bw.Write($pngBySize[$s]) }
+    $bw.Flush()
+    [IO.File]::WriteAllBytes($path, $ms.ToArray())
 }
-foreach ($s in $icoSizes) { $bw.Write($png[$s]) }
-$bw.Flush()
+
 $ico = Join-Path $root 'assets\icon.ico'
-[IO.File]::WriteAllBytes($ico, $ms.ToArray())
+Write-Ico $ico $icoSizes $png
 Write-Host "Scritti $ico ($($icoSizes.Count) dimensioni) e $($pngSizes.Count) PNG in $dir" -ForegroundColor Green
+
+# Area di notifica della 2.0 (ADR 0030): un .ico per stato, e per "al lavoro" uno per
+# fotogramma della freccia che scende (busy-01 e' quello fermo). Le misure dal 100% al 200%.
+$traySizes = 16, 20, 24, 32
+$trayDir = Join-Path $root 'assets\tray'
+New-Item -ItemType Directory -Force -Path $trayDir | Out-Null
+$tray = [ordered]@{
+    idle    = @('#0078D4', '#FFFFFF', 0)
+    updates = @('#13A10E', '#FFFFFF', 0)
+    errors  = @('#E81123', '#FFFFFF', 0)
+}
+# Sul giallo la freccia bianca non si legge: scura, come nei segnali di attenzione di Windows.
+for ($n = 0; $n -lt 13; $n++) { $tray['busy-{0:D2}' -f ($n + 1)] = @('#FFB900', '#1A1A1A', $n) }
+foreach ($name in $tray.Keys) {
+    $b, $a, $f = $tray[$name]
+    $frames = @{}
+    foreach ($s in $traySizes) { $frames[$s] = New-IconPng $s $b $a $f }
+    Write-Ico (Join-Path $trayDir "$name.ico") $traySizes $frames
+}
+Write-Host "Scritti $($tray.Count) .ico in $trayDir" -ForegroundColor Green

@@ -467,6 +467,22 @@ try {
 if (-not $shaded) { throw "assets\icon\icon-16.png non sfumata o freccia non abbassata: rilanciare src\icon.ps1" }
 "OK icon   sfumatura e freccia a 16 px"
 
+# 11d) Le icone dell'area di notifica della 2.0 (ADR 0030): tre stati fermi e 13 fotogrammi
+# della freccia che scende, ognuna a 16, 20, 24 e 32 px (scala dal 100% al 200%).
+$trayNames = @('idle', 'updates', 'errors') + @(1..13 | ForEach-Object { 'busy-{0:D2}' -f $_ })
+foreach ($n in $trayNames) {
+    $f = Join-Path $root "assets\tray\$n.ico"
+    $sizes = if (Test-Path $f) {
+        $b = [IO.File]::ReadAllBytes($f)
+        @(for ($i = 0; $i -lt [BitConverter]::ToUInt16($b, 4); $i++) { [int]$b[6 + 16 * $i] }) -join ','
+    }
+    if ($sizes -ne '16,20,24,32') { throw "assets\tray\$n.ico mancante o senza 16/20/24/32: rilanciare src\icon.ps1" }
+}
+$busy1 = [IO.File]::ReadAllBytes((Join-Path $root 'assets\tray\busy-01.ico'))
+$busy2 = [IO.File]::ReadAllBytes((Join-Path $root 'assets\tray\busy-02.ico'))
+if ([Convert]::ToBase64String($busy1) -eq [Convert]::ToBase64String($busy2)) { throw "assets\tray\busy-01 e busy-02 uguali: la freccia non si muove" }
+"OK tray   $($trayNames.Count) icone, 4 dimensioni"
+
 # 12) L'app si monta davvero? Carica i moduli come fa main.ps1 e chiama Start-App
 # -NoShow: nessuna finestra a schermo, ma finestra costruita, controlli risolti e
 # schede agganciate. E' l'unico controllo che vede gli errori di SCOPE: se un controllo
