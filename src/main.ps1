@@ -19,7 +19,7 @@
 # UNICA fonte di verita': finisce nel titolo della finestra come "[x.y.z]" e, letta
 # da build.ps1 con questa stessa regex, nelle proprieta' dell'exe (scheda Dettagli).
 # Aggiornarla qui e basta; Test-Ui.ps1 verifica che la regex la trovi ancora.
-$AppVersion = '1.12.0'
+$AppVersion = '1.13.0'
 
 # Quando parte il codice dell'app: nell'exe, tutto cio' che succede prima (host di ps2exe, analisi
 # e scansione antivirus dello script) e' fuori dal nostro controllo. Format-StartupTime li separa.
